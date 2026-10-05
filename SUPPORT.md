@@ -19,11 +19,11 @@ Most questions are already answered here:
 
 ## 2. Search existing issues
 
-Someone may have had the same problem: [search open and closed issues](https://github.com/ilramdhan/fintrack/issues?q=is%3Aissue).
+Someone may have had the same problem: [search open and closed issues](https://github.com/ilramdhan/dompetku/issues?q=is%3Aissue).
 
 ## 3. Ask a question
 
-[Open a new issue](https://github.com/ilramdhan/fintrack/issues/new/choose) and choose **Question**. Tell us what you tried, what you expected and what happened instead.
+[Open a new issue](https://github.com/ilramdhan/dompetku/issues/new/choose) and choose **Question**. Tell us what you tried, what you expected and what happened instead.
 
 > [!WARNING]
 > Issues are public. **Remove secrets before posting**: API keys, passwords, `SESSION_SECRET`, Supabase keys, Telegram bot tokens, chat IDs, your domain and your financial data.
@@ -32,8 +32,8 @@ Someone may have had the same problem: [search open and closed issues](https://g
 
 | You want to…                    | Go to                                                                                                 |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Report a bug                    | [Bug report form](https://github.com/ilramdhan/fintrack/issues/new?template=bug_report.yml)           |
-| Suggest a feature               | [Feature request form](https://github.com/ilramdhan/fintrack/issues/new?template=feature_request.yml) |
+| Report a bug                    | [Bug report form](https://github.com/ilramdhan/dompetku/issues/new?template=bug_report.yml)           |
+| Suggest a feature               | [Feature request form](https://github.com/ilramdhan/dompetku/issues/new?template=feature_request.yml) |
 | Report a security vulnerability | **Privately**, see [SECURITY.md](SECURITY.md) — never in a public issue                               |
 | Contribute code or docs         | [CONTRIBUTING.md](CONTRIBUTING.md)                                                                    |
 

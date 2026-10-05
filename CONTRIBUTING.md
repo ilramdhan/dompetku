@@ -2,7 +2,7 @@
 
 First of all: thank you! 🎉 Dompetku is a personal finance tracker (web app + Telegram bot via n8n + receipt OCR) and every contribution helps — whether it is a typo fix, a translation, a bug report or a whole new feature.
 
-This guide is written for **first-time contributors** as well as experienced developers. If anything here is unclear, that is a bug in this document — please [open a question](https://github.com/ilramdhan/fintrack/issues/new/choose) and we will improve it.
+This guide is written for **first-time contributors** as well as experienced developers. If anything here is unclear, that is a bug in this document — please [open a question](https://github.com/ilramdhan/dompetku/issues/new/choose) and we will improve it.
 
 > [!NOTE]
 > By participating in this project you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
@@ -23,8 +23,8 @@ This guide is written for **first-time contributors** as well as experienced dev
 
 | What                         | How                                                                                                                                                                                                                                                                                                   |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🐛 **Report a bug**          | Use the [bug report form](https://github.com/ilramdhan/fintrack/issues/new?template=bug_report.yml). Please search existing issues first.                                                                                                                                                             |
-| 💡 **Suggest a feature**     | Use the [feature request form](https://github.com/ilramdhan/fintrack/issues/new?template=feature_request.yml). Explain the problem you want solved, not only the solution.                                                                                                                            |
+| 🐛 **Report a bug**          | Use the [bug report form](https://github.com/ilramdhan/dompetku/issues/new?template=bug_report.yml). Please search existing issues first.                                                                                                                                                             |
+| 💡 **Suggest a feature**     | Use the [feature request form](https://github.com/ilramdhan/dompetku/issues/new?template=feature_request.yml). Explain the problem you want solved, not only the solution.                                                                                                                            |
 | 📖 **Improve the docs**      | Everything in `docs/`, `README.md` and `n8n/README.md` is fair game. Small doc fixes can go straight to a pull request.                                                                                                                                                                               |
 | 🌐 **Translations (ID/EN)**  | The app supports Indonesian and English. All UI text lives in the `DICT` dictionary in [`src/lib/i18n.tsx`](src/lib/i18n.tsx). The **key** is the original Indonesian text, the **value** is the English translation. Fixing awkward English or adding missing entries is a great first contribution. |
 | ✨ **Build a feature / fix** | Pick an issue (look for `good first issue` or `help wanted`), comment that you are working on it, then follow the walkthrough below. For bigger changes please open an issue first so we can agree on the approach.                                                                                   |
@@ -38,13 +38,13 @@ Never made a pull request before? No problem. A _pull request_ (PR) is a way of 
 
 ### 1. Fork and clone
 
-1. Click **Fork** (top-right of the [repository page](https://github.com/ilramdhan/fintrack)). This makes your own copy of the project on GitHub.
+1. Click **Fork** (top-right of the [repository page](https://github.com/ilramdhan/dompetku)). This makes your own copy of the project on GitHub.
 2. Clone your fork to your computer (replace `<your-username>`):
 
    ```sh
-   git clone https://github.com/<your-username>/fintrack.git
-   cd fintrack
-   git remote add upstream https://github.com/ilramdhan/fintrack.git
+   git clone https://github.com/<your-username>/dompetku.git
+   cd dompetku
+   git remote add upstream https://github.com/ilramdhan/dompetku.git
    ```
 
    `upstream` points at the original repository so you can pull in new changes later.

@@ -45,14 +45,14 @@ describe("version", () => {
   });
 
   it("parses owner/repo from GitHub URLs", () => {
-    expect(repoFromUrl(null)).toBe("ilramdhan/fintrack");
+    expect(repoFromUrl(null)).toBe("ilramdhan/dompetku");
     expect(repoFromUrl("https://github.com/alice/my-fork")).toBe("alice/my-fork");
     expect(repoFromUrl("https://github.com/alice/my-fork.git")).toBe("alice/my-fork");
     expect(repoFromUrl("https://github.com/alice/my-fork/tree/main")).toBe("alice/my-fork");
-    expect(repoFromUrl("https://gitlab.com/alice/x")).toBe("ilramdhan/fintrack");
-    expect(repoFromUrl("http://github.com/alice/x")).toBe("ilramdhan/fintrack");
-    expect(repoFromUrl("https://github.com/alice")).toBe("ilramdhan/fintrack");
-    expect(repoFromUrl("not a url")).toBe("ilramdhan/fintrack");
+    expect(repoFromUrl("https://gitlab.com/alice/x")).toBe("ilramdhan/dompetku");
+    expect(repoFromUrl("http://github.com/alice/x")).toBe("ilramdhan/dompetku");
+    expect(repoFromUrl("https://github.com/alice")).toBe("ilramdhan/dompetku");
+    expect(repoFromUrl("not a url")).toBe("ilramdhan/dompetku");
   });
 
   it("builds release URLs", () => {

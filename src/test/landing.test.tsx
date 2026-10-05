@@ -68,8 +68,8 @@ describe("landingRedirect", () => {
 
 describe("landing link helpers", () => {
   it("falls back to the upstream repo for missing or non-https URLs", () => {
-    expect(repoUrl(null)).toBe("https://github.com/ilramdhan/fintrack");
-    expect(repoUrl("http://github.com/a/b")).toBe("https://github.com/ilramdhan/fintrack");
+    expect(repoUrl(null)).toBe("https://github.com/ilramdhan/dompetku");
+    expect(repoUrl("http://github.com/a/b")).toBe("https://github.com/ilramdhan/dompetku");
     expect(repoUrl("https://github.com/a/b/")).toBe("https://github.com/a/b");
   });
   it("builds docs links on GitHub repos only", () => {
@@ -77,7 +77,7 @@ describe("landing link helpers", () => {
       "https://github.com/a/b/blob/main/docs/FAQ.md",
     );
     expect(docsUrl("https://gitlab.com/a/b", "LICENSE")).toBe(
-      "https://github.com/ilramdhan/fintrack/blob/main/LICENSE",
+      "https://github.com/ilramdhan/dompetku/blob/main/LICENSE",
     );
   });
   it("maps screenshot names to light and dark files", () => {

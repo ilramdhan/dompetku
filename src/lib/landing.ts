@@ -1,6 +1,6 @@
 /** Pure, client-safe helpers for the public landing page at `/`. */
 
-export const DEFAULT_REPO_URL = "https://github.com/ilramdhan/fintrack";
+export const DEFAULT_REPO_URL = "https://github.com/ilramdhan/dompetku";
 
 export type LandingRedirect = "/login" | "/dashboard" | null;
 

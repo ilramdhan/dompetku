@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Please read the [FAQ](https://github.com/ilramdhan/fintrack/blob/main/docs/FAQ.md) and the [self-hosting guide](https://github.com/ilramdhan/fintrack/blob/main/docs/SELF-HOSTING.md) (it has a troubleshooting section) first — your answer may already be there.
+        Please read the [FAQ](https://github.com/ilramdhan/dompetku/blob/main/docs/FAQ.md) and the [self-hosting guide](https://github.com/ilramdhan/dompetku/blob/main/docs/SELF-HOSTING.md) (it has a troubleshooting section) first — your answer may already be there.
 
         **Never paste secrets** (API keys, passwords, Supabase keys, bot tokens, chat IDs) or real financial data.
   - type: textarea

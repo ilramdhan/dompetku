@@ -8,7 +8,7 @@ keep rules there, not here, so there is a single source of truth.
 
 ## Project at a glance
 
-Dompetku (repo `fintrack`) is a single-user personal finance tracker: web app +
+Dompetku (repo `dompetku`, formerly `fintrack`) is a single-user personal finance tracker: web app +
 Telegram bot (forwarded by n8n) + receipt OCR. Stack: TanStack Start (React 19,
 TanStack Router/Query), Tailwind CSS 4 + shadcn/ui, Supabase (Postgres + Storage,
 server-side only), Vitest. Deployed on Lovable and Vercel from the same code.

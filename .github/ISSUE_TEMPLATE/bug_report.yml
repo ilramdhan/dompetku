@@ -6,9 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report a bug! Please check the [FAQ](https://github.com/ilramdhan/fintrack/blob/main/docs/FAQ.md) and [existing issues](https://github.com/ilramdhan/fintrack/issues?q=is%3Aissue) first.
+        Thanks for taking the time to report a bug! Please check the [FAQ](https://github.com/ilramdhan/dompetku/blob/main/docs/FAQ.md) and [existing issues](https://github.com/ilramdhan/dompetku/issues?q=is%3Aissue) first.
 
-        > **Security issue?** Do not file it here — follow [SECURITY.md](https://github.com/ilramdhan/fintrack/blob/main/SECURITY.md) instead.
+        > **Security issue?** Do not file it here — follow [SECURITY.md](https://github.com/ilramdhan/dompetku/blob/main/SECURITY.md) instead.
 
         **Never paste secrets** (API keys, passwords, `SESSION_SECRET`, Supabase keys, bot tokens, chat IDs) or real financial data. Replace them with placeholders.
   - type: textarea

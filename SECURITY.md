@@ -18,8 +18,8 @@ Dompetku is a self-hosted app without numbered releases. Only the latest code on
 
 Report privately through GitHub:
 
-1. Go to the repository's [**Security** tab](https://github.com/ilramdhan/fintrack/security).
-2. Click **Report a vulnerability** (or open [this link directly](https://github.com/ilramdhan/fintrack/security/advisories/new)).
+1. Go to the repository's [**Security** tab](https://github.com/ilramdhan/dompetku/security).
+2. Click **Report a vulnerability** (or open [this link directly](https://github.com/ilramdhan/dompetku/security/advisories/new)).
 3. Describe the issue. Helpful details:
    - what an attacker can do (impact),
    - steps to reproduce or a proof of concept,

@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the idea! Please check [existing issues](https://github.com/ilramdhan/fintrack/issues?q=is%3Aissue) first — if someone already suggested it, add a 👍 there instead.
+        Thanks for the idea! Please check [existing issues](https://github.com/ilramdhan/dompetku/issues?q=is%3Aissue) first — if someone already suggested it, add a 👍 there instead.
   - type: textarea
     id: problem
     attributes:

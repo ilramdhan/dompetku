@@ -4,7 +4,7 @@
 
 **A private, self-hosted personal finance tracker with a Telegram bot and receipt OCR.**
 
-[![CI](https://github.com/ilramdhan/fintrack/actions/workflows/ci.yml/badge.svg)](https://github.com/ilramdhan/fintrack/actions/workflows/ci.yml)
+[![CI](https://github.com/ilramdhan/dompetku/actions/workflows/ci.yml/badge.svg)](https://github.com/ilramdhan/dompetku/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![TanStack Start](https://img.shields.io/badge/TanStack-Start-ff4154)](https://tanstack.com/start)
 [![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ecf8e?logo=supabase&logoColor=white)](https://supabase.com)
@@ -172,7 +172,7 @@ You need free accounts on [GitHub](https://github.com), [Supabase](https://supab
 5. **Deploy, open your site and log in.** Add the Telegram bot, OCR and reminders later if you
    want them.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ilramdhan/fintrack&env=SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,APP_USERNAME,APP_PASSWORD,SESSION_SECRET)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ilramdhan/dompetku&env=SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,APP_USERNAME,APP_PASSWORD,SESSION_SECRET)
 
 > [!IMPORTANT]
 > The button deploys the app, but you still need to run `supabase/schema.sql` in your Supabase
@@ -234,8 +234,8 @@ You need [Node.js](https://nodejs.org) 22 or newer (or [Bun](https://bun.sh), wh
 a Supabase project with the schema applied.
 
 ```bash
-git clone https://github.com/<your-username>/fintrack.git
-cd fintrack
+git clone https://github.com/<your-username>/dompetku.git
+cd dompetku
 npm install
 cp .env.example .env    # then fill in at least the five required variables
 npm run dev             # open the URL printed in the terminal
@@ -294,4 +294,4 @@ strings in `src/lib/i18n.tsx`) if your instance needs different wording.
 ---
 
 If Dompetku is useful to you, please consider giving it a star. Feedback, ideas and bug reports
-are welcome in [GitHub Issues](https://github.com/ilramdhan/fintrack/issues).
+are welcome in [GitHub Issues](https://github.com/ilramdhan/dompetku/issues).

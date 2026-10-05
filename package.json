@@ -7,11 +7,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ilramdhan/fintrack.git"
+    "url": "git+https://github.com/ilramdhan/dompetku.git"
   },
-  "homepage": "https://github.com/ilramdhan/fintrack#readme",
+  "homepage": "https://github.com/ilramdhan/dompetku#readme",
   "bugs": {
-    "url": "https://github.com/ilramdhan/fintrack/issues"
+    "url": "https://github.com/ilramdhan/dompetku/issues"
   },
   "scripts": {
     "dev": "vite dev",
