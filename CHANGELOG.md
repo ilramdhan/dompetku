@@ -9,6 +9,19 @@ Starting with v1.0.0, versioned entries (`## [x.y.z]`) are generated automatical
 > [!NOTE]
 > When an entry mentions a **schema section** (`v2`…`v13`), self-hosters must run that section of [`supabase/schema.sql`](supabase/schema.sql) on their Supabase project. Every section is safe to run more than once, and the app keeps working (with the feature disabled) until you do.
 
+## [1.4.0](https://github.com/ilramdhan/dompetku/compare/v1.3.0...v1.4.0) (2026-10-05)
+
+
+### Features
+
+* **bot:** guard AI token usage with an amount gate, length cap and daily quota ([#17](https://github.com/ilramdhan/dompetku/issues/17)) ([85e86dc](https://github.com/ilramdhan/dompetku/commit/85e86dc4d04cf060d0e048cf00fa5d60be55a3d3))
+
+
+### Documentation
+
+* add accessibility statement ([#16](https://github.com/ilramdhan/dompetku/issues/16)) ([b5b9fbe](https://github.com/ilramdhan/dompetku/commit/b5b9fbefcd4f1cd5e8ea7cb76faa829c0eff104f))
+* point repository links at ilramdhan/dompetku ([#18](https://github.com/ilramdhan/dompetku/issues/18)) ([a937710](https://github.com/ilramdhan/dompetku/commit/a937710bb16528c3b5731cb0069c73dcf046de41))
+
 ## [1.3.0](https://github.com/ilramdhan/dompetku/compare/v1.2.0...v1.3.0) (2026-10-04)
 
 
