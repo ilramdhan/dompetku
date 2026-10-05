@@ -51,11 +51,12 @@ Provider examples (Gemini, OpenAI, OpenRouter, Ollama): [SELF-HOSTING §6.2](SEL
 
 ## Telegram bot (optional)
 
-| Name                   | Required?                   | Example                       | What it does                                                                                                                                                                       |
-| ---------------------- | --------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BOT_ALLOWED_CHAT_IDS` | **Yes, if you use the bot** | `123456789,987654321`         | Comma-separated Telegram chat IDs allowed to use the bot. **Fails closed:** empty = every chat is refused before any database access, and the bot replies with the chat ID to add. |
-| `BOT_DEFAULT_ACCOUNT`  | No                          | `BCA`                         | Account name used when a message doesn't mention one. Must match an existing account name. Can be overridden in Settings → App (v14).                                              |
-| `BOT_TEXT_AI`          | No (default `auto`)         | `auto` \| `always` \| `never` | When chat messages may use AI: only when ambiguous, always, or never (zero AI tokens for chat; receipts still use AI).                                                             |
+| Name                   | Required?                   | Example                       | What it does                                                                                                                                                                                     |
+| ---------------------- | --------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BOT_ALLOWED_CHAT_IDS` | **Yes, if you use the bot** | `123456789,987654321`         | Comma-separated Telegram chat IDs allowed to use the bot. **Fails closed:** empty = every chat is refused before any database access, and the bot replies with the chat ID to add.               |
+| `BOT_DEFAULT_ACCOUNT`  | No                          | `BCA`                         | Account name used when a message doesn't mention one. Must match an existing account name. Can be overridden in Settings → App (v14).                                                            |
+| `BOT_TEXT_AI`          | No (default `auto`)         | `auto` \| `always` \| `never` | When chat messages may use AI: only when ambiguous, always, or never (zero AI tokens for chat; receipts still use AI).                                                                           |
+| `BOT_AI_DAILY_LIMIT`   | No (default `50`)           | `50` \| `0`                   | Max bot AI calls (chat parsing + photo OCR) per chat per app-local day; the bot then asks for the quick format. `0` = unlimited. Counted in `ai_usage` (v15); without it, today's AI/OCR drafts. |
 
 ## Regional (optional)
 

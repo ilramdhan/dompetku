@@ -145,7 +145,7 @@ A **fork** is your own copy of the project on GitHub. Vercel will build the webs
 **What success looks like:** the result panel says **Success. No rows returned** (you may also see a small table from the last statement). In **Table Editor** you now see tables such as `accounts`, `categories`, `transactions`, `debts`, `subscriptions`, `budgets`, `goals` … and the `categories` table already has default categories.
 
 <details>
-<summary><strong>What are the sections v1 … v14?</strong></summary>
+<summary><strong>What are the sections v1 … v15?</strong></summary>
 
 The file grew with the app. Every section uses `if not exists` / `on conflict do nothing` / `create or replace`, so **the whole file is idempotent: running it again is always safe** and never deletes data. Run the whole file each time you update.
 
@@ -165,6 +165,7 @@ The file grew with the app. Every section uses `if not exists` / `on conflict do
 | v12       | Split transactions, up to 5 receipt photos, item search                                                                                  |
 | v13       | Per-account report and bank reconciliation                                                                                               |
 | v14       | App settings (name, logo, time zone, landing page, bot defaults)                                                                         |
+| v15       | AI usage log and per-chat daily bot AI quota                                                                                             |
 
 If a later section has not been run, the related page shows a hint instead of crashing, and the rest of the app keeps working.
 
@@ -338,7 +339,8 @@ Reads receipt photos (web **and** bot) and understands ambiguous chat messages. 
 >
 > - If `AI_API_URL` is empty the app falls back to the Lovable AI gateway, which only works when the project runs on Lovable. On Vercel, always set `AI_API_URL`.
 > - Ollama on `localhost` only works for **local development**. Vercel cannot reach your computer unless you expose Ollama through a public HTTPS tunnel.
-> - `BOT_TEXT_AI` controls when chat uses AI: `auto` (only ambiguous messages — default), `always`, or `never` (zero AI tokens for chat).
+> - `BOT_TEXT_AI` controls when chat uses AI: `auto` (only ambiguous messages — default), `always`, or `never` (zero AI tokens for chat). Chats with no amount (digits or words like "dua puluh ribu", "goceng") or over 300 characters never reach AI.
+> - `BOT_AI_DAILY_LIMIT` caps bot AI calls (chat + photo OCR) per chat per day — default `50`, `0` = unlimited. Every AI call is logged in `ai_usage` (schema v15).
 
 ### 6.3 Email reminders (Resend)
 

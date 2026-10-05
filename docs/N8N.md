@@ -146,7 +146,7 @@ These are the only `$env` values the templates use (set them in **n8n**, not in 
 
 Plus `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` so the nodes may read them.
 
-On the **app side (Vercel)** the bot needs `N8N_API_KEY` (random string, **at least 24 characters** — shorter or empty makes every `/api/public/n8n/*` route answer 503) and `BOT_ALLOWED_CHAT_IDS`; optional: `BOT_DEFAULT_ACCOUNT`, `BOT_TEXT_AI`, `AI_MODEL_TEXT`, `APP_TIMEZONE`. See [docs/ENVIRONMENT.md](ENVIRONMENT.md).
+On the **app side (Vercel)** the bot needs `N8N_API_KEY` (random string, **at least 24 characters** — shorter or empty makes every `/api/public/n8n/*` route answer 503) and `BOT_ALLOWED_CHAT_IDS`; optional: `BOT_DEFAULT_ACCOUNT`, `BOT_TEXT_AI`, `BOT_AI_DAILY_LIMIT`, `AI_MODEL_TEXT`, `APP_TIMEZONE`. See [docs/ENVIRONMENT.md](ENVIRONMENT.md).
 
 > [!TIP]
 > Generate an API key with `openssl rand -hex 32` (macOS/Linux terminal) or any password manager (≥ 24 characters).
