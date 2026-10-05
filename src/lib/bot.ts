@@ -704,3 +704,26 @@ export function parseCallback(data: string): Callback {
   const u = data.match(new RegExp(`^u:(${UUID})$`));
   return u ? { kind: "undo", id: u[1]! } : null;
 }
+
+/* ---------------- AI text gate (pure) ---------------- */
+/** Longest chat text that may be sent to AI; longer messages are refused without a call. */
+export const BOT_AI_TEXT_MAX = 300;
+
+/** Indonesian number words and money slang that can carry an amount without digits. */
+const AMOUNT_WORDS =
+  /\b(satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|sebelas|belas|puluh|puluhan|ratus|ratusan|seratus|ribu|ribuan|seribu|juta|jutaan|sejuta|miliar|milyar|triliun|setengah|rb|rban|jt|jtan|rp|idr|usd|dolar|dollar|goceng|gocap|gopek|ceban|cepek|seceng|ceceng|noban|cetiao|sejeti)\b/i;
+
+/** True when the text could contain an amount: any digit, or a number word / money slang. */
+export function hasAmountSignal(text: string): boolean {
+  return /\d/.test(text) || AMOUNT_WORDS.test(text);
+}
+
+export type AiTextGate = { ok: true } | { ok: false; reason: "no_amount" | "too_long" };
+
+/** Decides whether an unparsed chat may go to AI: no amount signal or over-long text never does. */
+export function aiTextGate(text: string): AiTextGate {
+  const t = text.trim();
+  if (t.length > BOT_AI_TEXT_MAX) return { ok: false, reason: "too_long" };
+  if (!hasAmountSignal(t)) return { ok: false, reason: "no_amount" };
+  return { ok: true };
+}

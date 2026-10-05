@@ -1,5 +1,7 @@
 import { draftSchema, type Draft } from "./schemas";
 import { isValidDate, matchCategory } from "./bot";
+import { usageFromResponse } from "./ai-usage";
+import type { AiMeta } from "./ai-usage.server";
 
 /** What the model may pick from. Names only — never the "(expense)" suffix, which models echo back. */
 export type ParseContext = { income: string[]; expense: string[]; accounts?: string[] };
@@ -23,33 +25,65 @@ export function aiErrorReason(body: string): string | null {
     .slice(0, 160);
 }
 
-async function aiJson(messages: unknown[], vision: boolean): Promise<unknown> {
+const WEB: AiMeta = { source: "web" };
+
+/** Records the call in `ai_usage` (v15); never throws and never delays the caller on failure. */
+async function record(meta: AiMeta, vision: boolean, model: string, ok: boolean, body?: unknown) {
+  try {
+    const { recordAiUsage } = await import("./ai-usage.server");
+    await recordAiUsage({
+      meta,
+      kind: vision ? "vision" : "text",
+      model,
+      ok,
+      ...usageFromResponse(body),
+    });
+  } catch {
+    // recordAiUsage already logs; importing it should never fail a parse.
+  }
+}
+
+async function aiJson(messages: unknown[], vision: boolean, meta: AiMeta = WEB): Promise<unknown> {
   const url = process.env["AI_API_URL"] || "https://ai.gateway.lovable.dev/v1/chat/completions";
   const key = process.env["AI_API_KEY"] || process.env["LOVABLE_API_KEY"];
   if (!key) throw new Error("AI_API_KEY belum diatur untuk fitur OCR.");
   const base = process.env["AI_MODEL"] || "google/gemini-2.5-flash";
   // AI_MODEL_TEXT lets chat parsing use a cheaper model (e.g. flash-lite) than receipt OCR.
   const model = vision ? base : process.env["AI_MODEL_TEXT"] || base;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0,
-      response_format: { type: "json_object" },
-    }),
-    signal: AbortSignal.timeout(45_000),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0,
+        response_format: { type: "json_object" },
+      }),
+      signal: AbortSignal.timeout(45_000),
+    });
+  } catch (e) {
+    await record(meta, vision, model, false);
+    throw e;
+  }
   if (!res.ok) {
     const body = await res.text();
+    await record(meta, vision, model, false);
     console.error(`AI request failed [${res.status}] model=${model}: ${body.slice(0, 500)}`);
     if (res.status === 429) throw new Error("Batas pemakaian AI tercapai, coba lagi sebentar.");
     if (res.status === 402) throw new Error("Kredit AI habis.");
     const reason = aiErrorReason(body);
     throw new Error(`Gagal membaca dengan AI [${res.status}]${reason ? `: ${reason}` : "."}`);
   }
-  const j: any = await res.json();
+  let j: any;
+  try {
+    j = await res.json();
+  } catch (e) {
+    await record(meta, vision, model, false);
+    throw e;
+  }
+  await record(meta, vision, model, true, j);
   const content: string = j?.choices?.[0]?.message?.content ?? "{}";
   const m = content.match(/\{[\s\S]*\}/);
   try {
@@ -82,7 +116,11 @@ function normalize(d: Draft, ctx: ParseContext): Draft {
   };
 }
 
-export async function parseReceipt(imageDataUrl: string, ctx: ParseContext): Promise<Draft> {
+export async function parseReceipt(
+  imageDataUrl: string,
+  ctx: ParseContext,
+  meta: AiMeta = WEB,
+): Promise<Draft> {
   (await import("./demo.server")).assertNotDemo();
   const out = await aiJson(
     [
@@ -99,11 +137,17 @@ export async function parseReceipt(imageDataUrl: string, ctx: ParseContext): Pro
       },
     ],
     true,
+    meta,
   );
   return normalize(draftSchema.parse(out), ctx);
 }
 
-export async function parseText(text: string, ctx: ParseContext, today: string): Promise<Draft> {
+export async function parseText(
+  text: string,
+  ctx: ParseContext,
+  today: string,
+  meta: AiMeta = WEB,
+): Promise<Draft> {
   (await import("./demo.server")).assertNotDemo();
   const out = await aiJson(
     [
@@ -114,6 +158,7 @@ export async function parseText(text: string, ctx: ParseContext, today: string):
       { role: "user", content: text.slice(0, 1000) },
     ],
     false,
+    meta,
   );
   return normalize(draftSchema.parse(out), ctx);
 }

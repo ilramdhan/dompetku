@@ -215,18 +215,19 @@ public/          PWA manifest, icons and self-hosted fonts
 
 ## Documentation
 
-| Document                                     | What it covers                                                                    |
-| -------------------------------------------- | --------------------------------------------------------------------------------- |
-| [Self-hosting guide](docs/SELF-HOSTING.md)   | Step-by-step install: Supabase, Vercel, first login, optional features, updates   |
-| [Environment variables](docs/ENVIRONMENT.md) | Reference for every setting                                                       |
-| [n8n, Telegram & email](docs/N8N.md)         | Telegram bot, reminders, reports, weekly backup, Google Drive, Gmail SMTP, Resend |
-| [Architecture](docs/ARCHITECTURE.md)         | Tech stack, directory layout, data flows, contributor rules                       |
-| [FAQ](docs/FAQ.md)                           | Common questions and troubleshooting                                              |
-| [Public demo](docs/DEMO.md)                  | How the live demo works and how to run your own                                   |
-| [n8n templates](n8n/README.md)               | What each workflow file does                                                      |
-| [Changelog](CHANGELOG.md)                    | Notable changes                                                                   |
-| [Contributing](CONTRIBUTING.md)              | How to propose changes                                                            |
-| [Security policy](SECURITY.md)               | How to report a vulnerability                                                     |
+| Document                                     | What it covers                                                                     |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [Self-hosting guide](docs/SELF-HOSTING.md)   | Step-by-step install: Supabase, Vercel, first login, optional features, updates    |
+| [Environment variables](docs/ENVIRONMENT.md) | Reference for every setting                                                        |
+| [n8n, Telegram & email](docs/N8N.md)         | Telegram bot, reminders, reports, weekly backup, Google Drive, Gmail SMTP, Resend  |
+| [Architecture](docs/ARCHITECTURE.md)         | Tech stack, directory layout, data flows, contributor rules                        |
+| [FAQ](docs/FAQ.md)                           | Common questions and troubleshooting                                               |
+| [Public demo](docs/DEMO.md)                  | How the live demo works and how to run your own                                    |
+| [n8n templates](n8n/README.md)               | What each workflow file does                                                       |
+| [Changelog](CHANGELOG.md)                    | Notable changes                                                                    |
+| [Contributing](CONTRIBUTING.md)              | How to propose changes                                                             |
+| [Security policy](SECURITY.md)               | How to report a vulnerability                                                      |
+| [Accessibility](ACCESSIBILITY.md)            | Accessibility goals, supported environments, known gaps and how to report barriers |
 
 ## Local development
 
@@ -260,7 +261,8 @@ Contributions are welcome, from typo fixes and translations to new features. Ple
 opening a pull request, make sure `npm run lint`, `npm run typecheck`, `npm test` and
 `npm run build` all pass; CI runs the same checks. Contributor rules (schema sections, i18n,
 privacy mode and more) are summarised in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#conventions-and-contributor-rules)
-and listed in full in [AGENTS.md](AGENTS.md).
+and listed in full in [AGENTS.md](AGENTS.md). For user-facing changes, also follow the
+[accessibility expectations](ACCESSIBILITY.md#contributor-expectations).
 
 ## Security
 

@@ -1,6 +1,7 @@
 /** Telegram/n8n bot: drafts with confirm buttons, reports and lists. Shared business logic stays in finance.server. */
 import { db } from "./db.server";
 import {
+  aiTextGate,
   clampMessage,
   guessCategory,
   matchCategory,
@@ -189,6 +190,14 @@ async function historyCategory(description: string, kind: string): Promise<strin
   return ((r.data as any)?.category?.name as string) ?? null;
 }
 
+const NO_AMOUNT =
+  '❓ Nominal tidak terbaca. Contoh: "kopi 25rb", "gaji 8jt ke BCA", atau kirim foto struk. Ketik /help untuk perintah.';
+const TOO_LONG =
+  '✂️ Pesan terlalu panjang untuk dibaca AI (maks. 300 karakter). Pakai format singkat seperti "kopi 25rb", atau kirim foto struk.';
+const AI_QUOTA =
+  '⏳ Kuota AI harian untuk chat ini sudah habis. Pakai format singkat seperti "kopi 25rb" (tanpa AI). Foto struk baru bisa dibaca lagi besok.';
+const aiUsage = () => import("./ai-usage.server");
+
 async function draftFromText(u: BotUpdate, text: string): Promise<BotReply> {
   const externalId = draftKey(u.chat_id, u.update_id);
   const prev = await existingDraft(externalId);
@@ -218,8 +227,12 @@ async function draftFromText(u: BotUpdate, text: string): Promise<BotReply> {
       via: "quick",
     };
   } else if (mode !== "never") {
+    // Token guard: never spend AI on chat without any amount signal or on over-long text.
+    const gate = aiTextGate(text);
+    if (!gate.ok) return reply(gate.reason === "too_long" ? TOO_LONG : NO_AMOUNT);
+    if (await (await aiUsage()).botAiQuotaReached(u.chat_id)) return reply(AI_QUOTA);
     const { parseText } = await import("./ocr.server");
-    const d = await parseText(text, ctx, today);
+    const d = await parseText(text, ctx, today, { source: "bot", chatId: u.chat_id });
     if (d.amount > 0)
       payload = {
         kind: d.kind,
@@ -234,10 +247,7 @@ async function draftFromText(u: BotUpdate, text: string): Promise<BotReply> {
         via: "ai",
       };
   }
-  if (!payload)
-    return reply(
-      '❓ Nominal tidak terbaca. Contoh: "kopi 25rb", "gaji 8jt ke BCA", atau kirim foto struk. Ketik /help untuk perintah.',
-    );
+  if (!payload) return reply(NO_AMOUNT);
   return previewReply(await storeDraft(externalId, u.chat_id, payload, "telegram", null));
 }
 
@@ -248,10 +258,11 @@ async function draftFromImage(u: BotUpdate): Promise<BotReply> {
   const mime = /^image\/(jpeg|png|webp)$/.test(u.mime_type ?? "") ? u.mime_type! : "image/jpeg";
   const b64 = u.image_base64!.replace(/^data:[^,]+,/, "");
   const dataUrl = `data:${mime};base64,${b64}`;
+  if (await (await aiUsage()).botAiQuotaReached(u.chat_id)) return reply(AI_QUOTA);
   const f = await fin();
   const ctx = await f.parseContext();
   const { parseReceipt } = await import("./ocr.server");
-  const d = await parseReceipt(dataUrl, ctx);
+  const d = await parseReceipt(dataUrl, ctx, { source: "bot", chatId: u.chat_id });
   if (!(d.amount > 0))
     return reply("❓ Total nota tidak terbaca. Coba foto lebih dekat, terang, dan tidak miring.");
   // Caption can name the account: foto + caption "pakai BCA".

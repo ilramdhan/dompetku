@@ -214,8 +214,58 @@ describe("alur bot end-to-end (tanpa AI)", () => {
 
   it("pesan ambigu tanpa AI key memberi error ramah (bukan crash diam)", async () => {
     await expect(
-      handleBotUpdate({ update_id: 5, chat_id: "111", text: "kemarin patungan sama andi" }),
+      handleBotUpdate({ update_id: 5, chat_id: "111", text: "kemarin patungan sama andi 120rb" }),
     ).rejects.toThrow(/AI_API_KEY/);
+  });
+
+  it("chat tanpa nominal atau terlalu panjang tidak dikirim ke AI", async () => {
+    const r = await handleBotUpdate({ update_id: 6, chat_id: "111", text: "halo apa kabar" });
+    expect(r.text).toContain("Nominal tidak terbaca");
+    const long = await handleBotUpdate({
+      update_id: 7,
+      chat_id: "111",
+      text: `kemarin patungan 50rb ${"x".repeat(320)}`,
+    });
+    expect(long.text).toContain("terlalu panjang");
+    expect(dbCalls).not.toContain("ai_usage"); // not even the quota check
+    expect(tables["bot_drafts"] ?? []).toHaveLength(0);
+  });
+
+  it("kuota AI harian per chat menghentikan AI chat dan foto sebelum dipanggil", async () => {
+    const { today } = await import("../lib/finance.server");
+    tables["ai_usage"] = Array.from({ length: 3 }, () => ({
+      source: "bot",
+      chat_id: "111",
+      day: today(),
+    }));
+    process.env["BOT_AI_DAILY_LIMIT"] = "3";
+    try {
+      const t = await handleBotUpdate({
+        update_id: 8,
+        chat_id: "111",
+        text: "kemarin patungan sama andi 120rb",
+      });
+      expect(t.text).toContain("Kuota AI harian");
+      const p = await handleBotUpdate({
+        update_id: 9,
+        chat_id: "111",
+        image_base64: "x".repeat(200),
+        mime_type: "image/jpeg",
+      });
+      expect(p.text).toContain("Kuota AI harian");
+      // chat lain belum kena kuota → AI dicoba (gagal karena tanpa key)
+      process.env["BOT_ALLOWED_CHAT_IDS"] = "111,222";
+      await expect(
+        handleBotUpdate({ update_id: 10, chat_id: "222", text: "patungan sama andi 120rb" }),
+      ).rejects.toThrow(/AI_API_KEY/);
+      // "0" = tanpa batas
+      process.env["BOT_AI_DAILY_LIMIT"] = "0";
+      await expect(
+        handleBotUpdate({ update_id: 11, chat_id: "111", text: "patungan sama andi 120rb" }),
+      ).rejects.toThrow(/AI_API_KEY/);
+    } finally {
+      delete process.env["BOT_AI_DAILY_LIMIT"];
+    }
   });
 
   it("undo lewat callback tidak bisa menghapus transaksi sembarang", async () => {

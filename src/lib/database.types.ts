@@ -836,6 +836,49 @@ export type Database = {
           },
         ];
       };
+      /** v15 (optional table): one row per AI call (web/bot OCR and chat parsing). */
+      ai_usage: {
+        Row: {
+          id: string;
+          created_at: string;
+          day: string;
+          source: string;
+          chat_id: string | null;
+          kind: string;
+          model: string;
+          prompt_tokens: number | null;
+          completion_tokens: number | null;
+          total_tokens: number | null;
+          ok: boolean;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          day: string;
+          source: string;
+          chat_id?: string | null;
+          kind: string;
+          model: string;
+          prompt_tokens?: number | null;
+          completion_tokens?: number | null;
+          total_tokens?: number | null;
+          ok?: boolean;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          day?: string;
+          source?: string;
+          chat_id?: string | null;
+          kind?: string;
+          model?: string;
+          prompt_tokens?: number | null;
+          completion_tokens?: number | null;
+          total_tokens?: number | null;
+          ok?: boolean;
+        };
+        Relationships: [];
+      };
       /** v11: threshold alerts already sent (one per budget, month and level). */
       budget_alerts: {
         Row: { id: string; budget_id: string; month: string; level: number; created_at: string };
