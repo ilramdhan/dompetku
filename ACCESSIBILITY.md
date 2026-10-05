@@ -49,7 +49,7 @@ still have to pass as usual.
 ## Reporting accessibility issues
 
 If something stops you from using Dompetku, please
-[open a bug report](https://github.com/ilramdhan/fintrack/issues/new?template=bug_report.yml) and
+[open a bug report](https://github.com/ilramdhan/dompetku/issues/new?template=bug_report.yml) and
 start the title with **"Accessibility:"**. It helps to include:
 
 - what you were trying to do (for example "add a transaction" or "read the monthly report");
@@ -63,7 +63,7 @@ Screenshots or recordings are welcome but optional. You never need to tell us ab
 Please do not include real financial data, passwords, API keys or chat IDs.
 
 If the bug report form itself is hard to use, the shorter
-[question form](https://github.com/ilramdhan/fintrack/issues/new?template=question.yml) is fine
+[question form](https://github.com/ilramdhan/dompetku/issues/new?template=question.yml) is fine
 too. Just say it is about accessibility and we will take it from there.
 
 ### Severity
@@ -128,6 +128,6 @@ promise they will work well. Reports from people who use them are especially wel
 ## Feedback and improvements
 
 Suggestions for this document or for how we handle accessibility are welcome. Open a
-[feature request](https://github.com/ilramdhan/fintrack/issues/new?template=feature_request.yml)
+[feature request](https://github.com/ilramdhan/dompetku/issues/new?template=feature_request.yml)
 or a pull request that changes this file. If something is stopping you from using the app right
 now, please use [the reporting process above](#reporting-accessibility-issues) instead.
