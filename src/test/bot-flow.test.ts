@@ -214,8 +214,20 @@ describe("alur bot end-to-end (tanpa AI)", () => {
 
   it("pesan ambigu tanpa AI key memberi error ramah (bukan crash diam)", async () => {
     await expect(
-      handleBotUpdate({ update_id: 5, chat_id: "111", text: "kemarin patungan sama andi" }),
+      handleBotUpdate({ update_id: 5, chat_id: "111", text: "kemarin patungan sama andi 120rb" }),
     ).rejects.toThrow(/AI_API_KEY/);
+  });
+
+  it("chat tanpa nominal atau terlalu panjang tidak dikirim ke AI", async () => {
+    const r = await handleBotUpdate({ update_id: 6, chat_id: "111", text: "halo apa kabar" });
+    expect(r.text).toContain("Nominal tidak terbaca");
+    const long = await handleBotUpdate({
+      update_id: 7,
+      chat_id: "111",
+      text: `kemarin patungan 50rb ${"x".repeat(320)}`,
+    });
+    expect(long.text).toContain("terlalu panjang");
+    expect(tables["bot_drafts"] ?? []).toHaveLength(0);
   });
 
   it("undo lewat callback tidak bisa menghapus transaksi sembarang", async () => {
