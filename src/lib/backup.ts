@@ -11,7 +11,7 @@ import { z } from "zod";
  * transactions, so transactions go right after accounts & categories.
  * Newer optional tables (v10 recurring_transactions, v11 budget_alerts, v13
  * account_reconciliations) come last: their parents (accounts/categories/budgets) are earlier.
- * bot_drafts and activity_log are never restored.
+ * bot_drafts, activity_log and ai_usage (v15 logs) are never exported or restored.
  */
 export const RESTORE_TABLES = [
   "accounts",
@@ -123,7 +123,7 @@ const backupSchema = z.object({
 export type ParsedBackup = {
   exportedAt: string | null;
   tables: { table: RestoreTable; rows: Row[] }[];
-  /** Tables in the file that are not restored (unknown, bot_drafts, activity_log). */
+  /** Tables in the file that are not restored (unknown, bot_drafts, activity_log, ai_usage). */
   ignored: string[];
   total: number;
 };

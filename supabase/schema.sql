@@ -472,3 +472,25 @@ revoke all on public.app_settings from anon, authenticated;
 grant all on public.app_settings to service_role;
 alter table public.app_settings enable row level security;
 notify pgrst, 'reload schema';
+
+-- ============ v15: log pemakaian AI & kuota AI harian bot per chat (aman dijalankan ulang) ============
+-- Opsional: tanpa bagian ini kuota bot dihitung kira-kira dari draft AI/foto di bot_drafts.
+-- Satu baris per panggilan AI (OCR web/bot, parsing chat). day = tanggal lokal aplikasi.
+create table if not exists public.ai_usage (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  day date not null,
+  source text not null check (source in ('bot','web')),
+  chat_id text,
+  kind text not null check (kind in ('text','vision')),
+  model text not null,
+  prompt_tokens int,
+  completion_tokens int,
+  total_tokens int,
+  ok boolean not null default true
+);
+create index if not exists ai_usage_day_chat_idx on public.ai_usage (day, chat_id);
+revoke all on public.ai_usage from anon, authenticated;
+grant all on public.ai_usage to service_role;
+alter table public.ai_usage enable row level security;
+notify pgrst, 'reload schema';
