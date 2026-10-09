@@ -37,6 +37,7 @@ time), and amounts support **IDR and USD**.
 
 ## Table of contents
 
+- [What's new in v1.5](#whats-new-in-v15)
 - [Live demo](#live-demo)
 - [Screenshots](#screenshots)
 - [Features](#features)
@@ -49,6 +50,20 @@ time), and amounts support **IDR and USD**.
 - [Security](#security)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
+
+## What's new in v1.5
+
+A plain-language summary of the v1.5 release, ready to share: bot settings in the app, a profile
+page, family accounts with per-wallet access, and pockets inside wallets. Already using Dompetku?
+Run `supabase/schema.sql` once more; everything else is optional.
+
+<p>
+  <a href="docs/assets/whats-new-v1.5-id.png"><img src="docs/assets/whats-new-v1.5-id.png" alt="Apa yang baru di Dompetku v1.5 (Bahasa Indonesia)" width="49%"></a>
+  <a href="docs/assets/whats-new-v1.5-en.png"><img src="docs/assets/whats-new-v1.5-en.png" alt="What's new in Dompetku v1.5 (English)" width="49%"></a>
+</p>
+
+Full size: [Bahasa Indonesia](docs/assets/whats-new-v1.5-id.png) · [English](docs/assets/whats-new-v1.5-en.png) ·
+[Changelog](CHANGELOG.md)
 
 ## Live demo
 
