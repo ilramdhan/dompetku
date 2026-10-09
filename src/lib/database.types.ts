@@ -120,6 +120,8 @@ export type Database = {
           receipt_paths?: string[] | null;
           /** v12 (generated) */
           items_search?: string | null;
+          /** v19 */
+          pocket_id?: string | null;
         };
         Insert: {
           id?: string;
@@ -142,6 +144,7 @@ export type Database = {
           external_id?: string | null;
           split_group?: string | null;
           receipt_paths?: string[] | null;
+          pocket_id?: string | null;
         };
         Update: {
           id?: string;
@@ -164,6 +167,7 @@ export type Database = {
           external_id?: string | null;
           split_group?: string | null;
           receipt_paths?: string[] | null;
+          pocket_id?: string | null;
         };
         Relationships: [
           {
@@ -1082,6 +1086,87 @@ export type Database = {
             columns: ["bot_default_account_id"];
             isOneToOne: false;
             referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** v19 (optional table): Kantong (envelopes) inside one wallet. */
+      pockets: {
+        Row: {
+          id: string;
+          account_id: string;
+          name: string;
+          allocated: number;
+          min_balance: number | null;
+          period: "monthly" | "none";
+          icon: string | null;
+          color: string | null;
+          archived: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          account_id: string;
+          name: string;
+          allocated?: number;
+          min_balance?: number | null;
+          period?: "monthly" | "none";
+          icon?: string | null;
+          color?: string | null;
+          archived?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          account_id?: string;
+          name?: string;
+          allocated?: number;
+          min_balance?: number | null;
+          period?: "monthly" | "none";
+          icon?: string | null;
+          color?: string | null;
+          archived?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pockets_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: false;
+            referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** v19 (optional table): pocket threshold alerts already sent (pocket, month, level). */
+      pocket_alerts: {
+        Row: { id: string; pocket_id: string; period: string; level: string; created_at: string };
+        Insert: {
+          id?: string;
+          pocket_id: string;
+          period: string;
+          level: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          pocket_id?: string;
+          period?: string;
+          level?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pocket_alerts_pocket_id_fkey";
+            columns: ["pocket_id"];
+            isOneToOne: false;
+            referencedRelation: "pockets";
             referencedColumns: ["id"];
           },
         ];

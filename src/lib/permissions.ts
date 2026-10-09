@@ -137,7 +137,11 @@ export function canWriteTx(a: Access | null | undefined, tx: TxSides): boolean {
 export const OTHER_WALLET = "Dompet lain";
 
 type NamedAccount = { id?: string | null; name?: string | null; masked?: boolean } | null;
-type MaskableTx = TxSides & { account?: NamedAccount; to_account?: NamedAccount };
+type MaskableTx = TxSides & {
+  account?: NamedAccount;
+  to_account?: NamedAccount;
+  pocket_id?: string | null;
+};
 
 /**
  * Hides wallets the subject may not see on a (visible) transaction: the id is cleared and the
@@ -156,6 +160,9 @@ export function maskTx<T extends MaskableTx>(a: Access | null | undefined, tx: T
   };
   hide("account_id", "account");
   hide("to_account_id", "to_account");
+  // v19: a Kantong belongs to the source wallet; never leak its id when that wallet is hidden.
+  if (tx.account_id && !can(a, "wallet:view", tx.account_id) && "pocket_id" in tx)
+    (out as MaskableTx).pocket_id = null;
   return out;
 }
 

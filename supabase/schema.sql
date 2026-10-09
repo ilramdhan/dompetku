@@ -561,3 +561,51 @@ grant all on public.account_permissions to service_role;
 alter table public.account_permissions enable row level security;
 alter table public.activity_log add column if not exists actor text check (actor is null or length(actor) <= 100);
 notify pgrst, 'reload schema';
+
+-- ============ v19: kantong (amplop) di dalam dompet & peringatan ambang (aman dijalankan ulang) ============
+-- Opsional: tanpa bagian ini bagian "Kantong" di halaman dompet hanya menampilkan petunjuk untuk
+-- menjalankan v19, dan transaksi tersimpan tanpa kantong persis seperti sebelumnya.
+-- Kantong = alokasi uang di dalam SATU dompet (mis. Mandiri → Makan 500rb, Transport 250rb).
+-- Tidak menggantikan Budget per kategori. Jumlah memakai mata uang dompet (kolom amount, seperti saldo).
+-- period 'monthly': sisa = alokasi − pengeluaran + pemasukan kantong bulan ini (zona waktu aplikasi);
+-- period 'none': amplop berjalan, semua transaksi kantong dihitung. Transfer keluar dari dompet boleh
+-- diberi kantong (dihitung sebagai pengeluaran kantong); sisi penerima transfer tidak.
+-- min_balance: ambang peringatan (sisa ≤ ambang → "hampir habis"; sisa ≤ 0 → "habis").
+create table if not exists public.pockets (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  name text not null check (length(trim(name)) between 1 and 60),
+  allocated numeric(18,2) not null default 0 check (allocated >= 0),
+  min_balance numeric(18,2) check (min_balance is null or min_balance >= 0),
+  period text not null default 'monthly' check (period in ('monthly','none')),
+  icon text check (icon is null or length(icon) <= 40),
+  color text check (color is null or length(color) <= 20),
+  archived boolean not null default false,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists pockets_account_name_idx on public.pockets (account_id, lower(name));
+revoke all on public.pockets from anon, authenticated;
+grant all on public.pockets to service_role;
+alter table public.pockets enable row level security;
+
+alter table public.transactions add column if not exists pocket_id uuid
+  references public.pockets(id) on delete set null;
+create index if not exists transactions_pocket_idx on public.transactions (pocket_id, occurred_at)
+  where pocket_id is not null;
+
+-- Peringatan yang sudah dikirim agar tidak berulang: satu per kantong, bulan (period = 'YYYY-MM',
+-- juga untuk amplop berjalan) dan level ('low' = sisa ≤ ambang, 'empty' = sisa ≤ 0).
+create table if not exists public.pocket_alerts (
+  id uuid primary key default gen_random_uuid(),
+  pocket_id uuid not null references public.pockets(id) on delete cascade,
+  period text not null,
+  level text not null check (level in ('low','empty')),
+  created_at timestamptz not null default now(),
+  unique (pocket_id, period, level)
+);
+revoke all on public.pocket_alerts from anon, authenticated;
+grant all on public.pocket_alerts to service_role;
+alter table public.pocket_alerts enable row level security;
+notify pgrst, 'reload schema';

@@ -17,10 +17,13 @@ import { z } from "zod";
  * session_version) are stripped on export and on restore, and replace mode never deletes it.
  * account_permissions (v18) comes after both of its parents (accounts, app_users); restored member
  * rows have no password hash, so they cannot log in until the admin resets their password.
+ * pockets (v19) sit between accounts and transactions (transactions.pocket_id → pockets);
+ * pocket_alerts come last. Older backups without them restore unchanged (pocket_id stays null).
  */
 export const RESTORE_TABLES = [
   "accounts",
   "categories",
+  "pockets",
   "transactions",
   "debts",
   "subscriptions",
@@ -38,6 +41,7 @@ export const RESTORE_TABLES = [
   "app_settings",
   "app_users",
   "account_permissions",
+  "pocket_alerts",
 ] as const;
 export type RestoreTable = (typeof RESTORE_TABLES)[number];
 
@@ -72,6 +76,8 @@ export const CONFLICT_KEYS: Record<RestoreTable, string[]> = {
   app_settings: ["id"],
   app_users: ["id"],
   account_permissions: ["user_id", "account_id"],
+  pockets: ["id"],
+  pocket_alerts: ["id"],
 };
 
 /**
@@ -86,6 +92,8 @@ export const NATURAL_KEYS: Partial<Record<RestoreTable, string[]>> = {
   transactions: ["external_id"],
   budget_alerts: ["budget_id", "month", "level"],
   app_users: ["username"],
+  pockets: ["account_id", "name"],
+  pocket_alerts: ["pocket_id", "period", "level"],
 };
 
 /** FK column → referenced table, used to rewrite ids remapped by natural keys. */
@@ -99,6 +107,7 @@ export const FK_COLUMNS: Record<string, RestoreTable> = {
   budget_id: "budgets",
   bot_default_account_id: "accounts",
   user_id: "app_users",
+  pocket_id: "pockets",
 };
 
 /**

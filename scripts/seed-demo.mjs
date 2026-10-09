@@ -89,6 +89,7 @@ const MONTHS = 14; // offsets -13 … 0
 
 /* ---------------- reset / guard ---------------- */
 const WIPE = [
+  "pocket_alerts",
   "budget_alerts",
   "account_reconciliations",
   "bot_drafts",
@@ -103,6 +104,7 @@ const WIPE = [
   "budgets",
   "goals",
   "transactions",
+  "pockets",
   "accounts",
   "activity_log",
   "app_users",

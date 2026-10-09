@@ -146,13 +146,25 @@ export const saveTransaction = createServerFn({ method: "POST" })
       [...receiptPaths(data.values as never), data.values.receipt_path],
       prev,
     );
-    if (data.id) return (await updateTransaction(data.id, data.values)) as any;
-    const tx = await insertTransaction(data.values);
+    // v19 Kantong: must belong to the source wallet (manage on it was checked above); an edit
+    // that moves the row to another wallet without choosing a pocket drops the old one.
+    const { pocketOnEdit } = await import("./pockets");
+    const pocket_id = pocketOnEdit(prev as any, data.values);
+    const values = { ...data.values, pocket_id };
+    const ps = await import("./pockets.server");
+    await ps.assertPocketForTx(pocket_id, values, (prev as any)?.pocket_id ?? null);
+    if (data.id) {
+      const tx = await updateTransaction(data.id, values);
+      return { ...tx, pocketAlerts: await ps.pocketAlertsFor(tx as any, prev as any) } as any;
+    }
+    const tx = await insertTransaction(values);
+    // v19: pocket threshold alerts (never throw; members see them for wallets they manage).
+    const pocketAlerts = await ps.pocketAlertsFor(tx as any);
     // Budgets are admin-only: members get no budget alerts.
-    if (context.role !== "admin") return { ...tx, budgetAlerts: [] } as any;
+    if (context.role !== "admin") return { ...tx, budgetAlerts: [], pocketAlerts } as any;
     // v11: instant budget alerts (never throws; [] on any failure).
     const { budgetAlertsFor } = await import("./budget.server");
-    return { ...tx, budgetAlerts: await budgetAlertsFor(tx) } as any;
+    return { ...tx, budgetAlerts: await budgetAlertsFor(tx), pocketAlerts } as any;
   });
 
 const txFilterSchema = z.object({
@@ -161,6 +173,7 @@ const txFilterSchema = z.object({
   search: z.string().max(100).optional(),
   category_id: z.string().uuid().optional(),
   account_id: z.string().uuid().optional(),
+  pocket_id: z.string().uuid().optional(),
   sort: z.enum(["occurred_at", "amount", "description"]).optional(),
   direction: z.enum(["asc", "desc"]).optional(),
 });
