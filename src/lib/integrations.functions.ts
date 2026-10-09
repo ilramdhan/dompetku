@@ -1,20 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireAuth } from "./auth-middleware";
+import { requireAdmin } from "./auth-middleware";
 import { INTEGRATION_KEYS, type IntegrationKey } from "./integrations";
 
 const keySchema = z.enum(INTEGRATION_KEYS as [IntegrationKey, ...IntegrationKey[]]);
 
 /** Status of every managed integration key. Secrets come back only as a masked hint. */
 export const getIntegrationSettings = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async () => {
     const { readIntegrations } = await import("./integrations.server");
     return readIntegrations();
   });
 
 export const saveIntegrationFn = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z.object({ key: keySchema, value: z.string().max(4000) }).parse(d),
   )
@@ -26,7 +26,7 @@ export const saveIntegrationFn = createServerFn({ method: "POST" })
 
 /** Deletes the DB value so the key falls back to its env var (or default). */
 export const removeIntegrationFn = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ key: keySchema }).parse(d))
   .handler(async ({ data }) => {
     (await import("./demo.server")).assertNotDemo();
@@ -36,7 +36,7 @@ export const removeIntegrationFn = createServerFn({ method: "POST" })
 
 /** "Tes koneksi" for the AI endpoint: a free GET …/models (no tokens used). */
 export const testAiConnection = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async (): Promise<{ ok: boolean; message: string }> => {
     (await import("./demo.server")).assertNotDemo();
     const { aiConfig } = await import("./ocr.server");
@@ -61,7 +61,7 @@ export const testAiConnection = createServerFn({ method: "POST" })
 
 /** Telegram direct-mode status: bot username and current webhook (no token). */
 export const telegramStatus = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async () => {
     const tg = await import("./telegram.server");
     const token = await tg.telegramToken();
@@ -78,7 +78,7 @@ export const telegramStatus = createServerFn({ method: "GET" })
   });
 
 export const setTelegramWebhook = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ origin: z.string().url().max(300) }).parse(d))
   .handler(async ({ data }) => {
     (await import("./demo.server")).assertNotDemo();
@@ -91,7 +91,7 @@ export const setTelegramWebhook = createServerFn({ method: "POST" })
   });
 
 export const deleteTelegramWebhook = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async () => {
     (await import("./demo.server")).assertNotDemo();
     const tg = await import("./telegram.server");

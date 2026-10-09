@@ -1,7 +1,7 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
-import { clearSessionCache, isUnauthorizedError } from "./lib/session-cache";
+import { clearSessionCache, isPasswordChangeError, isUnauthorizedError } from "./lib/session-cache";
 
 export const getRouter = () => {
   // The client caches the session check (see _app.tsx); when a server fn
@@ -9,7 +9,14 @@ export const getRouter = () => {
   // send the user back to /login.
   let redirecting = false;
   const onAuthError = (err: unknown) => {
-    if (typeof window === "undefined" || !isUnauthorizedError(err)) return;
+    if (typeof window === "undefined") return;
+    // v18: a member with a temporary password is sent to the forced password change.
+    if (isPasswordChangeError(err)) {
+      clearSessionCache();
+      if (router.state.location.pathname !== "/profile") void router.navigate({ to: "/profile" });
+      return;
+    }
+    if (!isUnauthorizedError(err)) return;
     clearSessionCache();
     if (redirecting || router.state.location.pathname === "/login") return;
     redirecting = true;

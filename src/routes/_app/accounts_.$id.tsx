@@ -21,6 +21,8 @@ import { usePrivacy } from "@/lib/privacy";
 import { signedAmount, TRANSFER_OUT } from "@/lib/account-report";
 import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/head";
+import { useAccess } from "@/hooks/use-access";
+import { walletLabel } from "@/lib/permissions";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const PAGE_SIZE = 50;
@@ -57,6 +59,9 @@ function AccountDetailPage() {
     placeholderData: (p) => p,
   });
   const { data: total = 0 } = useQuery({ ...txCountQuery(filter), placeholderData: (p) => p });
+  // v18: recording needs manage on this wallet; reconciliation is admin-only.
+  const { isAdmin, can } = useAccess();
+  const canManage = can("wallet:manage", id);
   if (!r) return <PageSkeleton />;
   const cur: string = r.account.currency;
   const list = (rows as any[]).slice(0, PAGE_SIZE);
@@ -78,13 +83,15 @@ function AccountDetailPage() {
                 <ArrowLeft className="size-4" /> {t("Akun")}
               </Link>
             </Button>
-            <Button
-              onClick={() =>
-                setDlg({ open: true, draft: { ...newTxDraft(), account_id: id }, id: null })
-              }
-            >
-              <Plus className="size-4" /> {t("Catat")}
-            </Button>
+            {canManage ? (
+              <Button
+                onClick={() =>
+                  setDlg({ open: true, draft: { ...newTxDraft(), account_id: id }, id: null })
+                }
+              >
+                <Plus className="size-4" /> {t("Catat")}
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -183,13 +190,15 @@ function AccountDetailPage() {
         </Card>
       </div>
 
-      <AccountReconcile
-        accountId={id}
-        currency={cur}
-        ready={!!r.reconciliation?.ready}
-        last={r.reconciliation?.last ?? null}
-        onRecord={(draft) => setDlg({ open: true, draft, id: null })}
-      />
+      {isAdmin ? (
+        <AccountReconcile
+          accountId={id}
+          currency={cur}
+          ready={!!r.reconciliation?.ready}
+          last={r.reconciliation?.last ?? null}
+          onRecord={(draft) => setDlg({ open: true, draft, id: null })}
+        />
+      ) : null}
 
       <Card className="mt-4 min-w-0 p-0">
         <h2 className="p-5 pb-2 text-lg font-semibold">{t("Transaksi akun")}</h2>
@@ -204,8 +213,8 @@ function AccountDetailPage() {
               const other =
                 tx.kind === "transfer"
                   ? tx.account_id === id
-                    ? `→ ${tx.to_account?.name ?? "-"}`
-                    : `← ${tx.account?.name ?? "-"}`
+                    ? `→ ${walletLabel(tx.to_account, t)}`
+                    : `← ${walletLabel(tx.account, t)}`
                   : (tx.category?.name ?? t("Tanpa kategori"));
               return (
                 <li

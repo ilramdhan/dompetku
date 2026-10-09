@@ -1,11 +1,23 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireAuth } from "./auth-middleware";
+import { requireAdmin } from "./auth-middleware";
 
+/**
+ * Public: whether the caller is signed in, and as whom. `role`/`mustChangePassword` only drive
+ * the UI (nav, route redirects, forced password screen); the server enforces on every fn.
+ */
 export const getSession = createServerFn({ method: "GET" }).handler(async () => {
-  const { readValidSession } = await import("./session.server");
-  const s = await readValidSession();
-  return { authenticated: !!s, user: s?.u ?? null };
+  const { readPrincipal } = await import("./session.server");
+  const p = await readPrincipal();
+  return {
+    authenticated: !!p,
+    user: p?.username ?? null,
+    role: p?.role ?? null,
+    displayName: p?.displayName ?? null,
+    mustChangePassword: p?.mustChangePassword ?? false,
+    // Members only: their own wallet levels so the UI can hide actions (the server enforces).
+    wallets: p && p.role === "member" ? { ...p.access.grants } : null,
+  };
 });
 
 const passwordStep = z.object({
@@ -25,13 +37,8 @@ const totpStep = z.object({
 export const login = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.union([passwordStep, totpStep]).parse(d))
   .handler(async ({ data }) => {
-    const {
-      checkCredentials,
-      createSession,
-      createLoginChallenge,
-      readLoginChallenge,
-      sessionVersionFor,
-    } = await import("./session.server");
+    const { createSession, createLoginChallenge, readLoginChallenge, sessionVersionFor } =
+      await import("./session.server");
     const { configuredTotpSecret, verifyLoginTotp } = await import("./totp.server");
     const { logActivity } = await import("./finance.server");
     const { recentLoginFailures, noteLoginFailure } = await import("./login-throttle.server");
@@ -62,7 +69,19 @@ export const login = createServerFn({ method: "POST" })
       return { ok: true as const };
     }
 
-    if (!(await checkCredentials(data.username, data.password))) {
+    const { authenticate } = await import("./users.server");
+    const auth = await authenticate(data.username, data.password);
+    if (auth.ok && auth.role === "member") {
+      // Members: own password only; APP_TOTP_SECRET is the owner's second factor (member 2FA is
+      // future work). The cookie is marked as a member cookie.
+      createSession(auth.username, auth.sv, auth.id);
+      const { runAsActor } = await import("./request-context.server");
+      await runAsActor({ username: auth.username, role: "member" }, () =>
+        logActivity("auth.login", "auth", { name: auth.username.slice(0, 60) }),
+      );
+      return { ok: true as const };
+    }
+    if (!auth.ok) {
       noteLoginFailure();
       await logActivity("auth.login_failed", "auth", { name: data.username.slice(0, 60) });
       await slow();
@@ -83,7 +102,7 @@ export const login = createServerFn({ method: "POST" })
 
 /** Whether two-step login is active. Never returns the configured secret. */
 export const getTwoFactorStatus = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async () => {
     const { configuredTotpSecret } = await import("./totp.server");
     if ((await import("./demo.server")).isDemo()) return { active: false, invalid: false };
@@ -93,7 +112,7 @@ export const getTwoFactorStatus = createServerFn({ method: "GET" })
 
 /** Generates a fresh secret for enrollment; refused while 2FA is already active. */
 export const generateTwoFactorSecret = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async ({ context }) => {
     const { configuredTotpSecret, generateTotpSecret } = await import("./totp.server");
     const { buildOtpauthUri } = await import("./totp");
@@ -107,9 +126,16 @@ export const generateTwoFactorSecret = createServerFn({ method: "POST" })
   });
 
 export const logout = createServerFn({ method: "POST" }).handler(async () => {
-  const { destroySession } = await import("./session.server");
+  const { destroySession, readSession } = await import("./session.server");
+  const s = readSession();
   destroySession();
   const { logActivity } = await import("./finance.server");
-  await logActivity("auth.logout", "auth", null);
+  const { runAsActor } = await import("./request-context.server");
+  // Signed cookie only (no DB check): the actor is informational.
+  if (s?.r === "member")
+    await runAsActor({ username: s.u, role: "member" }, () =>
+      logActivity("auth.logout", "auth", null),
+    );
+  else await logActivity("auth.logout", "auth", null);
   return { ok: true };
 });

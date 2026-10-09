@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireAuth } from "./auth-middleware";
+import { requireAdmin } from "./auth-middleware";
 
 const optDate = z
   .string()
@@ -10,7 +10,7 @@ const optDate = z
 
 /** Rows for the recurring page; `ready: false` before schema v10 is run. */
 export const getRecurring = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async () => {
     const { listRecurring } = await import("./recurring.server");
     return listRecurring();
@@ -18,7 +18,7 @@ export const getRecurring = createServerFn({ method: "GET" })
 
 /** "Catat sekarang" — record the current occurrence and advance next_due. */
 export const postRecurring = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), date: optDate }).parse(d))
   .handler(async ({ data }) => {
     const { postRecurringNow } = await import("./recurring.server");
@@ -27,7 +27,7 @@ export const postRecurring = createServerFn({ method: "POST" })
 
 /** Pause / resume a recurring item. */
 export const toggleRecurring = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), active: z.boolean() }).parse(d))
   .handler(async ({ data }) => {
     const { setRecurringActive } = await import("./recurring.server");

@@ -37,6 +37,8 @@ export const rowsQuery = (table: CrudTable) =>
     queryFn: () => listRows({ data: { table } }),
     staleTime: REFERENCE_FRESH,
   });
+/** Settings → Pengguna (v18, admin only). */
+export const usersQueryKey = ["users"] as const;
 /** Logged-in user's profile (v17); also feeds the header avatar. */
 export const profileQuery = () =>
   queryOptions({ queryKey: ["profile"], queryFn: () => getProfile(), staleTime: 5 * 60_000 });
@@ -184,7 +186,8 @@ const AFFECTS: Record<string, string[]> = {
   // v14 settings: branding (logo/name), the settings card itself, and "today"-based views.
   app_settings: ["branding", "app-settings", "activity", "dashboard", "reminders"],
   // v17 profile: the profile page, the header avatar and the activity log.
-  app_users: ["profile", "activity"],
+  // v18: user management list (Settings → Pengguna) too.
+  app_users: ["profile", "activity", "users"],
 };
 
 export function invalidateFor(qc: QueryClient, table: string) {

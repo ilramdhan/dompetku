@@ -9,6 +9,7 @@ import { planGoalFunds } from "./goals";
 import { receiptColumns } from "./receipts";
 import { budgetPercent } from "./budget";
 import type { Json, Tables, TablesInsert } from "./database.types";
+import { scopeIds, txScopeFilter, walletNetByMonth } from "./permissions";
 import {
   categoriesByName,
   categorySlices,
@@ -71,11 +72,25 @@ export function isMissingTable(
 }
 
 /* ---------------- Activity log ---------------- */
+// v18 activity_log.actor is optional: once PostgREST reports it missing, inserts/reads skip it.
+let actorColumnMissing = false;
+
 export async function logActivity(action: string, entity?: string | null, detail?: unknown) {
   try {
-    const res = await db()
+    const { currentActor } = await import("./request-context.server");
+    const actor = actorColumnMissing ? null : currentActor();
+    const row: TablesInsert<"activity_log"> = {
+      action,
+      entity: entity ?? null,
+      detail: (detail ?? null) as Json,
+    };
+    let res = await db()
       .from("activity_log")
-      .insert({ action, entity: entity ?? null, detail: (detail ?? null) as Json });
+      .insert(actor ? { ...row, actor } : row);
+    if (res.error && actor && /actor/.test(res.error.message)) {
+      actorColumnMissing = true;
+      res = await db().from("activity_log").insert(row);
+    }
     if (res.error && !isMissingTable(res.error))
       console.error("activity log failed", res.error.message);
   } catch (e) {
@@ -85,16 +100,22 @@ export async function logActivity(action: string, entity?: string | null, detail
 
 export async function listActivity(limit = 30) {
   try {
-    const res = await db()
-      .from("activity_log")
-      .select("id, action, entity, detail, created_at")
-      .order("created_at", { ascending: false })
-      .limit(limit);
+    const run = (cols: string) =>
+      db().from("activity_log").select(cols).order("created_at", { ascending: false }).limit(limit);
+    let res = await run(
+      actorColumnMissing
+        ? "id, action, entity, detail, created_at"
+        : "id, action, entity, detail, created_at, actor",
+    );
+    if (res.error && !actorColumnMissing && /actor/.test(res.error.message)) {
+      actorColumnMissing = true;
+      res = await run("id, action, entity, detail, created_at");
+    }
     if (res.error) {
       if (!isMissingTable(res.error)) console.error("activity list failed", res.error.message);
       return [] as Tables<"activity_log">[];
     }
-    return res.data ?? [];
+    return (res.data ?? []) as unknown as Tables<"activity_log">[];
   } catch (e) {
     console.error("activity list failed", e);
     return [] as Tables<"activity_log">[];
@@ -424,6 +445,13 @@ export async function createFromExternal(t: ExternalTx) {
   return { transaction: tx, duplicate: false, message };
 }
 
+/**
+ * v18 data scope: the account ids a member may see. `null`/`undefined` = every account (owner,
+ * bot, n8n) — the unscoped behaviour is unchanged. Server fns pass `allowedAccountIds(access)`;
+ * the scope is never taken from client input.
+ */
+export type Scope = readonly string[] | null | undefined;
+
 export type TxFilters = {
   month?: string | undefined;
   kind?: string | undefined;
@@ -445,7 +473,8 @@ function retryWithoutItemsSearch(res: Res, f: TxFilters): boolean {
   return true;
 }
 
-function applyTxFilters(q: any, f: TxFilters) {
+function applyTxFilters(q: any, f: TxFilters, scope?: Scope) {
+  if (scope) q = q.or(txScopeFilter(scope));
   if (f.month) {
     const { start, end } = monthRange(f.month);
     q = q.gte("occurred_at", start).lt("occurred_at", end);
@@ -478,34 +507,39 @@ function orderedTxList(f: TxFilters) {
     .order("created_at", { ascending: false });
 }
 
-export async function listTransactions(f: TxFilters) {
+export async function listTransactions(f: TxFilters, scope?: Scope) {
   const limit = f.limit ?? 500;
   const offset = f.offset ?? 0;
-  const run = () => applyTxFilters(orderedTxList(f).range(offset, offset + limit - 1), f);
+  const run = () => applyTxFilters(orderedTxList(f).range(offset, offset + limit - 1), f, scope);
   const res = await run();
   return must(retryWithoutItemsSearch(res, f) ? await run() : res);
 }
 
-export async function countTransactions(f: TxFilters) {
+export async function countTransactions(f: TxFilters, scope?: Scope) {
   const run = () =>
-    applyTxFilters(db().from("transactions").select("id", { count: "exact", head: true }), f);
+    applyTxFilters(
+      db().from("transactions").select("id", { count: "exact", head: true }),
+      f,
+      scope,
+    );
   let res = await run();
   if (retryWithoutItemsSearch(res, f)) res = await run();
   if (res.error) throw new Error(res.error.message);
   return res.count ?? 0;
 }
 
-export async function exportCsv(month?: string) {
+export async function exportCsv(month?: string, scope?: Scope, mask?: (r: TxListRow) => TxListRow) {
   // Same order/filters as listTransactions, paged past PostgREST's 1000-row cap (id = stable tie-break).
   const f: TxFilters = { month };
-  const rows = must<TxListRow[]>(
+  const fetched = must<TxListRow[]>(
     await fetchAll<TxListRow>(
-      (from, to) => applyTxFilters(orderedTxList(f).order("id"), f).range(from, to),
+      (from, to) => applyTxFilters(orderedTxList(f).order("id"), f, scope).range(from, to),
       {
         hardCap: 10000,
       },
     ),
   );
+  const rows = mask ? fetched.map(mask) : fetched;
   const head = [
     "Tanggal",
     "Jenis",
@@ -551,7 +585,7 @@ type AggTx = Pick<TxRow, "kind" | "amount_idr" | "occurred_at" | "category_id"> 
 async function fetchAggTx(
   start: string | null,
   end: string,
-  opts: { kind?: "income" | "expense"; hardCap?: number } = {},
+  opts: { kind?: "income" | "expense"; hardCap?: number; scope?: Scope } = {},
 ): Promise<AggTx[]> {
   return must<AggTx[]>(
     await fetchAll(
@@ -563,6 +597,8 @@ async function fetchAggTx(
           .neq("kind", "transfer");
         if (start) q = q.gte("occurred_at", start);
         if (opts.kind) q = q.eq("kind", opts.kind);
+        // Members: income/expense count toward the wallet they were recorded on.
+        if (opts.scope) q = q.in("account_id", scopeIds(opts.scope));
         return q.order("id").range(from, to);
       },
       opts.hardCap ? { hardCap: opts.hardCap } : {},
@@ -571,7 +607,18 @@ async function fetchAggTx(
 }
 type AggSource = () => Promise<AggTx[]>;
 
-async function monthTotals(start: string, end: string, fb: AggSource): Promise<MonthKindTotal[]> {
+/**
+ * v9 SQL aggregates are global; a scoped (member) request always uses the JS path, whose source
+ * fetch is filtered by account (`fetchAggTx(..., { scope })`), so totals never include other
+ * wallets.
+ */
+async function monthTotals(
+  start: string,
+  end: string,
+  fb: AggSource,
+  scope?: Scope,
+): Promise<MonthKindTotal[]> {
+  if (scope) return normalizeTotals(sumMonthKind(await fb()));
   const r = await sqlOrFallback(
     () => db().rpc("dk_month_totals", { p_start: start, p_end: end }),
     async () => sumMonthKind(await fb()),
@@ -584,7 +631,9 @@ async function categoryTotals(
   end: string,
   kind: "income" | "expense",
   fb: AggSource,
+  scope?: Scope,
 ): Promise<CategoryTotal[]> {
+  if (scope) return normalizeTotals(sumCategories((await fb()).filter((t) => t.kind === kind)));
   const r = await sqlOrFallback(
     () => db().rpc("dk_category_totals", { p_start: start, p_end: end, p_kind: kind }),
     async () => sumCategories((await fb()).filter((t) => t.kind === kind)),
@@ -596,7 +645,10 @@ async function monthCategoryTotals(
   start: string,
   end: string,
   fb: AggSource,
+  scope?: Scope,
 ): Promise<MonthCategoryTotal[]> {
+  if (scope)
+    return normalizeTotals(sumMonthCategories((await fb()).filter((t) => t.kind === "expense")));
   const r = await sqlOrFallback(
     () => db().rpc("dk_month_category_totals", { p_start: start, p_end: end }),
     async () => sumMonthCategories((await fb()).filter((t) => t.kind === "expense")),
@@ -1122,6 +1174,73 @@ export async function computeDashboard(month: string) {
   };
 }
 
+/**
+ * Member dashboard (v18): same shape as computeDashboard, computed only over the permitted
+ * wallets (JS aggregation). Debts, goals, budgets, subscriptions and reminders are admin-only
+ * and come back empty; monthly fees/recurring are not applied from a member request.
+ */
+export async function computeMemberDashboard(
+  month: string,
+  scope: readonly string[],
+  mask: <T extends Record<string, unknown>>(row: T) => T,
+) {
+  const { start, end } = monthRange(month);
+  const trendStart = monthRange(shiftMonth(month, -5)).start;
+  const ids = scopeIds(scope);
+  const fb = once(() => fetchAggTx(trendStart, end, { scope }));
+  const [totals, monthCats, trendCats, balRes, recentRes, rate] = await Promise.all([
+    monthTotals(trendStart, end, fb, scope),
+    categoryTotals(
+      start,
+      end,
+      "expense",
+      async () => (await fb()).filter((t) => String(t.occurred_at) >= start),
+      scope,
+    ),
+    monthCategoryTotals(trendStart, end, fb, scope),
+    db().from("account_balances").select("*").eq("archived", false).in("id", ids),
+    db()
+      .from("transactions")
+      .select(
+        "*, category:categories(name,color), account:accounts!transactions_account_id_fkey(id,name), to_account:accounts!transactions_to_account_id_fkey(id,name)",
+      )
+      .or(txScopeFilter(ids))
+      .order("occurred_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(8),
+    getUsdIdr(),
+  ]);
+  const income = kindTotal(totals, "income", month);
+  const expense = kindTotal(totals, "expense", month);
+  const trendMonths = Array.from({ length: 6 }, (_, i) => shiftMonth(month, i - 5));
+  const balances = must(balRes).map((b) => ({
+    ...b,
+    balance: Number(b.balance),
+    balance_idr: b.currency === "USD" ? Number(b.balance) * rate : Number(b.balance),
+  }));
+  const feesIdr = monthCats.filter((c) => c.name === FEE_CATEGORY).reduce((a, c) => a + c.total, 0);
+  return {
+    month,
+    feesIdr,
+    usdIdr: rate,
+    income,
+    expense,
+    net: income - expense,
+    byCategory: categorySlices(monthCats),
+    trend: monthSeries(trendMonths, totals),
+    categoryTrend: topCategoryTrend(trendMonths, trendCats),
+    balances,
+    totalBalanceIdr: balances.reduce((a, b) => a + b.balance_idr, 0),
+    debtOutstandingIdr: 0,
+    subsMonthlyIdr: 0,
+    budgets: [] as Awaited<ReturnType<typeof computeBudgets>>,
+    reminders: [] as Reminder[],
+    recent: must(recentRes).map((r) => mask(r as Record<string, unknown>)),
+    goals: [] as { id: string; name: string; target_amount: number; saved_amount: number }[],
+    scoped: true as const,
+  };
+}
+
 export async function summaryText(month: string): Promise<string> {
   const d = await computeDashboard(month);
   const fmt = (n: number) =>
@@ -1380,21 +1499,29 @@ export async function importCsv(text: string) {
 }
 
 /* ---------------- Reports ---------------- */
-export async function categoryTrend(months: number, endMonth: string) {
+export async function categoryTrend(months: number, endMonth: string, scope?: Scope) {
   const first = shiftMonth(endMonth, -(months - 1));
   const { start } = monthRange(first);
   const { end } = monthRange(endMonth);
-  const rows = await monthCategoryTotals(start, end, () =>
-    fetchAggTx(start, end, { kind: "expense", hardCap: 50000 }),
+  const rows = await monthCategoryTotals(
+    start,
+    end,
+    () => fetchAggTx(start, end, { kind: "expense", hardCap: 50000, scope }),
+    scope,
   );
   const list = Array.from({ length: months }, (_, i) => shiftMonth(first, i));
   return { months: list, ...categoryTrendSeries(list, rows) };
 }
 
-export async function yearlySummary(year: number) {
+export async function yearlySummary(year: number, scope?: Scope) {
   const start = `${year}-01-01`;
   const end = `${year + 1}-01-01`;
-  const totals = await monthTotals(start, end, () => fetchAggTx(start, end, { hardCap: 100000 }));
+  const totals = await monthTotals(
+    start,
+    end,
+    () => fetchAggTx(start, end, { hardCap: 100000, scope }),
+    scope,
+  );
   const months = monthSeries(
     Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`),
     totals,
@@ -1576,7 +1703,48 @@ export async function sendReminderEmail(days: number, to?: string) {
 }
 
 /* ---------------- Reports: net worth ---------------- */
-export async function netWorthSeries(months = 12, endMonth: string) {
+/**
+ * Member net worth (v18): the summed balance of the permitted wallets only (no gold, receivables
+ * or other wallets). Transfers between two permitted wallets cancel out.
+ */
+async function walletNetWorthSeries(months: number, endMonth: string, scope: readonly string[]) {
+  const { end } = monthRange(endMonth);
+  const ids = scopeIds(scope);
+  const [rate, accRes, txRes] = await Promise.all([
+    getUsdIdr(),
+    db().from("accounts").select("id, initial_balance, currency").in("id", ids),
+    fetchAll<Pick<TxRow, "kind" | "amount" | "account_id" | "to_account_id" | "occurred_at">>(
+      (from, to) =>
+        db()
+          .from("transactions")
+          .select("kind, amount, account_id, to_account_id, occurred_at")
+          .or(txScopeFilter(ids))
+          .lt("occurred_at", end)
+          .order("id")
+          .range(from, to),
+      { hardCap: 200000 },
+    ),
+  ]);
+  const accs = must(accRes);
+  const txs =
+    must<Pick<TxRow, "kind" | "amount" | "account_id" | "to_account_id" | "occurred_at">[]>(txRes);
+  const wallets = new Map(accs.map((a) => [a.id, { currency: a.currency }]));
+  let cum = 0;
+  for (const a of accs) cum += Number(a.initial_balance) * (a.currency === "USD" ? rate : 1);
+  const nets = new Map(walletNetByMonth(txs, wallets, rate).map((n) => [n.month, n.net]));
+  const first = shiftMonth(endMonth, -(months - 1));
+  for (const [m, v] of [...nets.entries()].sort()) if (m < first) cum += v;
+  const out: { month: string; netWorth: number; gold: number }[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const m = shiftMonth(endMonth, -i);
+    cum += nets.get(m) ?? 0;
+    out.push({ month: m, netWorth: r2(cum), gold: 0 });
+  }
+  return out;
+}
+
+export async function netWorthSeries(months = 12, endMonth: string, scope?: Scope) {
+  if (scope) return walletNetWorthSeries(months, endMonth, scope);
   const { end } = monthRange(endMonth);
   const assets = await import("./assets.server");
   const rateP = getUsdIdr();
@@ -1638,6 +1806,7 @@ export async function exportBackup() {
     "account_reconciliations",
     "app_settings",
     "app_users",
+    "account_permissions",
   ] as const;
   const { stripSecrets } = await import("./backup");
   const data: Record<string, any[]> = {};
@@ -1645,6 +1814,7 @@ export async function exportBackup() {
   const orderKeys: Partial<Record<(typeof tables)[number], string[]>> = {
     fx_rates: ["rate_date", "base", "quote"],
     gold_prices: ["price_date", "source"],
+    account_permissions: ["user_id", "account_id"],
   };
   const results = await Promise.all(
     tables.map((t) =>

@@ -15,6 +15,7 @@ import { usePrivacy } from "@/lib/privacy";
 import { formatPresets } from "@/lib/fees";
 import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/head";
+import { useAccess } from "@/hooks/use-access";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const Route = createFileRoute("/_app/accounts")({
@@ -42,6 +43,8 @@ function AccountsPage() {
     archived: false,
     color: "#2f7d5b",
   });
+  // v18 members: read-only list of their permitted wallets (accounts CRUD is admin-only).
+  const { isAdmin } = useAccess();
   const TYPES = [
     { value: "bank", label: t("Bank") },
     { value: "ewallet", label: t("E-wallet") },
@@ -56,9 +59,11 @@ function AccountsPage() {
         title={t("Akun & Dompet")}
         subtitle={t("Saldo dihitung otomatis dari saldo awal + semua transaksi.")}
         actions={
-          <Button onClick={() => crud.openNew()}>
-            <Plus className="size-4" /> {t("Akun baru")}
-          </Button>
+          isAdmin ? (
+            <Button onClick={() => crud.openNew()}>
+              <Plus className="size-4" /> {t("Akun baru")}
+            </Button>
+          ) : undefined
         }
       />
       {balances.length === 0 ? (
@@ -94,24 +99,26 @@ function AccountsPage() {
                       {a.archived ? <Badge variant="outline">{t("Arsip")}</Badge> : null}
                     </div>
                   </div>
-                  <RowActions
-                    onEdit={() =>
-                      crud.openEdit({
-                        id: a.id,
-                        name: a.name,
-                        type: a.type,
-                        currency: a.currency,
-                        initial_balance: a.initial_balance,
-                        color: a.color,
-                        archived: a.archived,
-                        transfer_fees: formatPresets(a.transfer_fees),
-                        topup_fees: formatPresets(a.topup_fees),
-                        monthly_fee: a.monthly_fee,
-                        monthly_fee_day: a.monthly_fee_day,
-                      })
-                    }
-                    onDelete={() => crud.remove(a.id, `${t("akun")} ${a.name}`)}
-                  />
+                  {isAdmin ? (
+                    <RowActions
+                      onEdit={() =>
+                        crud.openEdit({
+                          id: a.id,
+                          name: a.name,
+                          type: a.type,
+                          currency: a.currency,
+                          initial_balance: a.initial_balance,
+                          color: a.color,
+                          archived: a.archived,
+                          transfer_fees: formatPresets(a.transfer_fees),
+                          topup_fees: formatPresets(a.topup_fees),
+                          monthly_fee: a.monthly_fee,
+                          monthly_fee_day: a.monthly_fee_day,
+                        })
+                      }
+                      onDelete={() => crud.remove(a.id, `${t("akun")} ${a.name}`)}
+                    />
+                  ) : null}
                 </div>
                 {Number(a.monthly_fee) > 0 ? (
                   <p className="num mt-2 break-words text-xs text-muted-foreground">

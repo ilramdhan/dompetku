@@ -6,17 +6,30 @@
  */
 export const SESSION_TTL_MS = 5 * 60_000;
 
-let cached: { user: string | null; at: number } | null = null;
+/** UI-only session info (v18 role, forced password change, wallet levels); never trusted server-side. */
+export type SessionInfo = {
+  role?: "admin" | "member" | null;
+  displayName?: string | null;
+  mustChangePassword?: boolean;
+  wallets?: Record<string, "view" | "manage"> | null;
+};
 
-export function getCachedSession(now = Date.now()): { user: string | null } | null {
+let cached: ({ user: string | null; at: number } & SessionInfo) | null = null;
+
+export function getCachedSession(now = Date.now()): ({ user: string | null } & SessionInfo) | null {
   if (typeof window === "undefined") return null; // never share across SSR requests
   if (!cached || now - cached.at > SESSION_TTL_MS) return null;
-  return { user: cached.user };
+  const { at: _at, ...rest } = cached;
+  return rest;
 }
 
-export function setCachedSession(user: string | null, now = Date.now()): void {
+export function setCachedSession(
+  user: string | null,
+  now = Date.now(),
+  info: SessionInfo = {},
+): void {
   if (typeof window === "undefined") return;
-  cached = { user, at: now };
+  cached = { user, at: now, ...info };
 }
 
 export function clearSessionCache(): void {
@@ -25,4 +38,9 @@ export function clearSessionCache(): void {
 
 export function isUnauthorizedError(err: unknown): boolean {
   return err instanceof Error ? err.message === "Unauthorized" : false;
+}
+
+/** v18: a member must replace the temporary password before using the app. */
+export function isPasswordChangeError(err: unknown): boolean {
+  return err instanceof Error ? err.message === "PasswordChangeRequired" : false;
 }

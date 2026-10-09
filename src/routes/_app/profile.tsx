@@ -21,6 +21,7 @@ import { clearSessionCache } from "@/lib/session-cache";
 import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/head";
 import { cn } from "@/lib/utils";
+import { useAccess } from "@/hooks/use-access";
 
 export const Route = createFileRoute("/_app/profile")({
   head: () => pageHead("Profil", "Nama, alamat, foto profil, dan password."),
@@ -63,6 +64,25 @@ async function resizeAvatar(file: File): Promise<string> {
 function ProfilePage() {
   const { t } = useI18n();
   const q = useQuery(profileQuery());
+  const forced = !!q.data?.must_change_password;
+  if (forced && q.data)
+    return (
+      <>
+        <PageHeader
+          title={t("Ganti password sementara")}
+          subtitle={t("Buat password baru milik Anda sebelum memakai aplikasi.")}
+        />
+        <div className="mx-auto w-full max-w-lg">
+          <PasswordCard
+            username={q.data.profile.username}
+            ready={q.data.ready}
+            hasDbPassword
+            resetMode={false}
+            forced
+          />
+        </div>
+      </>
+    );
   return (
     <>
       <PageHeader title={t("Profil")} subtitle={t("Nama, alamat, foto profil, dan password.")} />
@@ -282,17 +302,21 @@ function PasswordCard({
   ready,
   hasDbPassword,
   resetMode,
+  forced = false,
 }: {
   username: string;
   ready: boolean;
   hasDbPassword: boolean;
   resetMode: boolean;
+  /** v18: member's forced first-login change of the temporary password. */
+  forced?: boolean;
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const router = useRouter();
   const navigate = useNavigate();
   const change = useServerFn(changePassword);
+  const { isAdmin } = useAccess();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -319,6 +343,12 @@ function PasswordCard({
       setConfirm("");
       toast.success(t("Password diganti. Perangkat lain sudah dikeluarkan."));
       await invalidateFor(qc, "app_users");
+      if (forced) {
+        // Re-read the session (role/flags) and continue into the app.
+        clearSessionCache();
+        await router.invalidate();
+        await navigate({ to: "/dashboard" });
+      }
     } catch (err) {
       const m = errMsg(err);
       if (m === "Unauthorized") {
@@ -341,11 +371,19 @@ function PasswordCard({
         <KeyRound className="size-4" /> {t("Ganti password")}
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        {hasDbPassword
-          ? t("Password disimpan sebagai hash di database; APP_PASSWORD di env tidak lagi dipakai.")
-          : t(
-              "Saat ini login memakai APP_PASSWORD dari env. Setelah diganti, password baru disimpan sebagai hash di database.",
-            )}
+        {forced
+          ? t(
+              "Admin membuatkan password sementara. Masukkan password itu, lalu buat password baru.",
+            )
+          : !isAdmin
+            ? t("Password Anda disimpan sebagai hash di database.")
+            : hasDbPassword
+              ? t(
+                  "Password disimpan sebagai hash di database; APP_PASSWORD di env tidak lagi dipakai.",
+                )
+              : t(
+                  "Saat ini login memakai APP_PASSWORD dari env. Setelah diganti, password baru disimpan sebagai hash di database.",
+                )}
       </p>
       {resetMode ? (
         <p className="mt-3 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
@@ -364,7 +402,9 @@ function PasswordCard({
           hidden
         />
         <div className="space-y-1.5">
-          <Label htmlFor="pw-current">{t("Password saat ini")}</Label>
+          <Label htmlFor="pw-current">
+            {forced ? t("Password sementara") : t("Password saat ini")}
+          </Label>
           <PasswordInput
             id="pw-current"
             autoComplete="current-password"

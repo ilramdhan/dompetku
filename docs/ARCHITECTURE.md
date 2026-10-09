@@ -13,7 +13,7 @@ so you can follow along even if you are new to web development.
 - [Tech stack](#tech-stack)
 - [System diagram](#system-diagram)
 - [Directory structure](#directory-structure)
-- [Database schema sections (v1–v17)](#database-schema-sections-v1v17)
+- [Database schema sections (v1–v18)](#database-schema-sections-v1v18)
 - [Key flows](#key-flows)
 - [Conventions and contributor rules](#conventions-and-contributor-rules)
 - [Testing and CI](#testing-and-ci)
@@ -128,7 +128,7 @@ collapsed. Lovable planning drafts in `.lovable/` are omitted.
 │   ├── icons/                     # PWA icons (collapsed)
 │   ├── manifest.webmanifest       # PWA manifest (no service worker)
 │   └── robots.txt
-├── supabase/schema.sql            # Full database schema, sections v1–v17, safe to re-run
+├── supabase/schema.sql            # Full database schema, sections v1–v18, safe to re-run
 ├── src/
 │   ├── server.ts                  # Server entry wrapper: catches SSR errors → logError + error page
 │   ├── start.ts                   # Global request middleware: security headers, error page, CSRF
@@ -208,7 +208,7 @@ File-name suffixes tell you where code may run:
 | `i18n.tsx`                                                                    | `LanguageProvider` / `useI18n`, ID→EN dictionary.                                                                      |
 | `dates.ts`, `head.ts`, `utils.ts`                                             | Date helpers, page `<head>` helper, `cn()` class merge.                                                                |
 
-## Database schema sections (v1–v17)
+## Database schema sections (v1–v18)
 
 `supabase/schema.sql` is one file, organised in sections that are **safe to re-run** (`if not
 exists` everywhere). A fresh install runs the whole file once. Existing installs run any newer
@@ -234,6 +234,7 @@ the section is run.
 | v15     | `ai_usage` log (one row per AI call: source, chat, kind, model, tokens) for the bot daily AI quota.                                                                                                                             |
 | v16     | `integration_settings` (key/value/is_secret): bot, AI, email and n8n values from Settings → Integrasi over env; secrets AES-256-GCM encrypted, excluded from backups.                                                           |
 | v17     | `app_users` (username, display_name, address, avatar data URL, password_hash, role, is_active, session_version): profile + in-app password change; backups carry profile fields only.                                           |
+| v18     | Multi-user: `app_users.must_change_password`, `account_permissions` (user_id, account_id, level `view`/`manage`, PK both, cascade), optional `activity_log.actor`.                                                              |
 
 ## Key flows
 
@@ -258,6 +259,43 @@ the section is run.
    because Lovable previews run in an iframe.
 6. n8n routes do not use the cookie. They require `x-api-key: <N8N_API_KEY>` (or
    `Authorization: Bearer`); a missing or short key makes them answer `503`.
+
+### Users and wallet-level access (RBAC, v18)
+
+- **Roles.** The `APP_USERNAME` user is always the **owner/admin**: never demoted, deactivated or
+  deleted, and the only user the TOTP secret, the Telegram bot and the n8n API act for. The owner
+  adds **members** (`app_users.role = 'member'`) in Settings → Pengguna with a temporary password
+  (`must_change_password`; the member must change it before any data fn works). Member usernames
+  are lower-case and immutable; the editable label is the full name (`display_name || username`).
+- **Login.** `authenticate()` (users.server.ts) checks the owner first, then an active member's
+  own scrypt hash. Member cookies carry `r: "member"`, so a member cookie can never validate as the
+  owner's and vice versa.
+- **Principal per request.** `requireAuth` resolves the cookie with `resolvePrincipal()`: owner
+  = signature + session version as before; member = active row, matching `session_version` and
+  wallet grants from `account_permissions` (cached ~30 s per instance, dropped on every admin
+  change; DB errors never invent access). Context: `{ user, userId, role, access, can() }`.
+  Deactivating, resetting the password or deleting bumps/removes the row, so the member's cookies
+  stop working within the cache TTL (immediately on the instance that made the change).
+- **Permission model** (`permissions.ts`, pure, tested). Strings `wallet:view`,
+  `wallet:manage`, `module:<name>`; `ROLE_CAPABILITIES` gives the admin `*` and members the
+  dashboard/transactions/accounts/reports/profile modules; one resolver `can(subject, permission,
+resource)`. New permissions become new strings (and, for per-resource grants, a new grant
+  table keyed like `account_permissions`) without touching callers.
+- **Server-fn classification.** `server-fn-access.ts` lists every `createServerFn` as `public`,
+  `session` (`requireSession`), `member` (`requireAuth` + RBAC scoping) or `admin`
+  (`requireAdmin`). `src/test/server-fn-access.test.ts` fails CI when a fn is unclassified, uses a
+  different middleware, or is member-accessible without consulting `rbac.server.ts`.
+- **Data scoping.** `accountScope(ctx)` (rbac.server.ts) returns the permitted account ids (null =
+  all for the owner). Member reads filter transactions with `account_id.in.(…) or
+to_account_id.in.(…)`, balances/accounts with `id in (…)`, and always use the **JS aggregation
+  path** (the v9 `dk_*` functions aggregate globally). Income/expense totals count the wallet they
+  were recorded on; the member net worth is the summed balance of the permitted wallets (no gold,
+  receivables, goals or debts). `maskTx()` replaces a non-permitted side of a transfer by "Dompet
+  lain" and clears its id.
+- **Writes.** Members need `manage` on the old and new wallet (both sides for transfers), every
+  transaction needs an account, categories are read-only, and receipt photos are uploaded under
+  `m/<user id>/` — a member can only attach or view their own uploads or photos of transactions on
+  permitted wallets.
 
 ### Data access and caching
 
@@ -437,7 +475,8 @@ worker** on purpose: it keeps Lovable previews and deployments free of stale cac
 `AGENTS.md` is the authoritative list. The most important rules:
 
 1. **Server-only data access.** Only `*.server.ts` code imports `db()`. Every data server
-   function uses `requireAuth`. Never add Supabase keys or clients to browser code.
+   function uses `requireAdmin`, or `requireAuth` plus RBAC scoping, and is classified in
+   `server-fn-access.ts`. Never add Supabase keys or clients to browser code.
 2. **Shared business logic.** Put logic in `finance.server.ts` (or a focused `*.server.ts`) so
    the web app and the bot/n8n API share it. Keep pure logic in client-safe files with tests.
 3. **Graceful degradation.** New tables/columns go into a **new optional schema section**. Reads

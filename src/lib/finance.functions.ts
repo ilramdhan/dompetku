@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireAuth } from "./auth-middleware";
+import { requireAdmin, requireAuth } from "./auth-middleware";
 import {
   CRUD_TABLES,
   DELETABLE_TABLES,
@@ -21,19 +21,24 @@ const optDate = z
 export const listRows = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .inputValidator((d: unknown) => z.object({ table: z.enum(CRUD_TABLES) }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { db } = await import("./db.server");
+    const { accountScope } = await import("./rbac.server");
+    const { scopeIds } = await import("./permissions");
+    const scope = accountScope(context);
+    // Members: categories (read-only) and their permitted accounts; every other table is admin-only.
+    if (scope && data.table !== "categories" && data.table !== "accounts")
+      throw new Error("Akses ditolak");
     const byName = data.table === "categories" || data.table === "accounts";
-    const res = await db()
-      .from(data.table)
-      .select("*")
-      .order(byName ? "name" : "created_at", { ascending: true });
+    let q: any = db().from(data.table).select("*");
+    if (scope && data.table === "accounts") q = q.in("id", scopeIds(scope));
+    const res = await q.order(byName ? "name" : "created_at", { ascending: true });
     if (res.error) throw new Error(res.error.message);
     return (res.data ?? []) as any[];
   });
 
 export const saveRow = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -94,7 +99,7 @@ export const saveRow = createServerFn({ method: "POST" })
   });
 
 export const deleteRow = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z.object({ table: z.enum(DELETABLE_TABLES), id: z.string().uuid() }).parse(d),
   )
@@ -129,10 +134,22 @@ export const saveTransaction = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z.object({ id: z.string().uuid().nullable().optional(), values: transactionSchema }).parse(d),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { insertTransaction, updateTransaction } = await import("./finance.server");
+    const rbac = await import("./rbac.server");
+    const { receiptPaths } = await import("./receipts");
+    // Members: manage on the old sides (edit) and on the new sides (both, for transfers).
+    const prev = data.id ? await rbac.assertTxIdWrite(context, data.id) : null;
+    rbac.assertTxWrite(context, data.values);
+    rbac.assertReceiptPathsAllowed(
+      context,
+      [...receiptPaths(data.values as never), data.values.receipt_path],
+      prev,
+    );
     if (data.id) return (await updateTransaction(data.id, data.values)) as any;
     const tx = await insertTransaction(data.values);
+    // Budgets are admin-only: members get no budget alerts.
+    if (context.role !== "admin") return { ...tx, budgetAlerts: [] } as any;
     // v11: instant budget alerts (never throws; [] on any failure).
     const { budgetAlertsFor } = await import("./budget.server");
     return { ...tx, budgetAlerts: await budgetAlertsFor(tx) } as any;
@@ -153,29 +170,39 @@ export const listTransactions = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) =>
     txFilterSchema.extend({ offset: z.number().int().min(0).optional() }).parse(d),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { listTransactions } = await import("./finance.server");
-    return (await listTransactions(data)) as any[];
+    const { accountScope, maskRows } = await import("./rbac.server");
+    const rows = (await listTransactions(data, accountScope(context))) as any[];
+    return maskRows(context, rows);
   });
 
 export const getTxCount = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .inputValidator((d: unknown) => txFilterSchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { countTransactions } = await import("./finance.server");
-    return countTransactions(data);
+    const { accountScope } = await import("./rbac.server");
+    return countTransactions(data, accountScope(context));
   });
 
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .inputValidator((d: unknown) => z.object({ month }).parse(d))
-  .handler(async ({ data }) => {
-    const { computeDashboard } = await import("./finance.server");
+  .handler(async ({ data, context }) => {
+    const { computeDashboard, computeMemberDashboard } = await import("./finance.server");
+    const { accountScope } = await import("./rbac.server");
+    const { maskTx } = await import("./permissions");
+    const scope = accountScope(context);
+    if (scope)
+      return (await computeMemberDashboard(data.month, scope, (r) =>
+        maskTx(context.access, r as any),
+      )) as any;
     return (await computeDashboard(data.month)) as any;
   });
 
 export const getReminders = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ days: z.number().int().min(1).max(365) }).parse(d))
   .handler(async ({ data }) => {
     const { computeReminders } = await import("./finance.server");
@@ -183,14 +210,14 @@ export const getReminders = createServerFn({ method: "GET" })
   });
 
 export const getDebts = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async () => {
     const { computeDebts } = await import("./finance.server");
     return (await computeDebts()) as any[];
   });
 
 export const getBudgets = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ month }).parse(d))
   .handler(async ({ data }) => {
     const { computeBudgets } = await import("./finance.server");
@@ -199,9 +226,14 @@ export const getBudgets = createServerFn({ method: "GET" })
 
 export const getBalances = createServerFn({ method: "GET" })
   .middleware([requireAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
     const { db } = await import("./db.server");
-    const res = await db().from("account_balances").select("*").order("name");
+    const { accountScope } = await import("./rbac.server");
+    const { scopeIds } = await import("./permissions");
+    const scope = accountScope(context);
+    let q: any = db().from("account_balances").select("*");
+    if (scope) q = q.in("id", scopeIds(scope));
+    const res = await q.order("name");
     if (res.error) throw new Error(res.error.message);
     return (res.data ?? []) as any[];
   });
@@ -214,7 +246,7 @@ export const getFxRate = createServerFn({ method: "GET" })
   });
 
 export const payDebt = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z.object({ debt_id: z.string().uuid(), account_id: optUuid, date: optDate }).parse(d),
   )
@@ -224,7 +256,7 @@ export const payDebt = createServerFn({ method: "POST" })
   });
 
 export const paySubscription = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z.object({ id: z.string().uuid(), account_id: optUuid, date: optDate }).parse(d),
   )
@@ -234,7 +266,7 @@ export const paySubscription = createServerFn({ method: "POST" })
   });
 
 export const addGoalFunds = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -256,13 +288,18 @@ export const addGoalFunds = createServerFn({ method: "POST" })
 export const exportTransactionsCsv = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .inputValidator((d: unknown) => z.object({ month: month.optional() }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { exportCsv } = await import("./finance.server");
-    return { csv: await exportCsv(data.month) };
+    const { accountScope } = await import("./rbac.server");
+    const { maskTx } = await import("./permissions");
+    const scope = accountScope(context);
+    return {
+      csv: await exportCsv(data.month, scope, scope ? (r) => maskTx(context.access, r) : undefined),
+    };
   });
 
 export const scanReceipt = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z.object({ image: z.string().startsWith("data:image/").max(8_000_000) }).parse(d),
   )
@@ -274,7 +311,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
   });
 
 export const getYearly = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ year: z.string().regex(/^\d{4}$/) }).parse(d))
   .handler(async ({ data }) => {
     const { computeYearly } = await import("./finance.server");
@@ -282,7 +319,7 @@ export const getYearly = createServerFn({ method: "GET" })
   });
 
 export const importTransactionsCsv = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ csv: z.string().min(1).max(5_000_000) }).parse(d))
   .handler(async ({ data }) => {
     (await import("./demo.server")).assertNotDemo();
@@ -295,16 +332,21 @@ export const uploadReceiptImage = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z.object({ image: z.string().startsWith("data:image/").max(8_000_000) }).parse(d),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     (await import("./demo.server")).assertNotDemo();
+    const rbac = await import("./rbac.server");
+    rbac.assertCanWriteSomewhere(context);
     const { uploadReceipt } = await import("./receipt.server");
-    return uploadReceipt(data.image);
+    const prefix =
+      context.role === "admin" || !context.userId ? "" : rbac.memberReceiptPrefix(context.userId);
+    return uploadReceipt(data.image, prefix);
   });
 
 export const getReceiptUrl = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .inputValidator((d: unknown) => z.object({ path: z.string().min(1).max(500) }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await (await import("./rbac.server")).assertReceiptView(context, data.path);
     const { receiptUrl } = await import("./receipt.server");
     return { url: await receiptUrl(data.path) };
   });
@@ -314,21 +356,23 @@ export const getCategoryTrend = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) =>
     z.object({ months: z.number().int().min(3).max(24), end: month }).parse(d),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { categoryTrend } = await import("./finance.server");
-    return categoryTrend(data.months, data.end);
+    const { accountScope } = await import("./rbac.server");
+    return categoryTrend(data.months, data.end, accountScope(context));
   });
 
 export const getYearlySummary = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .inputValidator((d: unknown) => z.object({ year: z.number().int().min(2000).max(2100) }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { yearlySummary } = await import("./finance.server");
-    return yearlySummary(data.year);
+    const { accountScope } = await import("./rbac.server");
+    return yearlySummary(data.year, accountScope(context));
   });
 
 export const importCsvTransactions = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z
       .object({ rows: z.array(importRowSchema).min(1).max(5000), createMissing: z.boolean() })
@@ -345,20 +389,21 @@ export const getNetWorth = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) =>
     z.object({ months: z.number().int().min(3).max(36), end: month }).parse(d),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { netWorthSeries } = await import("./finance.server");
-    return netWorthSeries(data.months, data.end);
+    const { accountScope } = await import("./rbac.server");
+    return netWorthSeries(data.months, data.end, accountScope(context));
   });
 
 export const exportBackupJson = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async () => {
     const { exportBackup } = await import("./finance.server");
     return exportBackup();
   });
 
 export const getActivity = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z.object({ limit: z.number().int().min(1).max(100).default(30) }).parse(d),
   )
@@ -371,7 +416,7 @@ export const getActivity = createServerFn({ method: "GET" })
 const recvSchema = () => import("./schemas").then((m) => m.receivableSchema);
 
 export const getGold = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -388,7 +433,7 @@ export const getGold = createServerFn({ method: "GET" })
   });
 
 export const getReceivables = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -403,7 +448,7 @@ export const getReceivables = createServerFn({ method: "GET" })
   });
 
 export const saveReceivableFn = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z.object({ id: z.string().uuid().nullable().optional(), values: z.unknown() }).parse(d),
   )
@@ -415,7 +460,7 @@ export const saveReceivableFn = createServerFn({ method: "POST" })
   });
 
 export const payReceivableFn = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -432,7 +477,7 @@ export const payReceivableFn = createServerFn({ method: "POST" })
   });
 
 export const receivableActionFn = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -451,7 +496,7 @@ export const receivableActionFn = createServerFn({ method: "POST" })
   });
 
 export const getAssets = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async () => {
     const { assetsOverview } = await import("./assets.server");
     return (await assetsOverview()) as any;
