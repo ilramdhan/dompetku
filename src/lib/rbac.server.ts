@@ -14,7 +14,7 @@ import {
   maskTx,
   type Access,
 } from "./permissions";
-import { receiptPaths } from "./receipts";
+import { isOwnReceiptPath, receiptPaths } from "./receipts";
 
 type Ctx = { access: Access; userId: string | null };
 
@@ -101,12 +101,11 @@ export function assertReceiptPathsAllowed(
   previous?: TxRow | null,
 ): void {
   if (isAdmin(ctx.access)) return;
-  const own = ctx.userId ? memberReceiptPrefix(ctx.userId) : null;
   const prev = new Set(previous ? receiptPaths(previous as never) : []);
   for (const p of paths) {
     if (!p) continue;
     if (prev.has(p)) continue;
-    if (own && p.startsWith(own) && !p.includes("..")) continue;
+    if (isOwnReceiptPath(p, ctx.userId)) continue;
     throw new Error("Akses ditolak");
   }
 }
@@ -117,8 +116,7 @@ export function assertReceiptPathsAllowed(
  */
 export async function assertReceiptView(ctx: Ctx, path: string): Promise<void> {
   if (isAdmin(ctx.access)) return;
-  if (ctx.userId && path.startsWith(memberReceiptPrefix(ctx.userId)) && !path.includes(".."))
-    return;
+  if (isOwnReceiptPath(path, ctx.userId)) return;
   const ids = allowedAccountIds(ctx.access) ?? [];
   if (!ids.length) throw new Error("Akses ditolak");
   const { txScopeFilter } = await import("./permissions");
