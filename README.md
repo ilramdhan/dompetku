@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/banner.png" alt="Dompetku — catat keuangan pribadi dengan rapi: Telegram bot, receipt OCR, dashboard, budgets and gold tracking" width="100%">
+
 # Dompetku
 
 **A private, self-hosted personal finance tracker with a Telegram bot and receipt OCR.**
