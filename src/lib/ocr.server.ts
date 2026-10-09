@@ -43,13 +43,25 @@ async function record(meta: AiMeta, vision: boolean, model: string, ok: boolean,
   }
 }
 
+export const DEFAULT_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+export const DEFAULT_AI_MODEL = "google/gemini-2.5-flash";
+
+/** Effective AI endpoint/key/model (Settings → Integrasi, else env, else defaults). */
+export async function aiConfig(vision: boolean) {
+  const { getIntegrations } = await import("./integrations.server");
+  const c = await getIntegrations(["AI_API_URL", "AI_API_KEY", "AI_MODEL", "AI_MODEL_TEXT"]);
+  const base = c.AI_MODEL || DEFAULT_AI_MODEL;
+  return {
+    url: c.AI_API_URL || DEFAULT_AI_URL,
+    key: c.AI_API_KEY || process.env["LOVABLE_API_KEY"],
+    // AI_MODEL_TEXT lets chat parsing use a cheaper model (e.g. flash-lite) than receipt OCR.
+    model: vision ? base : c.AI_MODEL_TEXT || base,
+  };
+}
+
 async function aiJson(messages: unknown[], vision: boolean, meta: AiMeta = WEB): Promise<unknown> {
-  const url = process.env["AI_API_URL"] || "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const key = process.env["AI_API_KEY"] || process.env["LOVABLE_API_KEY"];
+  const { url, key, model } = await aiConfig(vision);
   if (!key) throw new Error("AI_API_KEY belum diatur untuk fitur OCR.");
-  const base = process.env["AI_MODEL"] || "google/gemini-2.5-flash";
-  // AI_MODEL_TEXT lets chat parsing use a cheaper model (e.g. flash-lite) than receipt OCR.
-  const model = vision ? base : process.env["AI_MODEL_TEXT"] || base;
   let res: Response;
   try {
     res = await fetch(url, {

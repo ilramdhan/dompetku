@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/public/n8n/report")({
     handlers: {
       GET: withErrorLogging("n8n:report", async ({ request }) => {
         const { checkApiKey, json } = await import("@/lib/api-key.server");
-        const denied = checkApiKey(request);
+        const denied = await checkApiKey(request);
         if (denied) return denied;
         const period = (new URL(request.url).searchParams.get("period") ?? "month").slice(0, 20);
         try {

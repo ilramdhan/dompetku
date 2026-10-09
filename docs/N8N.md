@@ -197,6 +197,23 @@ A **credential** is a secret stored encrypted inside n8n. Create them under **Ov
 > [!TIP]
 > Bot replies are in Indonesian; amounts like `25rb` (25 thousand) and `1,5jt` (1.5 million) are understood.
 
+> [!TIP]
+> `N8N_API_KEY`, `BOT_ALLOWED_CHAT_IDS`, `BOT_TEXT_AI`, `BOT_AI_DAILY_LIMIT` and the AI/email values can also be set in the app under **Settings → Integrasi** (schema v16) — no Vercel redeploy needed. See [ENVIRONMENT.md](ENVIRONMENT.md#setting-integrations-from-the-web-ui-v16).
+
+### Telegram direct mode (without n8n)
+
+If you only want the chat bot (no scheduled reminders, error alerts or Drive backups), the app can talk to Telegram itself:
+
+1. Create the bot with @BotFather (step 1 above).
+2. In the app: **Settings → Integrasi → Bot Telegram** → paste the token into **Token bot Telegram** and your chat ID into **Chat ID yang diizinkan** (or set `TELEGRAM_BOT_TOKEN` / `BOT_ALLOWED_CHAT_IDS` as env vars).
+3. Click **Pasang webhook**. The app calls Telegram's `setWebhook` with `<your app>/api/public/telegram/webhook` and a secret token; Telegram then sends every update with the `X-Telegram-Bot-Api-Secret-Token` header, and requests without it are refused (401).
+4. Send `/help` to the bot.
+
+The webhook runs the **same** bot handler as `POST /api/public/n8n/bot` (same previews, buttons, AI quota and allow-list) and replies via the Bot API. It needs a public **https** address (Vercel is fine; `localhost` is not).
+
+> [!IMPORTANT]
+> A Telegram bot has **one** webhook. Direct mode and n8n workflow 01 cannot receive the same bot at once: **Pasang webhook** replaces n8n's Telegram Trigger webhook, and re-activating workflow 01 in n8n takes it back. Click **Lepas webhook** before switching back to n8n. The n8n endpoints keep working either way, so workflows 02–05 (reminders, errors, backups) still run.
+
 ---
 
 ## 5. Importing the templates

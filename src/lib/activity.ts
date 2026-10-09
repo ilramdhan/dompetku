@@ -41,6 +41,10 @@ const SPECIAL: Record<string, string> = {
   "recurring.pause": "Transaksi berulang dijeda",
   "recurring.resume": "Transaksi berulang dilanjutkan",
   "app_settings.update": "Pengaturan aplikasi diubah",
+  "integration.update": "Pengaturan integrasi diubah",
+  "integration.delete": "Pengaturan integrasi dihapus (kembali ke env)",
+  "integration.webhook_set": "Webhook Telegram dipasang",
+  "integration.webhook_delete": "Webhook Telegram dilepas",
 };
 
 export function activityLabel(action: string, t: (s: string) => string = (s) => s): string {

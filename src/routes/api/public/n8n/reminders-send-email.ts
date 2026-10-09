@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/public/n8n/reminders-send-email")({
     handlers: {
       POST: withErrorLogging("n8n:reminders-send-email", async ({ request }) => {
         const { checkApiKey, json } = await import("@/lib/api-key.server");
-        const denied = checkApiKey(request);
+        const denied = await checkApiKey(request);
         if (denied) return denied;
         const parsed = body.safeParse(await request.json().catch(() => ({})));
         if (!parsed.success)

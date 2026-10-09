@@ -145,7 +145,7 @@ A **fork** is your own copy of the project on GitHub. Vercel will build the webs
 **What success looks like:** the result panel says **Success. No rows returned** (you may also see a small table from the last statement). In **Table Editor** you now see tables such as `accounts`, `categories`, `transactions`, `debts`, `subscriptions`, `budgets`, `goals` … and the `categories` table already has default categories.
 
 <details>
-<summary><strong>What are the sections v1 … v15?</strong></summary>
+<summary><strong>What are the sections v1 … v16?</strong></summary>
 
 The file grew with the app. Every section uses `if not exists` / `on conflict do nothing` / `create or replace`, so **the whole file is idempotent: running it again is always safe** and never deletes data. Run the whole file each time you update.
 
@@ -166,6 +166,7 @@ The file grew with the app. Every section uses `if not exists` / `on conflict do
 | v13       | Per-account report and bank reconciliation                                                                                               |
 | v14       | App settings (name, logo, time zone, landing page, bot defaults)                                                                         |
 | v15       | AI usage log and per-chat daily bot AI quota                                                                                             |
+| v16       | Integration settings (bot, AI, email, n8n keys) editable in Settings → Integrasi; secrets encrypted                                      |
 
 If a later section has not been run, the related page shows a hint instead of crashing, and the rest of the app keeps working.
 
@@ -320,6 +321,9 @@ Log expenses by chatting ("coffee 25k", "gaji 8jt ke BCA") or sending a receipt 
 3. Create the bot with @BotFather and import the n8n workflows.
 
 Full walkthrough: **[N8N.md](N8N.md)**.
+
+> [!TIP]
+> With schema v16 you can set `N8N_API_KEY`, `BOT_ALLOWED_CHAT_IDS`, the AI keys and the Resend values in **Settings → Integrasi** instead of Vercel (no redeploy). Only want the chat bot? [Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n) needs no n8n at all: paste the bot token in Settings and click **Pasang webhook**.
 
 > [!TIP]
 > Don't know your chat ID? Leave `BOT_ALLOWED_CHAT_IDS` empty for a moment and message the bot: it refuses and replies with the chat ID to add.

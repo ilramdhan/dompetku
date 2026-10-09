@@ -20,6 +20,7 @@ import {
 import { addDays } from "./dates";
 import type { Tables } from "./database.types";
 import { withTax } from "./fees";
+import { isChatAllowed } from "./integrations";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const fin = () => import("./finance.server");
@@ -60,19 +61,21 @@ const edit = (
 
 /**
  * Required server-side allow-list (defense in depth on top of the n8n filter). Fails closed:
- * an empty or unset BOT_ALLOWED_CHAT_IDS refuses every chat.
+ * an empty or unset BOT_ALLOWED_CHAT_IDS (Settings → Integrasi, else env) refuses every chat.
+ * Only the integration_settings config table is read — never finance data.
  */
-export function chatAllowed(chatId: string): boolean {
-  const list = (process.env["BOT_ALLOWED_CHAT_IDS"] ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return list.length > 0 && list.includes(String(chatId));
+export async function chatAllowed(chatId: string): Promise<boolean> {
+  try {
+    const { getIntegration } = await import("./integrations.server");
+    return isChatAllowed(await getIntegration("BOT_ALLOWED_CHAT_IDS"), chatId);
+  } catch {
+    return false;
+  }
 }
 
 /* ---------------- Entry point ---------------- */
 export async function handleBotUpdate(u: BotUpdate): Promise<BotReply> {
-  if (!chatAllowed(u.chat_id)) {
+  if (!(await chatAllowed(u.chat_id))) {
     // Refuse before any DB access; echo the chat_id so the owner can add it to the env.
     console.warn(`bot: chat_id ${u.chat_id} ditolak (tidak ada di BOT_ALLOWED_CHAT_IDS)`);
     return reply(
@@ -205,7 +208,8 @@ async function draftFromText(u: BotUpdate, text: string): Promise<BotReply> {
   const f = await fin();
   const ctx = await f.parseContext();
   const today = f.today();
-  const mode = (process.env["BOT_TEXT_AI"] ?? "auto").toLowerCase(); // auto | always | never
+  const { getIntegration } = await import("./integrations.server");
+  const mode = ((await getIntegration("BOT_TEXT_AI")) ?? "auto").toLowerCase(); // auto | always | never
   const q = mode === "always" ? null : quickParse(text, today, ctx.accounts ?? []);
   let payload: DraftPayload | null = null;
   if (q) {

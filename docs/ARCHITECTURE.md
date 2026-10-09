@@ -13,7 +13,7 @@ so you can follow along even if you are new to web development.
 - [Tech stack](#tech-stack)
 - [System diagram](#system-diagram)
 - [Directory structure](#directory-structure)
-- [Database schema sections (v1–v15)](#database-schema-sections-v1v15)
+- [Database schema sections (v1–v16)](#database-schema-sections-v1v16)
 - [Key flows](#key-flows)
 - [Conventions and contributor rules](#conventions-and-contributor-rules)
 - [Testing and CI](#testing-and-ci)
@@ -128,7 +128,7 @@ collapsed. Lovable planning drafts in `.lovable/` are omitted.
 │   ├── icons/                     # PWA icons (collapsed)
 │   ├── manifest.webmanifest       # PWA manifest (no service worker)
 │   └── robots.txt
-├── supabase/schema.sql            # Full database schema, sections v1–v15, safe to re-run
+├── supabase/schema.sql            # Full database schema, sections v1–v16, safe to re-run
 ├── src/
 │   ├── server.ts                  # Server entry wrapper: catches SSR errors → logError + error page
 │   ├── start.ts                   # Global request middleware: security headers, error page, CSRF
@@ -206,7 +206,7 @@ File-name suffixes tell you where code may run:
 | `i18n.tsx`                                                                    | `LanguageProvider` / `useI18n`, ID→EN dictionary.                                                                      |
 | `dates.ts`, `head.ts`, `utils.ts`                                             | Date helpers, page `<head>` helper, `cn()` class merge.                                                                |
 
-## Database schema sections (v1–v15)
+## Database schema sections (v1–v16)
 
 `supabase/schema.sql` is one file, organised in sections that are **safe to re-run** (`if not
 exists` everywhere). A fresh install runs the whole file once. Existing installs run any newer
@@ -230,6 +230,7 @@ the section is run.
 | v13     | `dk_account_monthly` function and `account_reconciliations`.                                                                                                                                                                    |
 | v14     | `app_settings` (single row: name, tagline, logo data URL, time zone, base currency, landing, bot default account, reminder days).                                                                                               |
 | v15     | `ai_usage` log (one row per AI call: source, chat, kind, model, tokens) for the bot daily AI quota.                                                                                                                             |
+| v16     | `integration_settings` (key/value/is_secret): bot, AI, email and n8n values from Settings → Integrasi over env; secrets AES-256-GCM encrypted, excluded from backups.                                                           |
 
 ## Key flows
 

@@ -494,3 +494,20 @@ revoke all on public.ai_usage from anon, authenticated;
 grant all on public.ai_usage to service_role;
 alter table public.ai_usage enable row level security;
 notify pgrst, 'reload schema';
+
+-- ============ v16: pengaturan integrasi dari Web UI — bot, AI, email, n8n (aman dijalankan ulang) ============
+-- Opsional: tanpa bagian ini (atau dengan tabel kosong) semua nilai tetap dibaca dari env.
+-- Satu baris per kunci yang dikelola di Pengaturan → Integrasi (daftar putih di src/lib/integrations.ts).
+-- Nilai rahasia (is_secret) disimpan terenkripsi AES-256-GCM: v1:<iv>:<tag>:<ciphertext>; kuncinya
+-- SETTINGS_ENCRYPTION_KEY atau turunan SESSION_SECRET, tidak pernah ada di database.
+-- Tabel ini sengaja TIDAK ikut cadangan JSON (rahasia tidak boleh keluar dalam bentuk berkas).
+create table if not exists public.integration_settings (
+  key text primary key check (key ~ '^[A-Z][A-Z0-9_]{1,63}$'),
+  value text not null check (length(value) <= 4000),
+  is_secret boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+revoke all on public.integration_settings from anon, authenticated;
+grant all on public.integration_settings to service_role;
+alter table public.integration_settings enable row level security;
+notify pgrst, 'reload schema';

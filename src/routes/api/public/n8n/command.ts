@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/public/n8n/command")({
     handlers: {
       POST: withErrorLogging("n8n:command", async ({ request }) => {
         const { checkApiKey, json } = await import("@/lib/api-key.server");
-        const denied = checkApiKey(request);
+        const denied = await checkApiKey(request);
         if (denied) return denied;
         const parsed = schema.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return json({ ok: false, error: parsed.error.flatten() }, 400);

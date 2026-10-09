@@ -5,7 +5,8 @@
  *   1. `clearForReplace()` (replace mode only) — deletes current data in reverse FK order.
  *   2. `restoreChunk()` per table chunk, in RESTORE_TABLES order — upsert on the primary key.
  *   3. `finishRestore()` — logs `backup.restore`.
- * bot_drafts, activity_log and ai_usage (v15 logs) are never exported or restored.
+ * bot_drafts, activity_log and ai_usage (v15 logs) are never exported or restored, nor is
+ * integration_settings (v16): it holds encrypted API keys that must never leave the server in a file.
  */
 import { db } from "./db.server";
 import { isMissingTable, logActivity } from "./finance.server";

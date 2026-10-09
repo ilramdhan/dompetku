@@ -71,7 +71,8 @@ export async function botAiCallsToday(chatId: string): Promise<number> {
 
 /** True when this chat has used up `BOT_AI_DAILY_LIMIT` (default 50, "0" = unlimited). */
 export async function botAiQuotaReached(chatId: string): Promise<boolean> {
-  const limit = parseDailyLimit(process.env["BOT_AI_DAILY_LIMIT"]);
+  const { getIntegration } = await import("./integrations.server");
+  const limit = parseDailyLimit(await getIntegration("BOT_AI_DAILY_LIMIT"));
   if (limit == null) return false;
   return quotaExceeded(await botAiCallsToday(chatId), limit);
 }

@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/public/n8n/bot")({
     handlers: {
       POST: withErrorLogging("n8n:bot", async ({ request }) => {
         const { checkApiKey, json } = await import("@/lib/api-key.server");
-        const denied = checkApiKey(request);
+        const denied = await checkApiKey(request);
         if (denied) return denied;
         const body = await readJsonBody(request);
         if (!body.ok) return json({ ok: false, error: body.error, method: "none" }, body.status);
