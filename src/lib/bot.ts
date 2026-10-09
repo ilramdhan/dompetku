@@ -12,6 +12,7 @@ export type BotCommand =
   | { type: "debts" }
   | { type: "subscriptions" }
   | { type: "budget" }
+  | { type: "pockets" }
   | { type: "receivables" }
   | { type: "undo" }
   | { type: "pay"; target: string }
@@ -53,6 +54,7 @@ reg(["tagihan", "pengingat", "reminder", "reminders"], (a) => ({
   days: clampDays(a),
 }));
 reg(["budget", "anggaran"], () => ({ type: "budget" }));
+reg(["kantong", "pockets", "pocket", "amplop"], () => ({ type: "pockets" }));
 reg(["piutang", "receivables"], () => ({ type: "receivables" }));
 reg(["undo", "batal", "hapus"], () => ({ type: "undo" }));
 reg(["bayar", "pay"], (a) => ({ type: "pay", target: a.trim() }));
@@ -114,6 +116,7 @@ export const BOT_COMMANDS: { command: string; description: string }[] = [
   { command: "langganan", description: "Langganan aktif & tagihan" },
   { command: "tagihan", description: "Tagihan jatuh tempo (opsional jumlah hari)" },
   { command: "budget", description: "Pemakaian budget bulan ini" },
+  { command: "kantong", description: "Sisa kantong per dompet bulan ini" },
   { command: "piutang", description: "Piutang yang belum lunas" },
   { command: "bayar", description: "Catat bayar langganan/cicilan: /bayar netflix" },
   { command: "tarik", description: "Tarik tunai: /tarik 500rb dari BCA" },
@@ -130,6 +133,7 @@ export function botHelp(): string {
     "• makan siang 45.000 pakai gopay",
     "• gaji masuk 8jt ke BCA",
     "• netflix $15",
+    "• kopi 25rb #makan (masuk kantong Makan di dompetnya)",
     "• kirim foto struk untuk OCR",
     "Semua transaksi tampil sebagai pratinjau dulu, tekan ✅ untuk menyimpan.",
     "",
@@ -609,6 +613,8 @@ export type DraftPayload = {
   date: string;
   items: { name: string; qty?: number | null | undefined; price?: number | null | undefined }[];
   via: "quick" | "ai" | "ocr";
+  /** v19: "#makan" tag; matched against the wallet's Kantong when saving (unknown = ignored). */
+  pocket?: string | null;
 };
 
 export type InlineKeyboard = { inline_keyboard: { text: string; callback_data: string }[][] };
@@ -631,6 +637,7 @@ export function previewText(d: DraftPayload, defaultAccount: string | null): str
     `Akun: ${d.account ?? (defaultAccount ? `${defaultAccount} (default)` : "-")}`,
     `Tanggal: ${fmtDay(d.date)}`,
   ];
+  if (d.pocket) lines.push(`Kantong: #${d.pocket}`);
   if (d.description) lines.push(`Ket: ${d.description}`);
   if (d.merchant && d.merchant !== d.description) lines.push(`Merchant: ${d.merchant}`);
   if (d.items.length) {

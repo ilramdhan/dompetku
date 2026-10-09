@@ -89,6 +89,13 @@ These are linked transactions so balances stay correct: transfer/top-up/monthly 
 
 </details>
 
+<details>
+<summary><strong>Kantong vs Budget: what is the difference?</strong></summary>
+
+A **Budget** (Budget page) limits spending **per category** across all wallets, e.g. "Makan & Minuman at most 2 juta a month", with 80%/100% alerts. A **Kantong** (pocket, schema v19) splits the money **inside one wallet**, e.g. Mandiri → Makan 500rb and Transport 250rb, Cash → Parkir 100rb, without creating fake wallets. You choose the pocket on each transaction (or `#makan` in the bot); the wallet page shows what is left per pocket and how much of the balance is still unallocated (negative when you allocated more than the wallet holds). Monthly pockets start over each month; running pockets never reset. You get an alert when a pocket drops to its warning threshold or runs out. Both can be used together: a transaction can count toward a budget (its category) and a pocket (its wallet) at the same time.
+
+</details>
+
 ## Data, backup and deletion
 
 <details>

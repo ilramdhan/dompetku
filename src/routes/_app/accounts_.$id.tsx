@@ -11,6 +11,7 @@ import { BalanceLineChart, DonutChart } from "@/components/charts";
 import { CHART_PALETTE as PIE } from "@/components/charts/shared";
 import { TransactionDialog, newTxDraft, type TxDraft } from "@/components/transaction-dialog";
 import { AccountReconcile } from "@/components/account-reconcile";
+import { AccountPockets } from "@/components/account-pockets";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -189,6 +190,8 @@ function AccountDetailPage() {
           )}
         </Card>
       </div>
+
+      <AccountPockets accountId={id} month={month} currency={cur} canManage={canManage} />
 
       {isAdmin ? (
         <AccountReconcile

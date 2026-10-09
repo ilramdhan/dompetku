@@ -83,8 +83,25 @@ export const transactionSchema = z.object({
   /** v12: up to 5 photos; receipt_path is saved as the first one. */
   receipt_paths: z.array(z.string().min(1).max(500)).max(5).nullable().optional(),
   fee: z.preprocess(emptyToNull, z.coerce.number().min(0).nullable()).optional(),
+  /** v19 Kantong of the source wallet; undefined = leave unchanged on edit. */
+  pocket_id: optId.optional(),
 });
 export type TransactionInput = z.output<typeof transactionSchema>;
+
+/** v19 Kantong (envelope) inside one wallet. The wallet is fixed at creation. */
+export const pocketSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  allocated: z.coerce.number().finite().min(0).max(1e13),
+  min_balance: z
+    .preprocess(emptyToNull, z.coerce.number().finite().min(0).max(1e13).nullable())
+    .default(null),
+  period: z.enum(["monthly", "none"]).default("monthly"),
+  icon: optText(40).default(null),
+  color: optText(20).default(null),
+  archived: z.boolean().default(false),
+  sort_order: z.coerce.number().int().min(0).max(10_000).default(0),
+});
+export type PocketInput = z.output<typeof pocketSchema>;
 
 export const debtSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -237,6 +254,8 @@ export const externalTxSchema = z.object({
   /** Idempotency key, e.g. "draft:<bot_drafts.id>". A repeated key returns the existing transaction. */
   external_id: z.string().max(120).nullable().optional(),
   receipt_path: z.string().max(500).nullable().optional(),
+  /** v19: Kantong name in the source wallet (bot "#makan" tag); unknown names are ignored. */
+  pocket: z.string().max(60).nullable().optional(),
 });
 export type ExternalTx = z.output<typeof externalTxSchema>;
 

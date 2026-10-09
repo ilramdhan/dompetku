@@ -245,9 +245,11 @@ export async function findAccount(name?: string | null): Promise<string | null> 
 
 /* ---------------- Transactions ---------------- */
 function normalizeTx(input: TransactionInput) {
-  const { fee: _fee, receipt_paths, ...rest } = input;
+  const { fee: _fee, receipt_paths, pocket_id, ...rest } = input;
   return {
     ...rest,
+    // v19: undefined = leave the pocket unchanged (key absent); null clears it.
+    ...(pocket_id !== undefined ? { pocket_id } : {}),
     // v12: banyak foto → receipt_path selalu = foto pertama (kompatibel dengan versi lama).
     ...(receipt_paths !== undefined ? receiptColumns(receipt_paths ?? []) : {}),
     category_id: input.kind === "transfer" ? null : input.category_id,
@@ -268,11 +270,20 @@ function isMissingReceiptPathsColumn(err: { message?: string } | null) {
 function isMissingExternalColumn(err: { message?: string } | null) {
   return !!err?.message && err.message.includes("external_id");
 }
+// pocket_id (v19, Kantong) juga opsional: tanpa kolom itu transaksi disimpan tanpa kantong.
+function isMissingPocketColumn(err: { message?: string } | null) {
+  return !!err?.message && err.message.includes("pocket_id");
+}
 
 async function insertTxRow(row: TxInsert): Promise<TxRow> {
   let current = row;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     const res = await db().from("transactions").insert(current).select().single();
+    if (res.error && isMissingPocketColumn(res.error) && "pocket_id" in current) {
+      const { pocket_id: _drop, ...rest } = current;
+      current = rest;
+      continue;
+    }
     if (res.error && isMissingReceiptPathsColumn(res.error) && "receipt_paths" in current) {
       const { receipt_paths: _drop, ...rest } = current;
       current = rest;
@@ -338,6 +349,11 @@ export async function insertTransaction(
 export async function updateTransaction(id: string, input: TransactionInput) {
   let row = { ...normalizeTx(input), amount_idr: await toIdr(input.amount, input.currency) };
   let res = await db().from("transactions").update(row).eq("id", id).select().single();
+  if (res.error && isMissingPocketColumn(res.error) && "pocket_id" in row) {
+    const { pocket_id: _drop, ...rest } = row;
+    row = rest;
+    res = await db().from("transactions").update(row).eq("id", id).select().single();
+  }
   if (res.error && isMissingReceiptPathsColumn(res.error) && "receipt_paths" in row) {
     const { receipt_paths: _drop, ...rest } = row;
     row = rest;
@@ -417,6 +433,12 @@ export async function createFromExternal(t: ExternalTx) {
     notes: t.notes ?? null,
     receipt_path: t.receipt_path ?? null,
   };
+  // v19: "#kantong" tag from the bot / `pocket` from n8n, matched in the source wallet only.
+  if (t.pocket && t.kind !== "transfer") {
+    const { findPocketId } = await import("./pockets.server");
+    const pocket_id = await findPocketId(input.account_id, t.pocket);
+    if (pocket_id) input.pocket_id = pocket_id;
+  }
   let tx: TxRow;
   try {
     tx = await insertTransaction(input, t.raw, { external_id: t.external_id ?? null });
@@ -458,6 +480,8 @@ export type TxFilters = {
   search?: string | undefined;
   category_id?: string | undefined;
   account_id?: string | undefined;
+  /** v19 Kantong filter (only sent by the UI when pockets exist). */
+  pocket_id?: string | undefined;
   limit?: number | undefined;
   offset?: number | undefined;
   sort?: "occurred_at" | "amount" | "description" | undefined;
@@ -482,6 +506,7 @@ function applyTxFilters(q: any, f: TxFilters, scope?: Scope) {
   if (f.kind) q = q.eq("kind", f.kind);
   if (f.category_id) q = q.eq("category_id", f.category_id);
   if (f.account_id) q = q.or(`account_id.eq.${f.account_id},to_account_id.eq.${f.account_id}`);
+  if (f.pocket_id) q = q.eq("pocket_id", f.pocket_id);
   if (f.search) {
     const s = f.search.replace(/[%,()*]/g, "").trim();
     if (s)
@@ -1790,6 +1815,7 @@ export async function exportBackup() {
   const tables = [
     "accounts",
     "categories",
+    "pockets",
     "transactions",
     "debts",
     "debt_payments",
@@ -1807,6 +1833,7 @@ export async function exportBackup() {
     "app_settings",
     "app_users",
     "account_permissions",
+    "pocket_alerts",
   ] as const;
   const { stripSecrets } = await import("./backup");
   const data: Record<string, any[]> = {};
@@ -1874,6 +1901,9 @@ export async function botCommand(text: string): Promise<{ message: string; type:
       break;
     case "budget":
       message = await bot.budgetText();
+      break;
+    case "pockets":
+      message = await (await import("./pockets.server")).pocketsBotText();
       break;
     case "receivables":
       message = await bot.receivablesText();

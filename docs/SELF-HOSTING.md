@@ -15,7 +15,7 @@ This guide takes you from zero to your own private copy of **Dompetku** (a perso
 5. [First-time setup inside the app](#5-first-time-setup-inside-the-app)
 6. [Optional features](#6-optional-features)
 7. [Running locally (for developers)](#7-running-locally-for-developers)
-8. [Updating your instance](#8-updating-your-instance)
+8. [Updating your instance](#8-updating-your-instance) ([upgrading from v1.4](#81-upgrading-from-v14-integrasi-profile-family-members-kantong))
 9. [Using Lovable](#9-using-lovable)
 10. [Troubleshooting](#10-troubleshooting)
 
@@ -145,7 +145,7 @@ A **fork** is your own copy of the project on GitHub. Vercel will build the webs
 **What success looks like:** the result panel says **Success. No rows returned** (you may also see a small table from the last statement). In **Table Editor** you now see tables such as `accounts`, `categories`, `transactions`, `debts`, `subscriptions`, `budgets`, `goals` … and the `categories` table already has default categories.
 
 <details>
-<summary><strong>What are the sections v1 … v18?</strong></summary>
+<summary><strong>What are the sections v1 … v19?</strong></summary>
 
 The file grew with the app. Every section uses `if not exists` / `on conflict do nothing` / `create or replace`, so **the whole file is idempotent: running it again is always safe** and never deletes data. Run the whole file each time you update.
 
@@ -169,6 +169,7 @@ The file grew with the app. Every section uses `if not exists` / `on conflict do
 | v16       | Integration settings (bot, AI, email, n8n keys) editable in Settings → Integrasi; secrets encrypted                                      |
 | v17       | Profile (name, address, photo) and changing the login password in the app (`app_users`)                                                  |
 | v18       | Multi-user for families: members with per-wallet view/manage access (`account_permissions`), needs v17                                   |
+| v19       | Kantong (pockets) inside a wallet with low/empty alerts (`pockets`, `transactions.pocket_id`, `pocket_alerts`)                           |
 
 If a later section has not been run, the related page shows a hint instead of crashing, and the rest of the app keeps working.
 
@@ -316,7 +317,11 @@ Run sections **v17 and v18** of `schema.sql` first. Then, logged in as the owner
 
 Members only see the dashboard, transactions, accounts and reports, computed over their wallets. Everything else (gold, receivables, goals, debts, budgets, settings, CSV import, backup), the Telegram bot and the n8n API stay owner-only. Deactivate, reset the password or delete a member from the same card; their sessions end immediately. 2FA (`APP_TOTP_SECRET`) protects the owner only.
 
-### 5.7 Optional: import history
+### 5.7 Optional: pockets (Kantong, v19)
+
+Run section **v19** of `schema.sql` (or simply the whole file again). Then open **Accounts → a wallet → Kantong → + Kantong**: give it a name, an allocation, an optional warning threshold and a period (**monthly**, starting over each month, or **running**). When recording an expense, income or outgoing transfer on that wallet, pick the pocket in the optional **Kantong** field; in the Telegram bot add a tag at the end, e.g. `kopi 25rb #makan`, and use `/kantong` to see what is left. Without v19 the card only shows a hint and transactions save exactly as before.
+
+### 5.8 Optional: import history
 
 **Transactions → Import CSV** accepts a CSV with date, type, amount, category, account, notes, currency. You get a preview; duplicates and invalid rows are skipped.
 
@@ -423,6 +428,28 @@ Details: [DEMO-DATA.md → Regenerating screenshots](DEMO-DATA.md#regenerating-s
 2. Vercel notices the new commit and **deploys automatically** (watch **Deployments**).
 3. Open Supabase **SQL Editor** and run the latest `supabase/schema.sql` again — it's safe and adds any new tables or columns.
 4. Read [CHANGELOG.md](../CHANGELOG.md) for new environment variables or n8n workflow changes.
+
+### 8.1 Upgrading from v1.4 (Integrasi, profile, family members, Kantong)
+
+Nothing breaks if you only sync and redeploy: every new feature is off until you run its schema
+section, and all existing environment variables keep working exactly as before.
+
+| Step | Required?   | What to do                                                                                                                                                                                                                                                     |
+| ---- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Yes         | Sync your fork; Vercel redeploys.                                                                                                                                                                                                                              |
+| 2    | Recommended | Run the whole `supabase/schema.sql` again in the SQL Editor (adds v16–v19). Until you do, Settings shows "run schema vN" hints and the app behaves like v1.4.                                                                                                  |
+| 3    | Optional    | Add `SETTINGS_ENCRYPTION_KEY` (≥ 32 chars, `openssl rand -base64 48`) to Vercel **before** saving any secret in Settings → Integrasi. Without it the key is derived from `SESSION_SECRET`, so rotating `SESSION_SECRET` later means re-entering those secrets. |
+| 4    | Optional    | Settings → Integrasi: move bot/AI/email/n8n values from env into the app if you want to edit them without redeploying. Env values stay as the fallback; you do **not** need to delete them.                                                                    |
+| 5    | Optional    | Profile: once you change your password in the app, `APP_PASSWORD` no longer logs you in (the in-app password wins). Forgot it? Set `APP_PASSWORD_RESET=true`, redeploy, log in with `APP_PASSWORD`, change the password, then remove the variable.             |
+| 6    | Optional    | Settings → Pengguna: add family members and tick the wallets each one may view or manage.                                                                                                                                                                      |
+| 7    | Optional    | Wallet detail → Kantong: create pockets; tag bot chats with `#pocket` (e.g. `kopi 25rb #makan`).                                                                                                                                                               |
+
+**n8n:** nothing to change. Workflow 01 (bot relay) and 02–05 keep working with the same
+`N8N_API_KEY`. Only if you switch to Telegram direct mode (`TELEGRAM_BOT_TOKEN` + "Pasang
+webhook") does Telegram stop sending updates to n8n workflow 01 — see [N8N.md](N8N.md).
+
+**Backups:** `integration_settings` (encrypted secrets) and password hashes are never exported.
+After restoring onto a new instance, re-enter secrets in Settings → Integrasi.
 
 > [!NOTE]
 > If you edited files in your fork (e.g. `vercel.json`), _Sync fork_ may report a conflict. Choose **Discard commits** only if you are happy to redo your edits; otherwise open a pull request from the upstream repo into your fork and resolve the conflict there.

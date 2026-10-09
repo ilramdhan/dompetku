@@ -26,6 +26,7 @@ import {
 import { getRecurring } from "./recurring.functions";
 import { getAccountReport, getReconcileTransactions } from "./account-report.functions";
 import { getProfile } from "./profile.functions";
+import { getAccountPockets, getPocketOptions, getPocketWarnings } from "./pockets.functions";
 import type { CrudTable } from "./schemas";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -126,6 +127,7 @@ export type TxFilter = {
   search?: string;
   category_id?: string;
   account_id?: string;
+  pocket_id?: string;
   offset?: number;
   sort?: "occurred_at" | "amount" | "description";
   direction?: "asc" | "desc";
@@ -138,6 +140,25 @@ export const accountReportQuery = (id: string, month: string) =>
   queryOptions({
     queryKey: ["account-report", id, month],
     queryFn: () => getAccountReport({ data: { id, month } }),
+    staleTime: FRESH,
+  });
+/** v19 Kantong: wallet page card, form/list options and the dashboard warnings widget. */
+export const accountPocketsQuery = (id: string, month: string) =>
+  queryOptions({
+    queryKey: ["pockets", "account", id, month],
+    queryFn: () => getAccountPockets({ data: { id, month } }),
+    staleTime: FRESH,
+  });
+export const pocketOptionsQuery = () =>
+  queryOptions({
+    queryKey: ["pockets", "options"],
+    queryFn: () => getPocketOptions(),
+    staleTime: REFERENCE_FRESH,
+  });
+export const pocketWarningsQuery = (month: string) =>
+  queryOptions({
+    queryKey: ["pockets", "warnings", month],
+    queryFn: () => getPocketWarnings({ data: { month } }),
     staleTime: FRESH,
   });
 export const reconcileTxQuery = (id: string, from: string, to: string) =>
@@ -168,6 +189,7 @@ const MONEY = [
   "assets",
   "account-report",
   "account-recon",
+  "pockets",
 ];
 const AFFECTS: Record<string, string[]> = {
   transactions: MONEY,
@@ -188,6 +210,8 @@ const AFFECTS: Record<string, string[]> = {
   // v17 profile: the profile page, the header avatar and the activity log.
   // v18: user management list (Settings → Pengguna) too.
   app_users: ["profile", "activity", "users"],
+  // v19 Kantong: pocket cards/options/warnings, transactions (badges/filter) and the activity log.
+  pockets: ["pockets", "tx", "activity"],
 };
 
 export function invalidateFor(qc: QueryClient, table: string) {

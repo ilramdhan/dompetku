@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Paperclip, X } from "lucide-react";
 import { CURRENCY_OPTIONS, EntityDialog, type FieldDef } from "./entity-dialog";
 import { Button } from "@/components/ui/button";
-import { errMsg, rowsQuery, invalidateFor } from "@/lib/queries";
+import { errMsg, rowsQuery, invalidateFor, pocketOptionsQuery } from "@/lib/queries";
+import { pocketToSave, selectablePockets, type Pocket } from "@/lib/pockets";
 import { saveTransaction, uploadReceiptImage } from "@/lib/finance.functions";
 import { todayStr } from "@/lib/dates";
 import { useIsDemo } from "@/components/demo";
@@ -40,6 +41,8 @@ export function TransactionDialog({
   const { t } = useI18n();
   const accounts = (useQuery(rowsQuery("accounts")).data ?? []) as Account[];
   const categories = (useQuery(rowsQuery("categories")).data ?? []) as Category[];
+  // v19 Kantong of the wallets the caller may see ([] before v19 is run).
+  const pockets = (useQuery({ ...pocketOptionsQuery(), enabled: open }).data ?? []) as Pocket[];
   const save = useServerFn(saveTransaction);
   const saveSplit = useServerFn(saveSplitTransaction);
   const qc = useQueryClient();
@@ -94,6 +97,24 @@ export function TransactionDialog({
               .map((c) => ({ value: c.id, label: c.name })),
           ],
         },
+    // v19: optional Kantong of the selected wallet (hidden when it has none, and in split mode).
+    ...(selectablePockets(pockets, v["account_id"] as string, v["kind"] as string).length &&
+    !splitting(v, id)
+      ? [
+          {
+            name: "pocket_id",
+            label: t("Kantong (opsional)"),
+            type: "select" as const,
+            half: true,
+            options: [
+              { value: "", label: t("— Tanpa kantong —") },
+              ...selectablePockets(pockets, v["account_id"] as string, v["kind"] as string).map(
+                (p) => ({ value: p.id, label: p.name }),
+              ),
+            ],
+          },
+        ]
+      : []),
     ...(!id && v["kind"] !== "income"
       ? [
           {
@@ -135,7 +156,7 @@ export function TransactionDialog({
           if (err) throw new Error(t(err));
           await saveSplit({
             data: {
-              values: { ...values, category_id: null } as never,
+              values: { ...values, category_id: null, pocket_id: null } as never,
               rows: list.map((r) => ({
                 category_id: r.category_id!,
                 amount: Number(r.amount),
@@ -144,12 +165,19 @@ export function TransactionDialog({
             },
           });
         } else {
-          notifyBudgetAlerts(await save({ data: { id: id ?? null, values: values as never } }), t);
+          // Pockets not loaded yet: leave the stored pocket alone (undefined) instead of clearing it.
+          const pocket_id = pocketToSave(values, initial, pockets);
+          const res = await save({
+            data: { id: id ?? null, values: { ...values, pocket_id } as never },
+          });
+          notifyBudgetAlerts(res, t);
+          notifyPocketAlerts(res, t);
         }
         await invalidateFor(qc, "transactions");
       }}
       extra={(v, set) => (
         <div className="space-y-3">
+          <PocketGuard values={v} set={set} pockets={pockets} initial={initial} />
           {!id && v["kind"] === "transfer"
             ? (() => {
                 const opts = feeOptions(
@@ -345,5 +373,48 @@ function notifyBudgetAlerts(res: unknown, t: (s: string) => string) {
   for (const a of list)
     toast.warning(a.level === 100 ? t("Budget terlampaui") : t("Budget hampir habis"), {
       description: `${a.category} · ${Math.round(a.percent)}% · ${money(a.spent)} / ${money(a.effective)}`,
+    });
+}
+
+/** v19: clears the chosen Kantong once the wallet/kind changes and it no longer applies. */
+function PocketGuard({
+  values,
+  set,
+  pockets,
+  initial,
+}: {
+  values: Record<string, unknown>;
+  set: (k: string, v: unknown) => void;
+  pockets: Pocket[];
+  initial: TxDraft;
+}) {
+  const current = values["pocket_id"];
+  const account = values["account_id"] as string | null | undefined;
+  const kind = values["kind"] as string | null | undefined;
+  useEffect(() => {
+    if (!current || !pockets.length) return;
+    if (
+      pocketToSave({ pocket_id: current, account_id: account, kind }, initial, pockets) !== current
+    )
+      set("pocket_id", null);
+  }, [current, account, kind, pockets, set, initial]);
+  return null;
+}
+
+type PocketAlertToast = {
+  pocket: string;
+  account: string | null;
+  currency: string;
+  level: "low" | "empty";
+  remaining: number;
+  allocated: number;
+};
+
+/** v19: one warning toast per pocket threshold crossed by the save (no-op if none). */
+function notifyPocketAlerts(res: unknown, t: (s: string) => string) {
+  const list = (res as { pocketAlerts?: PocketAlertToast[] } | null)?.pocketAlerts ?? [];
+  for (const a of list)
+    toast.warning(a.level === "empty" ? t("Kantong habis") : t("Kantong menipis"), {
+      description: `${a.pocket}${a.account ? ` · ${a.account}` : ""} · ${t("Sisa")} ${money(a.remaining, a.currency)} / ${money(a.allocated, a.currency)}`,
     });
 }

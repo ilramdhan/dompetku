@@ -34,6 +34,13 @@ export function assertWalletView(ctx: Ctx, accountId: string): void {
   if (!ids.includes(accountId)) throw new Error("Akun tidak ditemukan");
 }
 
+/** Throws unless the caller may manage the wallet (v19 pockets; owner always may). */
+export function assertWalletManage(ctx: Ctx, accountId: string): void {
+  if (isAdmin(ctx.access)) return;
+  if (!(manageableAccountIds(ctx.access) ?? []).includes(accountId))
+    throw new Error("Akses ditolak");
+}
+
 /** Members need at least one wallet with `manage` to upload receipt photos. */
 export function assertCanWriteSomewhere(ctx: Ctx): void {
   if (isAdmin(ctx.access)) return;

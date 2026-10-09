@@ -34,6 +34,7 @@ import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/head";
 import { formatPercent, monthChange, previousOf, savingsRate } from "@/lib/ratio";
 import { IncomeRatioCard } from "@/components/income-ratio-card";
+import { PocketWarnings } from "@/components/pocket-warnings";
 import { useAccess } from "@/hooks/use-access";
 import { walletLabel } from "@/lib/permissions";
 
@@ -180,6 +181,8 @@ function Dashboard() {
         expense={d.expense}
         categories={d.byCategory}
       />
+
+      {month === currentMonth() ? <PocketWarnings month={month} /> : null}
 
       {isAdmin ? <AssetsOverview /> : null}
 
