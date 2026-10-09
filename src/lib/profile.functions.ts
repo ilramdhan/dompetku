@@ -1,22 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireAuth } from "./auth-middleware";
+import { requireSession } from "./auth-middleware";
 import { changePasswordSchema, profileInputSchema } from "./profile";
 
 /** Logged-in user's profile (v17 row, or env user with empty fields). */
 export const getProfile = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireSession])
   .handler(async ({ context }) => {
     const { getProfileState } = await import("./users.server");
     return getProfileState(context.user);
   });
 
 export const updateProfile = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => profileInputSchema.parse(d))
   .handler(async ({ data, context }) => {
     (await import("./demo.server")).assertNotDemo();
     const { saveProfile } = await import("./users.server");
-    return saveProfile(context.user, data);
+    return saveProfile(context.user, data, context.role);
   });
 
 /**
@@ -24,7 +24,7 @@ export const updateProfile = createServerFn({ method: "POST" })
  * out) and this device gets a fresh cookie carrying the new version.
  */
 export const changePassword = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => changePasswordSchema.parse(d))
   .handler(async ({ data, context }) => {
     (await import("./demo.server")).assertNotDemo();
@@ -36,7 +36,7 @@ export const changePassword = createServerFn({ method: "POST" })
         error: "Terlalu banyak percobaan masuk yang gagal. Coba lagi dalam 15 menit.",
       };
     const users = await import("./users.server");
-    const res = await users.changePassword(context.user, data.current, data.next);
+    const res = await users.changePassword(context.user, data.current, data.next, context.role);
     if (!res.ok) {
       if (res.error === "Password saat ini salah") {
         // Wrong current password counts toward the login throttle (guards a stolen session).
@@ -48,6 +48,6 @@ export const changePassword = createServerFn({ method: "POST" })
       return { ok: false as const, error: res.error };
     }
     const { createSession } = await import("./session.server");
-    createSession(context.user, res.session_version);
+    createSession(context.user, res.session_version, context.role === "member");
     return { ok: true as const };
   });

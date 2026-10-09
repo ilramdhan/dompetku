@@ -15,6 +15,8 @@ import { z } from "zod";
  * integration_settings (v16): it holds encrypted API keys that must never leave the server in a file.
  * app_users (v17) is exported with profile fields only: SECRET_COLUMNS (password_hash,
  * session_version) are stripped on export and on restore, and replace mode never deletes it.
+ * account_permissions (v18) comes after both of its parents (accounts, app_users); restored member
+ * rows have no password hash, so they cannot log in until the admin resets their password.
  */
 export const RESTORE_TABLES = [
   "accounts",
@@ -35,6 +37,7 @@ export const RESTORE_TABLES = [
   "account_reconciliations",
   "app_settings",
   "app_users",
+  "account_permissions",
 ] as const;
 export type RestoreTable = (typeof RESTORE_TABLES)[number];
 
@@ -68,6 +71,7 @@ export const CONFLICT_KEYS: Record<RestoreTable, string[]> = {
   account_reconciliations: ["id"],
   app_settings: ["id"],
   app_users: ["id"],
+  account_permissions: ["user_id", "account_id"],
 };
 
 /**
@@ -94,6 +98,7 @@ export const FK_COLUMNS: Record<string, RestoreTable> = {
   receivable_id: "receivables",
   budget_id: "budgets",
   bot_default_account_id: "accounts",
+  user_id: "app_users",
 };
 
 /**

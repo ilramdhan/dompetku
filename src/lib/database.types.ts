@@ -456,6 +456,8 @@ export type Database = {
           entity: string | null;
           detail: Json | null;
           created_at: string;
+          /** v18 (optional column): username of the acting user; null = owner/system/bot. */
+          actor?: string | null;
         };
         Insert: {
           id?: string;
@@ -463,6 +465,7 @@ export type Database = {
           entity?: string | null;
           detail?: Json | null;
           created_at?: string;
+          actor?: string | null;
         };
         Update: {
           id?: string;
@@ -470,6 +473,7 @@ export type Database = {
           entity?: string | null;
           detail?: Json | null;
           created_at?: string;
+          actor?: string | null;
         };
         Relationships: [];
       };
@@ -963,6 +967,8 @@ export type Database = {
           session_version: number;
           created_at: string;
           updated_at: string;
+          /** v18 (optional column): member must change the temporary password on next login. */
+          must_change_password?: boolean;
         };
         Insert: {
           id?: string;
@@ -976,6 +982,7 @@ export type Database = {
           session_version?: number;
           created_at?: string;
           updated_at?: string;
+          must_change_password?: boolean;
         };
         Update: {
           id?: string;
@@ -989,8 +996,41 @@ export type Database = {
           session_version?: number;
           created_at?: string;
           updated_at?: string;
+          must_change_password?: boolean;
         };
         Relationships: [];
+      };
+      /** v18 (optional table): per-member wallet grants ('view' | 'manage'). */
+      account_permissions: {
+        Row: { user_id: string; account_id: string; level: "view" | "manage"; created_at: string };
+        Insert: {
+          user_id: string;
+          account_id: string;
+          level: "view" | "manage";
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          account_id?: string;
+          level?: "view" | "manage";
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "account_permissions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "app_users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "account_permissions_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: false;
+            referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       /** v14 (optional table): single-row app settings (id = 1) set from the Settings page. */
       app_settings: {

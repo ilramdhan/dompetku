@@ -538,3 +538,26 @@ revoke all on public.app_users from anon, authenticated;
 grant all on public.app_users to service_role;
 alter table public.app_users enable row level security;
 notify pgrst, 'reload schema';
+
+-- ============ v18: multi-user (keluarga) & hak akses per dompet (aman dijalankan ulang) ============
+-- Opsional: tanpa bagian ini (atau tanpa anggota) aplikasi tetap satu pengguna persis seperti sebelumnya.
+-- Butuh v17 (app_users). Pengguna APP_USERNAME selalu pemilik/admin dan tidak bisa dinonaktifkan/dihapus.
+-- Anggota (role 'member') dibuat admin dari Pengaturan → Pengguna dengan password sementara
+-- (must_change_password = true → wajib ganti saat login pertama).
+-- account_permissions: dompet mana yang boleh dilihat ('view') atau dikelola ('manage') seorang anggota.
+-- Hak akses lain (per modul) kelak ditambah sebagai tabel bertipe sendiri (FK + cascade), bukan kolom bebas.
+-- activity_log.actor: username pelaku (null = pemilik/sistem/bot, seperti data lama).
+alter table public.app_users add column if not exists must_change_password boolean not null default false;
+create table if not exists public.account_permissions (
+  user_id uuid not null references public.app_users(id) on delete cascade,
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  level text not null check (level in ('view','manage')),
+  created_at timestamptz not null default now(),
+  primary key (user_id, account_id)
+);
+create index if not exists account_permissions_account_idx on public.account_permissions (account_id);
+revoke all on public.account_permissions from anon, authenticated;
+grant all on public.account_permissions to service_role;
+alter table public.account_permissions enable row level security;
+alter table public.activity_log add column if not exists actor text check (actor is null or length(actor) <= 100);
+notify pgrst, 'reload schema';

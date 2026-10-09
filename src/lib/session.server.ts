@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
-import { parseSessionData, sessionVersionValid, type SessionData } from "./session";
+import { parseSessionData, type SessionData } from "./session";
 
 const COOKIE = "dk_session";
 const MAX_AGE = 60 * 60 * 24 * 7;
@@ -38,16 +38,22 @@ const cookieOpts = {
   path: "/",
 };
 
-/** Sets the session cookie. `sv` = the user's current session_version (omitted before v17). */
-export function createSession(username: string, sv?: number | null): void {
+/**
+ * Sets the session cookie. `sv` = the user's current session_version (omitted before v17);
+ * `member` marks a v18 family member's cookie.
+ */
+export function createSession(username: string, sv?: number | null, member = false): void {
   const data: SessionData = { u: username, exp: Date.now() + MAX_AGE * 1000 };
   if (typeof sv === "number") data.sv = sv;
+  if (member) data.r = "member";
   const payload = Buffer.from(JSON.stringify(data)).toString("base64url");
   setCookie(COOKIE, `${payload}.${sign(payload)}`, { ...cookieOpts, maxAge: MAX_AGE });
 }
 
 /** Signature + expiry check only (no session-version check); prefer readValidSession(). */
-export function readSession(): { u: string; sv?: number } | null {
+export type RawSession = { u: string; sv?: number; r?: "member" };
+
+export function readSession(): RawSession | null {
   const raw = getCookie(COOKIE);
   if (!raw) return null;
   const [payload, sig] = raw.split(".");
@@ -55,21 +61,32 @@ export function readSession(): { u: string; sv?: number } | null {
   try {
     const data = parseSessionData(JSON.parse(Buffer.from(payload, "base64url").toString()));
     if (!data) return null;
-    return data.sv === undefined ? { u: data.u } : { u: data.u, sv: data.sv };
+    const out: RawSession = { u: data.u };
+    if (data.sv !== undefined) out.sv = data.sv;
+    if (data.r) out.r = data.r;
+    return out;
   } catch {
     return null;
   }
 }
 
 /**
- * Signed, unexpired cookie whose `sv` still matches the user's session_version (v17, cached
- * ~45 s). No user row / no table = valid, exactly as before v17.
+ * The authenticated principal for this request, or null. Signature + expiry are checked here;
+ * the owner/member rules (session_version, is_active, grants; cached ~30–45 s) live in
+ * users.server.ts `resolvePrincipal`. The owner without a v17 row behaves exactly as before.
  */
+export async function readPrincipal(): Promise<import("./users.server").Principal | null> {
+  const s = readSession();
+  if (!s) return null;
+  const { resolvePrincipal } = await import("./users.server");
+  return resolvePrincipal(s);
+}
+
+/** Back-compat wrapper: `{ u, sv }` of a valid session (any role), or null. */
 export async function readValidSession(): Promise<{ u: string; sv?: number } | null> {
   const s = readSession();
   if (!s) return null;
-  const { currentSessionVersion } = await import("./users.server");
-  return sessionVersionValid(s.sv, await currentSessionVersion(s.u)) ? s : null;
+  return (await readPrincipal()) ? { u: s.u, ...(s.sv !== undefined ? { sv: s.sv } : {}) } : null;
 }
 
 /** Session version to embed in a new cookie (null before v17 / without a user row); read fresh. */
