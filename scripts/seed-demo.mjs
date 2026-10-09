@@ -16,6 +16,7 @@
  *   every table (incl. visitor rows, activity log, bot drafts, budget alerts), categories back to
  *   the schema defaults, app_settings back to defaults and every object in the receipts bucket.
  */
+import { randomBytes, scryptSync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { defaultCategoriesFromSchema, parseSeedArgs } from "./seed-args.mjs";
@@ -167,6 +168,25 @@ async function wipeReceipts() {
   if (paths.length) console.log(`Reset: removed ${paths.length} receipt photo(s).`);
 }
 
+/** True when `table` (and optionally `column`) exists; optional schema sections may not be run. */
+async function hasTable(table, column = "id") {
+  const { error } = await sb.from(table).select(column, { head: true }).limit(1);
+  return !error;
+}
+
+/** Same string format as src/lib/password.ts: scrypt$v1$N$r$p$salt$hash (base64url). */
+function scryptHash(password) {
+  const [N, r, p] = [32768, 8, 1];
+  const salt = randomBytes(16);
+  const key = scryptSync(password.normalize("NFKC"), salt, 32, {
+    N,
+    r,
+    p,
+    maxmem: 128 * N * r * 2 + 1024 * 1024,
+  });
+  return ["scrypt", "v1", N, r, p, salt.toString("base64url"), key.toString("base64url")].join("$");
+}
+
 async function insert(table, rows) {
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await sb.from(table).insert(rows.slice(i, i + 500), { defaultToNull: false });
@@ -194,6 +214,12 @@ async function main() {
     if (!c) throw new Error(`category missing: ${name} (${kind}) — apply the full schema first`);
     return c.id;
   };
+
+  // Optional sections (v17/v18 users, v19 pockets): seeded only when the tables exist.
+  const HAS_POCKETS = (await hasTable("pockets")) && (await hasTable("transactions", "pocket_id"));
+  const HAS_MEMBERS =
+    (await hasTable("app_users", "must_change_password")) &&
+    (await hasTable("account_permissions", "user_id"));
 
   /* ----- fx rates (USD→IDR, one per day) ----- */
   const fxStart = dateIn(-(MONTHS - 1), 1);
@@ -762,6 +788,31 @@ async function main() {
     date: TODAY,
   });
 
+  // Parking paid in cash (fixed amounts, no PRNG draws): the Tunai "Parkir" running envelope.
+  // Added before the Transportasi budget top-up below so the ~85% showcase still holds.
+  const parking = [];
+  for (const [off, day, a] of [
+    [-2, 9, 5000],
+    [-2, 20, 10000],
+    [-1, 4, 5000],
+    [-1, 18, 15000],
+    [0, 1, 5000],
+    [0, 3, 10000],
+  ]) {
+    const date = off === 0 ? dateIn(0, Math.min(day, TD)) : dateIn(off, day);
+    parking.push(
+      add({
+        kind: "expense",
+        amount: a,
+        account: A.cash,
+        category: cat("Transportasi"),
+        description: "Parkir",
+        merchant: "Parkir Mall Kota",
+        date,
+      }),
+    );
+  }
+
   // Current month showcase: Hiburan over 100%, Transportasi ~85% of budget
   const cur = (day) => dateIn(0, Math.min(day, TD));
   add({
@@ -1022,9 +1073,95 @@ async function main() {
     },
   ].map((g) => ({ ...g, fetched_at: ts(g.price_date, 8) }));
 
+  /* ----- Kantong (v19): pockets in GoPay and Tunai; GoPay "Transport" sits below its threshold ----- */
+  const P = { food: uuid(), ride: uuid(), park: uuid() };
+  const pockets = [];
+  const pocketAlerts = [];
+  if (HAS_POCKETS) {
+    const since = ym(-2); // tag the last three months of matching rows
+    const tagged = (acc, category) =>
+      tx.filter(
+        (t) =>
+          t.account_id === acc &&
+          t.kind === "expense" &&
+          t.category_id === cat(category) &&
+          t.occurred_at.slice(0, 7) >= since,
+      );
+    for (const t of tagged(A.gopay, "Makanan & Minuman")) t.pocket_id = P.food;
+    for (const t of tagged(A.gopay, "Transportasi")) t.pocket_id = P.ride;
+    for (const t of tx) if (parking.includes(t.id)) t.pocket_id = P.park;
+    const spentNow = (pid) =>
+      tx
+        .filter((t) => t.pocket_id === pid && t.occurred_at.startsWith(ym(0)))
+        .reduce((s, t) => s + t.amount, 0);
+    const up = (n, step = 10_000) => Math.ceil(n / step) * step;
+    const foodSpent = spentNow(P.food);
+    const rideSpent = spentNow(P.ride);
+    // ~10% left of Transport: remaining > 0 but ≤ min_balance → "Menipis" on the dashboard.
+    const rideAlloc = Math.max(up(rideSpent / 0.9), up(rideSpent + 10_000));
+    const rideMin = up(rideAlloc - rideSpent + 10_000);
+    // Makan keeps ~60% of what GoPay holds beyond Transport, so the wallet is not over-allocated.
+    const gopayBal = tx
+      .filter((t) => t.occurred_at <= TODAY)
+      .reduce(
+        (b, t) =>
+          t.to_account_id === A.gopay
+            ? b + t.amount
+            : t.account_id !== A.gopay
+              ? b
+              : t.kind === "income"
+                ? b + t.amount
+                : b - t.amount,
+        accounts.find((a) => a.id === A.gopay).initial_balance,
+      );
+    const foodLeft = Math.max(
+      50_000,
+      Math.floor(((gopayBal - (rideAlloc - rideSpent)) * 0.6) / 50_000) * 50_000,
+    );
+    const pCreated = ts(dateIn(-2, 1), 8);
+    pockets.push(
+      {
+        id: P.food,
+        account_id: A.gopay,
+        name: "Makan",
+        allocated: up(foodSpent, 10_000) + foodLeft,
+        min_balance: 50_000,
+        period: "monthly",
+        color: "#c9a227",
+        sort_order: 0,
+        created_at: pCreated,
+      },
+      {
+        id: P.ride,
+        account_id: A.gopay,
+        name: "Transport",
+        allocated: rideAlloc,
+        min_balance: rideMin,
+        period: "monthly",
+        color: "#2f9e8f",
+        sort_order: 1,
+        created_at: pCreated,
+      },
+      {
+        id: P.park,
+        account_id: A.cash,
+        name: "Parkir",
+        allocated: 100_000,
+        min_balance: 20_000,
+        period: "none",
+        color: "#5a7d4f",
+        sort_order: 0,
+        created_at: pCreated,
+      },
+    );
+    pocketAlerts.push({ pocket_id: P.ride, period: ym(0), level: "low", created_at: ts(TODAY, 8) });
+  } else console.log("Skipping Kantong: run schema v19 to seed pockets.");
+
   /* ----- insert transactions & dependants ----- */
   tx.sort((a, b) => (a.occurred_at < b.occurred_at ? -1 : a.occurred_at > b.occurred_at ? 1 : 0));
+  if (pockets.length) await insert("pockets", pockets);
   await insert("transactions", tx);
+  if (pocketAlerts.length) await insert("pocket_alerts", pocketAlerts);
   await insert("debts", debts);
   await insert("debt_payments", debtPayments);
   await insert("receivables", receivables);
@@ -1293,6 +1430,27 @@ async function main() {
     },
   ]);
 
+  /* ----- family member (v18): one fictional member with access to GoPay only ----- */
+  // The password is random and never printed: the member only gives the Pengguna screen content.
+  // must_change_password stays false so the list shows a normal, active member.
+  let member = null;
+  if (HAS_MEMBERS) {
+    member = {
+      id: uuid(),
+      username: "sari",
+      display_name: "Sari Wulandari",
+      role: "member",
+      is_active: true,
+      must_change_password: false,
+      password_hash: scryptHash(randomBytes(24).toString("base64url")),
+      created_at: ts(dateIn(-1, 10), 19),
+    };
+    await insert("app_users", [member]);
+    await insert("account_permissions", [
+      { user_id: member.id, account_id: A.gopay, level: "manage", created_at: member.created_at },
+    ]);
+  } else console.log("Skipping member: run schema v17 + v18 to seed app_users.");
+
   /* ----- activity log (recent days) ----- */
   const recentTx = tx.filter((t) => t.occurred_at <= TODAY).slice(-14);
   const log = recentTx.map((t, i) => ({
@@ -1370,6 +1528,14 @@ async function main() {
       created_at: ts(dateIn(-1, 30), 22),
     },
   );
+  if (member)
+    log.push({
+      action: "pockets.update",
+      entity: "pockets",
+      actor: member.username,
+      detail: { name: "Makan", account: "GoPay" },
+      created_at: ts(TODAY, 8, 15),
+    });
   await insert("activity_log", log);
 
   /* ----- summary ----- */
