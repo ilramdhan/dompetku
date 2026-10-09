@@ -511,3 +511,30 @@ revoke all on public.integration_settings from anon, authenticated;
 grant all on public.integration_settings to service_role;
 alter table public.integration_settings enable row level security;
 notify pgrst, 'reload schema';
+
+-- ============ v17: profil pengguna & ganti password dari Web UI (aman dijalankan ulang) ============
+-- Opsional: tanpa bagian ini login tetap memakai APP_USERNAME/APP_PASSWORD dari env persis seperti sebelumnya,
+-- dan halaman Profil hanya menampilkan petunjuk untuk menjalankan v17.
+-- Satu baris per pengguna. Pengguna APP_USERNAME selalu pemilik (admin); barisnya dibuat saat profil
+-- pertama kali disimpan. password_hash (scrypt$v1$N$r$p$salt$hash) null = password dari env APP_PASSWORD.
+-- session_version naik setiap ganti password sehingga sesi di perangkat lain ikut keluar.
+-- role/is_active disiapkan untuk multi-user (#21); 'member' belum dipakai.
+-- Cadangan JSON menyertakan profil tetapi TIDAK PERNAH password_hash/session_version.
+create table if not exists public.app_users (
+  id uuid primary key default gen_random_uuid(),
+  username text not null unique check (length(username) between 1 and 100),
+  display_name text check (display_name is null or length(display_name) <= 80),
+  address text check (address is null or length(address) <= 300),
+  avatar text check (avatar is null or length(avatar) <= 300000),
+  password_hash text,
+  role text not null default 'admin' check (role in ('admin','member')),
+  is_active boolean not null default true,
+  session_version int not null default 1 check (session_version >= 1),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists app_users_username_lower_idx on public.app_users (lower(username));
+revoke all on public.app_users from anon, authenticated;
+grant all on public.app_users to service_role;
+alter table public.app_users enable row level security;
+notify pgrst, 'reload schema';

@@ -949,6 +949,49 @@ export type Database = {
         Update: { key?: string; value?: string; is_secret?: boolean; updated_at?: string };
         Relationships: [];
       };
+      /** v17 (optional table): user profiles, password hash and session version. */
+      app_users: {
+        Row: {
+          id: string;
+          username: string;
+          display_name: string | null;
+          address: string | null;
+          avatar: string | null;
+          password_hash: string | null;
+          role: "admin" | "member";
+          is_active: boolean;
+          session_version: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          username: string;
+          display_name?: string | null;
+          address?: string | null;
+          avatar?: string | null;
+          password_hash?: string | null;
+          role?: "admin" | "member";
+          is_active?: boolean;
+          session_version?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          username?: string;
+          display_name?: string | null;
+          address?: string | null;
+          avatar?: string | null;
+          password_hash?: string | null;
+          role?: "admin" | "member";
+          is_active?: boolean;
+          session_version?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       /** v14 (optional table): single-row app settings (id = 1) set from the Settings page. */
       app_settings: {
         Row: {

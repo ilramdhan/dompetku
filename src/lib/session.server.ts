@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
+import { parseSessionData, sessionVersionValid, type SessionData } from "./session";
 
 const COOKIE = "dk_session";
 const MAX_AGE = 60 * 60 * 24 * 7;
@@ -20,13 +21,13 @@ function safeEq(a: string, b: string): boolean {
   return timingSafeEqual(x, y);
 }
 
-export function checkCredentials(username: string, password: string): boolean {
-  const u = process.env["APP_USERNAME"];
-  const p = process.env["APP_PASSWORD"];
-  if (!u || !p) throw new Error("APP_USERNAME dan APP_PASSWORD belum diatur.");
-  const okU = safeEq(username, u);
-  const okP = safeEq(password, p);
-  return okU && okP;
+/**
+ * Login check: v17 stored hash for the env user when set, else APP_PASSWORD in constant time.
+ * See users.server.ts for the precedence and recovery rules.
+ */
+export async function checkCredentials(username: string, password: string): Promise<boolean> {
+  const { checkCredentials: check } = await import("./users.server");
+  return check(username, password);
 }
 
 const cookieOpts = {
@@ -37,28 +38,45 @@ const cookieOpts = {
   path: "/",
 };
 
-export function createSession(username: string): void {
-  const payload = Buffer.from(
-    JSON.stringify({ u: username, exp: Date.now() + MAX_AGE * 1000 }),
-  ).toString("base64url");
+/** Sets the session cookie. `sv` = the user's current session_version (omitted before v17). */
+export function createSession(username: string, sv?: number | null): void {
+  const data: SessionData = { u: username, exp: Date.now() + MAX_AGE * 1000 };
+  if (typeof sv === "number") data.sv = sv;
+  const payload = Buffer.from(JSON.stringify(data)).toString("base64url");
   setCookie(COOKIE, `${payload}.${sign(payload)}`, { ...cookieOpts, maxAge: MAX_AGE });
 }
 
-export function readSession(): { u: string } | null {
+/** Signature + expiry check only (no session-version check); prefer readValidSession(). */
+export function readSession(): { u: string; sv?: number } | null {
   const raw = getCookie(COOKIE);
   if (!raw) return null;
   const [payload, sig] = raw.split(".");
   if (!payload || !sig || !safeEq(sig, sign(payload))) return null;
   try {
-    const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
-      u: string;
-      exp: number;
-    };
-    if (typeof data.exp !== "number" || data.exp < Date.now()) return null;
-    return { u: data.u };
+    const data = parseSessionData(JSON.parse(Buffer.from(payload, "base64url").toString()));
+    if (!data) return null;
+    return data.sv === undefined ? { u: data.u } : { u: data.u, sv: data.sv };
   } catch {
     return null;
   }
+}
+
+/**
+ * Signed, unexpired cookie whose `sv` still matches the user's session_version (v17, cached
+ * ~45 s). No user row / no table = valid, exactly as before v17.
+ */
+export async function readValidSession(): Promise<{ u: string; sv?: number } | null> {
+  const s = readSession();
+  if (!s) return null;
+  const { currentSessionVersion } = await import("./users.server");
+  return sessionVersionValid(s.sv, await currentSessionVersion(s.u)) ? s : null;
+}
+
+/** Session version to embed in a new cookie (null before v17 / without a user row); read fresh. */
+export async function sessionVersionFor(username: string): Promise<number | null> {
+  const { currentSessionVersion, forgetSessionVersion } = await import("./users.server");
+  forgetSessionVersion(username);
+  return currentSessionVersion(username);
 }
 
 export function destroySession(): void {
