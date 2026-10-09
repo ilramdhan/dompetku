@@ -40,18 +40,25 @@ const cookieOpts = {
 
 /**
  * Sets the session cookie. `sv` = the user's current session_version (omitted before v17);
- * `member` marks a v18 family member's cookie.
+ * `memberId` (app_users.id) marks a v18 family member's cookie and binds it to that row.
  */
-export function createSession(username: string, sv?: number | null, member = false): void {
+export function createSession(
+  username: string,
+  sv?: number | null,
+  memberId?: string | null,
+): void {
   const data: SessionData = { u: username, exp: Date.now() + MAX_AGE * 1000 };
   if (typeof sv === "number") data.sv = sv;
-  if (member) data.r = "member";
+  if (memberId) {
+    data.r = "member";
+    data.i = memberId;
+  }
   const payload = Buffer.from(JSON.stringify(data)).toString("base64url");
   setCookie(COOKIE, `${payload}.${sign(payload)}`, { ...cookieOpts, maxAge: MAX_AGE });
 }
 
 /** Signature + expiry check only (no session-version check); prefer readValidSession(). */
-export type RawSession = { u: string; sv?: number; r?: "member" };
+export type RawSession = { u: string; sv?: number; r?: "member"; i?: string };
 
 export function readSession(): RawSession | null {
   const raw = getCookie(COOKIE);
@@ -64,6 +71,7 @@ export function readSession(): RawSession | null {
     const out: RawSession = { u: data.u };
     if (data.sv !== undefined) out.sv = data.sv;
     if (data.r) out.r = data.r;
+    if (data.i) out.i = data.i;
     return out;
   } catch {
     return null;

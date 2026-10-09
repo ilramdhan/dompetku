@@ -65,20 +65,27 @@ describe("resolvePrincipal", () => {
     expect(await resolvePrincipal({ u: "anak", sv: 3 })).toBeNull();
   });
   it("resolves an active member with grants and checks session_version", async () => {
-    const p = await resolvePrincipal({ u: "anak", sv: 3, r: "member" });
+    const p = await resolvePrincipal({ u: "anak", sv: 3, r: "member", i: "u1" });
     expect(p?.role).toBe("member");
     expect(p?.access.grants).toEqual({ [A]: "view" });
     forgetMember();
-    expect(await resolvePrincipal({ u: "anak", sv: 2, r: "member" })).toBeNull();
+    expect(await resolvePrincipal({ u: "anak", sv: 2, r: "member", i: "u1" })).toBeNull();
     expect(await resolvePrincipal({ u: "anak", r: "member" })).toBeNull();
+  });
+  it("binds member cookies to the row id (deleted + re-created username)", async () => {
+    expect(await resolvePrincipal({ u: "anak", sv: 3, r: "member" })).toBeNull();
+    expect(await resolvePrincipal({ u: "anak", sv: 3, r: "member", i: "u0" })).toBeNull();
+    expect((await resolvePrincipal({ u: "anak", sv: 3, r: "member", i: "u1" }))?.role).toBe(
+      "member",
+    );
   });
   it("refuses inactive members and admin rows behind member cookies", async () => {
     users["anak"].is_active = false;
-    expect(await resolvePrincipal({ u: "anak", sv: 3, r: "member" })).toBeNull();
+    expect(await resolvePrincipal({ u: "anak", sv: 3, r: "member", i: "u1" })).toBeNull();
     users["anak"].is_active = true;
     users["anak"].role = "admin";
     forgetMember();
-    expect(await resolvePrincipal({ u: "anak", sv: 3, r: "member" })).toBeNull();
+    expect(await resolvePrincipal({ u: "anak", sv: 3, r: "member", i: "u1" })).toBeNull();
   });
 });
 
@@ -92,6 +99,7 @@ describe("authenticate", () => {
     expect(await authenticate("Anak", "member-pass-1234")).toMatchObject({
       ok: true,
       role: "member",
+      id: "u1",
       username: "anak",
       sv: 3,
     });

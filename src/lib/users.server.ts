@@ -217,13 +217,15 @@ export async function resolvePrincipal(s: {
   u: string;
   sv?: number;
   r?: "member";
+  i?: string;
 }): Promise<Principal | null> {
   const owner = process.env["APP_USERNAME"];
   if (!owner) return null;
   if (s.r === "member") {
     if (s.u.toLowerCase() === owner.toLowerCase()) return null;
     const m = await memberState(s.u);
-    if (!m || s.sv === undefined || s.sv !== m.sv) return null;
+    // Bound to the row id: a deleted member's cookie never matches a re-created username.
+    if (!m || s.sv === undefined || s.sv !== m.sv || !s.i || s.i !== m.id) return null;
     return {
       username: m.username,
       userId: m.id,
@@ -287,7 +289,7 @@ let dummyHash: Promise<string> | null = null;
 export type LoginResult =
   | { ok: false }
   | { ok: true; role: "admin"; username: string }
-  | { ok: true; role: "member"; username: string; sv: number; mustChange: boolean };
+  | { ok: true; role: "member"; id: string; username: string; sv: number; mustChange: boolean };
 
 /**
  * Full login check (v18): the owner (exact APP_USERNAME, see checkCredentials) first, else an
@@ -313,6 +315,7 @@ export async function authenticate(username: string, password: string): Promise<
   return {
     ok: true,
     role: "member",
+    id: row.id,
     username: row.username,
     sv: row.session_version,
     mustChange: !!row.must_change_password,

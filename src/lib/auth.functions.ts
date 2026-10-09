@@ -74,7 +74,7 @@ export const login = createServerFn({ method: "POST" })
     if (auth.ok && auth.role === "member") {
       // Members: own password only; APP_TOTP_SECRET is the owner's second factor (member 2FA is
       // future work). The cookie is marked as a member cookie.
-      createSession(auth.username, auth.sv, true);
+      createSession(auth.username, auth.sv, auth.id);
       const { runAsActor } = await import("./request-context.server");
       await runAsActor({ username: auth.username, role: "member" }, () =>
         logActivity("auth.login", "auth", { name: auth.username.slice(0, 60) }),
