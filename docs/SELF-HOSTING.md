@@ -15,7 +15,7 @@ This guide takes you from zero to your own private copy of **Dompetku** (a perso
 5. [First-time setup inside the app](#5-first-time-setup-inside-the-app)
 6. [Optional features](#6-optional-features)
 7. [Running locally (for developers)](#7-running-locally-for-developers)
-8. [Updating your instance](#8-updating-your-instance)
+8. [Updating your instance](#8-updating-your-instance) ([upgrading from v1.4](#81-upgrading-from-v14-integrasi-profile-family-members-kantong))
 9. [Using Lovable](#9-using-lovable)
 10. [Troubleshooting](#10-troubleshooting)
 
@@ -428,6 +428,28 @@ Details: [DEMO-DATA.md → Regenerating screenshots](DEMO-DATA.md#regenerating-s
 2. Vercel notices the new commit and **deploys automatically** (watch **Deployments**).
 3. Open Supabase **SQL Editor** and run the latest `supabase/schema.sql` again — it's safe and adds any new tables or columns.
 4. Read [CHANGELOG.md](../CHANGELOG.md) for new environment variables or n8n workflow changes.
+
+### 8.1 Upgrading from v1.4 (Integrasi, profile, family members, Kantong)
+
+Nothing breaks if you only sync and redeploy: every new feature is off until you run its schema
+section, and all existing environment variables keep working exactly as before.
+
+| Step | Required?   | What to do                                                                                                                                                                                                                                                     |
+| ---- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Yes         | Sync your fork; Vercel redeploys.                                                                                                                                                                                                                              |
+| 2    | Recommended | Run the whole `supabase/schema.sql` again in the SQL Editor (adds v16–v19). Until you do, Settings shows "run schema vN" hints and the app behaves like v1.4.                                                                                                  |
+| 3    | Optional    | Add `SETTINGS_ENCRYPTION_KEY` (≥ 32 chars, `openssl rand -base64 48`) to Vercel **before** saving any secret in Settings → Integrasi. Without it the key is derived from `SESSION_SECRET`, so rotating `SESSION_SECRET` later means re-entering those secrets. |
+| 4    | Optional    | Settings → Integrasi: move bot/AI/email/n8n values from env into the app if you want to edit them without redeploying. Env values stay as the fallback; you do **not** need to delete them.                                                                    |
+| 5    | Optional    | Profile: once you change your password in the app, `APP_PASSWORD` no longer logs you in (the in-app password wins). Forgot it? Set `APP_PASSWORD_RESET=true`, redeploy, log in with `APP_PASSWORD`, change the password, then remove the variable.             |
+| 6    | Optional    | Settings → Pengguna: add family members and tick the wallets each one may view or manage.                                                                                                                                                                      |
+| 7    | Optional    | Wallet detail → Kantong: create pockets; tag bot chats with `#pocket` (e.g. `kopi 25rb #makan`).                                                                                                                                                               |
+
+**n8n:** nothing to change. Workflow 01 (bot relay) and 02–05 keep working with the same
+`N8N_API_KEY`. Only if you switch to Telegram direct mode (`TELEGRAM_BOT_TOKEN` + "Pasang
+webhook") does Telegram stop sending updates to n8n workflow 01 — see [N8N.md](N8N.md).
+
+**Backups:** `integration_settings` (encrypted secrets) and password hashes are never exported.
+After restoring onto a new instance, re-enter secrets in Settings → Integrasi.
 
 > [!NOTE]
 > If you edited files in your fork (e.g. `vercel.json`), _Sync fork_ may report a conflict. Choose **Discard commits** only if you are happy to redo your edits; otherwise open a pull request from the upstream repo into your fork and resolve the conflict there.
