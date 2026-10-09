@@ -10,6 +10,7 @@ import { CsvImport } from "@/components/csv-import";
 import { BackupRestore } from "@/components/backup-restore";
 import { TwoFactorCard } from "@/components/two-factor-card";
 import { AppSettingsCard } from "@/components/app-settings-card";
+import { IntegrationsCard } from "@/components/integrations-card";
 import { AboutCard } from "@/components/about-card";
 import { DemoDisabled } from "@/components/demo";
 import { RowActions, useCrudDialog } from "@/components/crud-page";
@@ -248,6 +249,10 @@ function SettingsPage() {
 
       <DemoDisabled>
         <AppSettingsCard />
+      </DemoDisabled>
+
+      <DemoDisabled>
+        <IntegrationsCard />
       </DemoDisabled>
 
       <DemoDisabled>
