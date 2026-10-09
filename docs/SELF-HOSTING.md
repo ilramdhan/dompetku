@@ -145,7 +145,7 @@ A **fork** is your own copy of the project on GitHub. Vercel will build the webs
 **What success looks like:** the result panel says **Success. No rows returned** (you may also see a small table from the last statement). In **Table Editor** you now see tables such as `accounts`, `categories`, `transactions`, `debts`, `subscriptions`, `budgets`, `goals` … and the `categories` table already has default categories.
 
 <details>
-<summary><strong>What are the sections v1 … v18?</strong></summary>
+<summary><strong>What are the sections v1 … v19?</strong></summary>
 
 The file grew with the app. Every section uses `if not exists` / `on conflict do nothing` / `create or replace`, so **the whole file is idempotent: running it again is always safe** and never deletes data. Run the whole file each time you update.
 
@@ -169,6 +169,7 @@ The file grew with the app. Every section uses `if not exists` / `on conflict do
 | v16       | Integration settings (bot, AI, email, n8n keys) editable in Settings → Integrasi; secrets encrypted                                      |
 | v17       | Profile (name, address, photo) and changing the login password in the app (`app_users`)                                                  |
 | v18       | Multi-user for families: members with per-wallet view/manage access (`account_permissions`), needs v17                                   |
+| v19       | Kantong (pockets) inside a wallet with low/empty alerts (`pockets`, `transactions.pocket_id`, `pocket_alerts`)                           |
 
 If a later section has not been run, the related page shows a hint instead of crashing, and the rest of the app keeps working.
 
@@ -316,7 +317,11 @@ Run sections **v17 and v18** of `schema.sql` first. Then, logged in as the owner
 
 Members only see the dashboard, transactions, accounts and reports, computed over their wallets. Everything else (gold, receivables, goals, debts, budgets, settings, CSV import, backup), the Telegram bot and the n8n API stay owner-only. Deactivate, reset the password or delete a member from the same card; their sessions end immediately. 2FA (`APP_TOTP_SECRET`) protects the owner only.
 
-### 5.7 Optional: import history
+### 5.7 Optional: pockets (Kantong, v19)
+
+Run section **v19** of `schema.sql` (or simply the whole file again). Then open **Accounts → a wallet → Kantong → + Kantong**: give it a name, an allocation, an optional warning threshold and a period (**monthly**, starting over each month, or **running**). When recording an expense, income or outgoing transfer on that wallet, pick the pocket in the optional **Kantong** field; in the Telegram bot add a tag at the end, e.g. `kopi 25rb #makan`, and use `/kantong` to see what is left. Without v19 the card only shows a hint and transactions save exactly as before.
+
+### 5.8 Optional: import history
 
 **Transactions → Import CSV** accepts a CSV with date, type, amount, category, account, notes, currency. You get a preview; duplicates and invalid rows are skipped.
 

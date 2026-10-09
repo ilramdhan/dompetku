@@ -114,6 +114,9 @@ or dark). Regenerate them with `npm run screenshots` (see [Regenerating screensh
 - Monthly **budgets per category**, with optional **rollover** of unused amounts.
 - **Instant alerts at 80% and 100%** of a budget, on the web and in the bot.
 - **Savings goals**, optionally linked to a savings account.
+- **Kantong (pockets)** inside a wallet: earmark part of one wallet's money (e.g. Mandiri → Makan
+  500rb, Transport 250rb), monthly or running, with an "unallocated" figure and alerts when a
+  pocket runs low or is empty, on the web and in the bot (`kopi 25rb #makan`, `/kantong`; schema v19).
 
 ### Assets and net worth
 

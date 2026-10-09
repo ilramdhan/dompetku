@@ -13,7 +13,7 @@ so you can follow along even if you are new to web development.
 - [Tech stack](#tech-stack)
 - [System diagram](#system-diagram)
 - [Directory structure](#directory-structure)
-- [Database schema sections (v1–v18)](#database-schema-sections-v1v18)
+- [Database schema sections (v1–v19)](#database-schema-sections-v1v19)
 - [Key flows](#key-flows)
 - [Conventions and contributor rules](#conventions-and-contributor-rules)
 - [Testing and CI](#testing-and-ci)
@@ -128,7 +128,7 @@ collapsed. Lovable planning drafts in `.lovable/` are omitted.
 │   ├── icons/                     # PWA icons (collapsed)
 │   ├── manifest.webmanifest       # PWA manifest (no service worker)
 │   └── robots.txt
-├── supabase/schema.sql            # Full database schema, sections v1–v18, safe to re-run
+├── supabase/schema.sql            # Full database schema, sections v1–v19, safe to re-run
 ├── src/
 │   ├── server.ts                  # Server entry wrapper: catches SSR errors → logError + error page
 │   ├── start.ts                   # Global request middleware: security headers, error page, CSRF
@@ -208,7 +208,7 @@ File-name suffixes tell you where code may run:
 | `i18n.tsx`                                                                    | `LanguageProvider` / `useI18n`, ID→EN dictionary.                                                                      |
 | `dates.ts`, `head.ts`, `utils.ts`                                             | Date helpers, page `<head>` helper, `cn()` class merge.                                                                |
 
-## Database schema sections (v1–v18)
+## Database schema sections (v1–v19)
 
 `supabase/schema.sql` is one file, organised in sections that are **safe to re-run** (`if not
 exists` everywhere). A fresh install runs the whole file once. Existing installs run any newer
@@ -235,6 +235,7 @@ the section is run.
 | v16     | `integration_settings` (key/value/is_secret): bot, AI, email and n8n values from Settings → Integrasi over env; secrets AES-256-GCM encrypted, excluded from backups.                                                           |
 | v17     | `app_users` (username, display_name, address, avatar data URL, password_hash, role, is_active, session_version): profile + in-app password change; backups carry profile fields only.                                           |
 | v18     | Multi-user: `app_users.must_change_password`, `account_permissions` (user_id, account_id, level `view`/`manage`, PK both, cascade), optional `activity_log.actor`.                                                              |
+| v19     | Kantong: `pockets` (account_id cascade, name unique per wallet, allocated, min_balance, period `monthly`/`none`), optional `transactions.pocket_id` (on delete set null), `pocket_alerts` (pocket, month, level `low`/`empty`). |
 
 ## Key flows
 
@@ -259,6 +260,30 @@ the section is run.
    because Lovable previews run in an iframe.
 6. n8n routes do not use the cookie. They require `x-api-key: <N8N_API_KEY>` (or
    `Authorization: Bearer`); a missing or short key makes them answer `503`.
+
+### Kantong (pockets, v19)
+
+- **What.** A pocket earmarks part of **one wallet's** money (Mandiri → Makan 500rb). It does not
+  replace category Budgets: budgets judge spending per category across all wallets, pockets track
+  physical money inside one wallet. Amounts are in the wallet's currency (`amount`, like balances).
+- **Math** (`pockets.ts`, pure, tested). `monthly`: remaining = allocated − pocket expenses this
+  month + pocket incomes this month (month in the app time zone); `none`: running envelope over all
+  time. A transfer **out** of the wallet may carry a pocket (counts as spending); the receiving
+  side never does. `unallocated = wallet balance − Σ max(0, remaining)` over active pockets, shown
+  negative with a warning when over-allocated. Example: BCA balance 1.000.000, Makan 500.000 with
+  150.000 spent (remaining 350.000) and Transport 250.000 unused → unallocated 400.000.
+- **Saving.** `transactions.pocket_id` is optional: `insertTxRow`/`updateTransaction` drop it and
+  retry when v19 is not run. `saveTransaction` validates that the pocket belongs to the source
+  wallet (`assertPocketForTx`); an edit that moves the row to another wallet without picking a
+  pocket clears it (`pocketOnEdit`). Splits, CSV import and recurring posts never set a pocket.
+- **Alerts.** `pocketAlertsFor(tx, prev)` (pockets.server.ts) runs after web and bot saves:
+  `low` when remaining crosses ≤ `min_balance`, `empty` when it crosses ≤ 0 (only on the way
+  down, current month only). Deduped per pocket/month/level in `pocket_alerts` (an `empty` also
+  claims `low`); missing table → alert without dedupe. Never throws. Web shows a toast and a
+  dashboard card; the bot appends the line to the "saved" reply.
+- **RBAC.** View on a wallet → see its pockets; manage → assign transactions to them and create,
+  edit, archive or delete them (`assertWalletManage`). `maskTx` clears `pocket_id` when the source
+  wallet is hidden. The bot (`#tag`, `/kantong`) is owner-only like the rest of the bot.
 
 ### Users and wallet-level access (RBAC, v18)
 
