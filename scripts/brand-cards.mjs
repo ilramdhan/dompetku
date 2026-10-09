@@ -206,3 +206,202 @@ export function bannerHtml({ logo, font }) {
     ${goldCard(1300, 274, 254)}
   </div>`;
 }
+
+/** Copy for the "what's new in v1.5" card; one template, two languages. Plain words only. */
+const WHATS_NEW_V15 = {
+  id: {
+    eyebrow: "Pembaruan v1.5",
+    title: "Apa yang baru?",
+    subtitle: "Empat fitur baru: lebih mudah diatur dan bisa dipakai bersama keluarga.",
+    f1: {
+      title: "Atur bot dari aplikasi",
+      body: "Hubungkan bot Telegram langsung dari Pengaturan tanpa mengubah server. Kunci rahasia disimpan terenkripsi dan tidak ditampilkan lagi.",
+      rows: [
+        ["Token bot Telegram", "•••••••• ✓"],
+        ["Chat yang diizinkan", "2 chat"],
+        ["Baca nota otomatis", "Aktif"],
+      ],
+      saved: "Tersimpan aman",
+    },
+    f2: {
+      title: "Halaman Profil",
+      body: "Ubah nama, foto, dan alamat Anda, lalu ganti password sendiri kapan saja.",
+      name: "Sari Rahma",
+      addr: "Jl. Melati 12, Bandung",
+      button: "Ganti password",
+      photo: "Ganti foto",
+    },
+    f3: {
+      title: "Akun keluarga",
+      body: "Tambah anggota keluarga dan pilih dompet mana yang boleh mereka lihat atau kelola.",
+      rows: [
+        ["Ayah", "Semua dompet", "Pemilik"],
+        ["Ibu", "Mandiri, BCA", "Kelola"],
+        ["Dika", "Uang Saku", "Lihat saja"],
+      ],
+      add: "Tambah anggota",
+    },
+    f4: {
+      title: "Kantong di dalam dompet",
+      body: "Pisahkan saldo satu dompet untuk tiap keperluan dan dapat peringatan saat kantong menipis atau habis.",
+      wallet: "Mandiri",
+      pockets: [
+        ["Makan", "sisa Rp65rb dari Rp500rb", 87],
+        ["Transport", "sisa Rp180rb dari Rp250rb", 28],
+      ],
+      chat: "kopi 25rb #makan",
+      alert: "⚠️ Kantong Makan tinggal Rp65rb",
+    },
+    footTitle: "Untuk yang sudah pakai",
+    steps: [
+      "Jalankan ulang file database (<b>schema.sql</b>) sekali.",
+      "Sisanya opsional — semua pengaturan lama tetap jalan.",
+    ],
+  },
+  en: {
+    eyebrow: "Update v1.5",
+    title: "What's new?",
+    subtitle: "Four new features: easier to set up, and ready to share with your family.",
+    f1: {
+      title: "Set up the bot in the app",
+      body: "Connect your Telegram bot from Settings, no server changes needed. Secret keys are encrypted and never shown again.",
+      rows: [
+        ["Telegram bot token", "•••••••• ✓"],
+        ["Allowed chats", "2 chats"],
+        ["Read receipts automatically", "On"],
+      ],
+      saved: "Saved securely",
+    },
+    f2: {
+      title: "Your profile page",
+      body: "Update your name, photo and address, and change your own password whenever you like.",
+      name: "Sari Rahma",
+      addr: "12 Melati St, Bandung",
+      button: "Change password",
+      photo: "Change photo",
+    },
+    f3: {
+      title: "Family accounts",
+      body: "Add family members and choose which wallets each of them can view or manage.",
+      rows: [
+        ["Dad", "All wallets", "Owner"],
+        ["Mom", "Mandiri, BCA", "Manage"],
+        ["Dika", "Pocket money", "View only"],
+      ],
+      add: "Add member",
+    },
+    f4: {
+      title: "Pockets inside wallets",
+      body: "Split one wallet's balance into pockets for different needs and get a heads-up when one runs low or empty.",
+      wallet: "Mandiri",
+      pockets: [
+        ["Food", "Rp65k left of Rp500k", 87],
+        ["Transport", "Rp180k left of Rp250k", 28],
+      ],
+      chat: "coffee 25k #food",
+      alert: "⚠️ Food pocket is down to Rp65k",
+    },
+    footTitle: "For existing users",
+    steps: [
+      "Run the database file (<b>schema.sql</b>) once more.",
+      "Everything else is optional — your existing settings keep working.",
+    ],
+  },
+};
+
+const wnIcon = {
+  plug: `<svg viewBox="0 0 24 24"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></svg>`,
+  user: `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>`,
+  users: `<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a7 7 0 0 1 4 6.5"/></svg>`,
+  wallet: `<svg viewBox="0 0 24 24"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 7l12-4 2 4"/><circle cx="16.5" cy="13.5" r="1.2"/></svg>`,
+};
+
+/** 1200×1500 portrait "what's new in v1.5" card (shareable in chats); `lang` is "id" | "en". */
+export function whatsNewV15Html({ logo, font, lang }) {
+  const s = WHATS_NEW_V15[lang];
+  const feature = (ic, f, mock) => `<div class="wn">
+      <div class="wn-head"><span class="ic">${ic}</span>${f.title}</div>
+      <p class="wn-body">${f.body}</p>
+      <div class="mock">${mock}</div>
+    </div>`;
+  const row = (l, r, last) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;${last ? "" : `border-bottom:1.5px solid ${C.border}`}"><span style="font:500 20px/1.2 Figtree">${l}</span><span style="font:700 19px/1 Figtree;color:${C.primary};white-space:nowrap">${r}</span></div>`;
+
+  const m1 = `${s.f1.rows.map(([l, r], i) => row(l, r, i === s.f1.rows.length - 1)).join("")}
+    <div style="margin-top:10px"><span class="tag" style="background:${C.primarySoft};color:${C.primary};font-size:18px">🔒 ${s.f1.saved}</span></div>`;
+
+  const m2 = `<div style="display:flex;align-items:center;gap:18px">
+      <div style="width:76px;height:76px;border-radius:50%;background:${C.goldSoft};border:3px solid ${C.gold};display:grid;place-items:center;font:700 28px/1 'Bricolage Grotesque';color:${C.goldInk}">SR</div>
+      <div><div style="font:700 24px/1.1 Figtree">${s.f2.name}</div><div style="font:500 19px/1.3 Figtree;color:${C.muted};margin-top:6px">${s.f2.addr}</div><span class="tag" style="background:${C.card};border:1.5px solid ${C.border};color:${C.primary};font-size:17px;margin-top:10px">📷 ${s.f2.photo}</span></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <div style="flex:1;height:44px;border-radius:10px;border:1.5px solid ${C.border};background:${C.card};padding:0 14px;display:flex;align-items:center;font:700 18px/1 Figtree;letter-spacing:3px;color:${C.muted}">••••••••</div>
+      <span class="pill" style="font-size:19px;padding:13px 16px">${s.f2.button}</span>
+    </div>`;
+
+  const roleColor = [
+    [C.primary, C.cream],
+    [C.primarySoft, C.primary],
+    [C.blueSoft, C.blue],
+  ];
+  const m3 = `${s.f3.rows
+    .map(
+      (
+        [n, w, r],
+        i,
+      ) => `<div style="display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1.5px solid ${C.border}">
+      <div style="width:44px;height:44px;border-radius:50%;background:${C.card};display:grid;place-items:center;font:700 19px/1 Figtree;color:${C.primary}">${n[0]}</div>
+      <div style="flex:1"><div style="font:700 20px/1.1 Figtree">${n}</div><div style="font:500 18px/1.2 Figtree;color:${C.muted};margin-top:3px">${w}</div></div>
+      <span class="tag" style="background:${roleColor[i][0]};color:${roleColor[i][1]};font-size:17px">${r}</span></div>`,
+    )
+    .join("")}
+    <div style="margin:12px 0 6px;height:44px;border-radius:10px;border:1.5px dashed ${C.primary};display:grid;place-items:center;font:700 19px/1 Figtree;color:${C.primary}">+ ${s.f3.add}</div>`;
+
+  const m4 = `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px"><span style="font:700 20px/1 Figtree">${s.f4.wallet}</span><span class="mono" style="font:700 20px/1 'JetBrains Mono'">Rp1.200.000</span></div>
+    ${s.f4.pockets
+      .map(
+        ([n, l, p], i) => `<div style="margin-top:${i ? 16 : 0}px">
+        <div style="display:flex;justify-content:space-between;font:600 19px/1 Figtree;margin-bottom:8px"><span>${n}</span><span style="color:${p > 80 ? C.goldInk : C.muted}">${l}</span></div>
+        <div class="bar" style="height:10px;background:${C.card}"><span style="width:${p}%;background:${p > 80 ? C.warning : C.income}"></span></div></div>`,
+      )
+      .join("")}
+    <div style="display:flex;justify-content:flex-end;margin-top:14px"><div class="bubble" style="background:${C.primary};color:${C.cream};font-size:19px">${s.f4.chat}</div></div>
+    <div class="bubble" style="background:${C.goldSoft};color:${C.goldInk};font:600 19px/1.25 Figtree;margin-top:8px;width:fit-content">${s.f4.alert}</div>`;
+
+  return `<style>${baseCss(font)}
+    .wn{background:${C.card};border:1.5px solid ${C.border};border-radius:24px;padding:28px 28px 26px;
+      box-shadow:0 10px 30px -18px #1d3b2f40;display:flex;flex-direction:column}
+    .wn-head{display:flex;align-items:center;gap:14px;font:700 26px/1.1 "Bricolage Grotesque";letter-spacing:-.4px}
+    .wn .ic{width:44px;height:44px;border-radius:12px;flex:none}
+    .wn .ic svg{width:24px;height:24px}
+    .wn-body{font:400 22px/1.42 Figtree;color:${C.muted};margin-top:14px}
+    .mock{margin-top:auto;padding-top:20px}
+  </style>
+  <div class="canvas" style="width:1200px;height:1500px;padding:56px 64px 0">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      ${brand(logo, 64)}
+      <span class="pill" style="background:${C.gold};color:${C.ink};font-size:22px;font-weight:700">v1.5</span>
+    </div>
+    <div class="eyebrow" style="margin-top:30px;font-size:17px">${s.eyebrow}</div>
+    <h1 class="display" style="font-weight:800;font-size:76px;line-height:1;letter-spacing:-2.5px;margin-top:14px">${s.title}</h1>
+    <p style="font:400 25px/1.4 Figtree;color:${C.muted};margin-top:16px;width:900px">${s.subtitle}</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:30px">
+      ${feature(wnIcon.plug, s.f1, `<div style="background:${C.soft};border-radius:16px;padding:6px 18px 14px">${m1}</div>`)}
+      ${feature(wnIcon.user, s.f2, `<div style="background:${C.soft};border-radius:16px;padding:18px">${m2}</div>`)}
+      ${feature(wnIcon.users, s.f3, `<div style="background:${C.soft};border-radius:16px;padding:6px 18px">${m3}</div>`)}
+      ${feature(wnIcon.wallet, s.f4, `<div style="background:${C.soft};border-radius:16px;padding:18px">${m4}</div>`)}
+    </div>
+    <div style="position:absolute;left:0;right:0;bottom:0;background:${C.ink};color:${C.cream};padding:28px 64px;display:flex;align-items:center;gap:32px">
+      <div style="flex:1">
+        <div style="font:700 17px/1 Figtree;letter-spacing:3px;text-transform:uppercase;color:${C.gold}">${s.footTitle}</div>
+        ${s.steps
+          .map(
+            (t, i) =>
+              `<div style="display:flex;gap:12px;align-items:baseline;margin-top:${i ? 8 : 14}px;font:400 23px/1.35 Figtree"><span style="font:700 20px/1 'JetBrains Mono';color:${C.gold}">${i + 1}</span><span>${t}</span></div>`,
+          )
+          .join("")}
+      </div>
+      <span class="pill" style="background:${C.cream};color:${C.ink};flex:none">dompetku.ilramdhan.dev</span>
+    </div>
+  </div>`;
+}

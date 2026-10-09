@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * Dev-only: renders the PNG icons (favicon, apple-touch, PWA, maskable) from public/logo.svg,
- * plus the og-image and README banner from the HTML templates in scripts/brand-cards.mjs, with a
- * headless Chromium. Not a project dependency — run with:
+ * plus the og-image, README banner and "what's new" cards from the HTML templates in
+ * scripts/brand-cards.mjs, with a headless Chromium. Not a project dependency — run with:
  *
- *   npx -p playwright -p sharp node scripts/render-icons.mjs [og-image banner …]
+ *   npx -p playwright -p sharp node scripts/render-icons.mjs [og-image banner whats-new …]
  *
  * Optional args only render outputs whose path contains one of them. *
  * (`npx playwright install chromium` once if the browser is missing.)
@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { bannerHtml, ogHtml } from "./brand-cards.mjs";
+import { bannerHtml, ogHtml, whatsNewV15Html } from "./brand-cards.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -65,6 +65,15 @@ const banner = {
   html: bannerHtml({ logo: svgData, font }),
 };
 
+/** "What's new in v1.5" portrait cards (ID + EN) for chats, README and release notes. */
+const whatsNew = (lang) => ({
+  w: 1200,
+  h: 1500,
+  opaque: true,
+  optimize: true,
+  html: whatsNewV15Html({ logo: svgData, font, lang }),
+});
+
 const targets = {
   "public/favicon.png": tile(64),
   "public/icons/favicon-32.png": tile(32),
@@ -78,6 +87,8 @@ const targets = {
   "public/icons/og-image.png": og,
   "src/assets/app-icon.png": tile(1024),
   "docs/assets/banner.png": banner,
+  "docs/assets/whats-new-v1.5-id.png": whatsNew("id"),
+  "docs/assets/whats-new-v1.5-en.png": whatsNew("en"),
 };
 
 const playwright = load("playwright");
