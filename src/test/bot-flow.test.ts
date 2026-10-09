@@ -178,7 +178,7 @@ describe("alur bot end-to-end (tanpa AI)", () => {
     expect(r.method).toBe("send");
     expect(r.text).toContain("chat_id 999");
     expect(r.text).toContain("BOT_ALLOWED_CHAT_IDS");
-    expect(dbCalls).toEqual([]);
+    expect(dbCalls.filter((t) => t !== "integration_settings")).toEqual([]); // config only
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
     const help = await handleBotUpdate({ update_id: 4, chat_id: "111", text: "/help" });
@@ -207,7 +207,7 @@ describe("alur bot end-to-end (tanpa AI)", () => {
         mime_type: "image/jpeg",
       });
     }
-    expect(dbCalls).toEqual([]);
+    expect(dbCalls.filter((t) => t !== "integration_settings")).toEqual([]); // config only
     expect(tables["bot_drafts"]).toBeUndefined();
     warn.mockRestore();
   });

@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/public/n8n/reminders")({
     handlers: {
       GET: withErrorLogging("n8n:reminders", async ({ request }) => {
         const { checkApiKey, json } = await import("@/lib/api-key.server");
-        const denied = checkApiKey(request);
+        const denied = await checkApiKey(request);
         if (denied) return denied;
         const url = new URL(request.url);
         try {

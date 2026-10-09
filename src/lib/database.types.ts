@@ -942,6 +942,13 @@ export type Database = {
           },
         ];
       };
+      /** v16 (optional table): integration settings from Settings → Integrasi (secrets encrypted). */
+      integration_settings: {
+        Row: { key: string; value: string; is_secret: boolean; updated_at: string };
+        Insert: { key: string; value: string; is_secret?: boolean; updated_at?: string };
+        Update: { key?: string; value?: string; is_secret?: boolean; updated_at?: string };
+        Relationships: [];
+      };
       /** v14 (optional table): single-row app settings (id = 1) set from the Settings page. */
       app_settings: {
         Row: {

@@ -1542,9 +1542,11 @@ export async function reminderEmail(days: number) {
 export async function sendReminderEmail(days: number, to?: string) {
   if ((await import("./demo.server")).isDemo())
     return { sent: false, reason: "Tidak tersedia di mode demo" };
-  const key = process.env["RESEND_API_KEY"];
-  const from = process.env["EMAIL_FROM"];
-  const recipient = to || process.env["EMAIL_TO"];
+  const { getIntegrations } = await import("./integrations.server");
+  const cfg = await getIntegrations(["RESEND_API_KEY", "EMAIL_FROM", "EMAIL_TO"]);
+  const key = cfg.RESEND_API_KEY;
+  const from = cfg.EMAIL_FROM;
+  const recipient = to || cfg.EMAIL_TO;
   if (!key || !from || !recipient)
     return {
       sent: false,

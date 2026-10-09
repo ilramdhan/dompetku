@@ -137,7 +137,7 @@ describe("server guards", () => {
   it("blocks n8n routes with a 403 in demo mode", async () => {
     process.env["DEMO_MODE"] = "true";
     const { checkApiKey } = await import("@/lib/api-key.server");
-    const res = checkApiKey(new Request("https://x/api/public/n8n/summary"));
+    const res = await checkApiKey(new Request("https://x/api/public/n8n/summary"));
     expect(res?.status).toBe(403);
     expect(await res?.json()).toEqual({ ok: false, error: "demo" });
   });
