@@ -85,6 +85,18 @@ or dark). Regenerate them with `npm run screenshots` (see [Regenerating screensh
     <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/recurring-dark.png"><img src="public/screenshots/recurring.png" alt="Recurring transactions"></picture><br><b>Recurring transactions</b>: Salary, rent and top-ups posted automatically when due.</td>
     <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/settings-dark.png"><img src="public/screenshots/settings.png" alt="Settings"></picture><br><b>Settings</b>: Categories, app settings and optional two-factor login.</td>
   </tr>
+  <tr>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/accounts-pockets-dark.png"><img src="public/screenshots/accounts-pockets.png" alt="Wallet detail with Kantong"></picture><br><b>Kantong (pockets)</b>: Envelopes inside a wallet with what is left this month and a low-balance badge.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/transaction-pocket-dark.png"><img src="public/screenshots/transaction-pocket.png" alt="Transaction form with the Kantong select open"></picture><br><b>Kantong on transactions</b>: Pick the wallet's pocket when recording an expense, income or transfer.</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/dashboard-pockets-dark.png"><img src="public/screenshots/dashboard-pockets.png" alt="Dashboard pocket alert"></picture><br><b>Pocket alerts</b>: The dashboard flags pockets at or below their threshold this month.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/settings-users-dark.png"><img src="public/screenshots/settings-users.png" alt="Settings: users and wallet access"></picture><br><b>Family members</b>: Add members and choose which wallets they can view or manage.</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/settings-integrations-dark.png"><img src="public/screenshots/settings-integrations.png" alt="Settings: integrations"></picture><br><b>Integrations</b>: Configure the Telegram bot, AI, email and n8n from the web UI; secrets stay encrypted.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/profile-dark.png"><img src="public/screenshots/profile.png" alt="Profile page"></picture><br><b>Profile</b>: Name, address, avatar and password change.</td>
+  </tr>
 </table>
 
 **On your phone and in Telegram**
