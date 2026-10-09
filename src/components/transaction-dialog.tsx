@@ -18,6 +18,7 @@ import { SplitEditor, SPLIT_ON, SPLIT_ROWS } from "./split-editor";
 import { useReceiptUrls } from "./receipt-gallery";
 import { MAX_RECEIPTS, receiptPaths } from "@/lib/receipts";
 import type { Account, Category } from "@/lib/schemas";
+import { useAccess } from "@/hooks/use-access";
 
 export type TxDraft = Record<string, unknown>;
 
@@ -42,10 +43,12 @@ export function TransactionDialog({
   const save = useServerFn(saveTransaction);
   const saveSplit = useServerFn(saveSplitTransaction);
   const qc = useQueryClient();
+  // v18 members: only wallets they may manage, and every transaction needs one (server-enforced).
+  const { isAdmin, can } = useAccess();
   const accOpts = [
-    { value: "", label: t("— Tanpa akun —") },
+    ...(isAdmin ? [{ value: "", label: t("— Tanpa akun —") }] : []),
     ...accounts
-      .filter((a) => !a.archived)
+      .filter((a) => !a.archived && can("wallet:manage", a.id))
       .map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` })),
   ];
 

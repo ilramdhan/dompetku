@@ -9,6 +9,9 @@ import { RouteError } from "@/components/route-error";
 import { CsvImport } from "@/components/csv-import";
 import { BackupRestore } from "@/components/backup-restore";
 import { TwoFactorCard } from "@/components/two-factor-card";
+import { UsersCard } from "@/components/users-card";
+import { listUsersFn } from "@/lib/users.functions";
+import { displayNameOf } from "@/lib/users";
 import { AppSettingsCard } from "@/components/app-settings-card";
 import { IntegrationsCard } from "@/components/integrations-card";
 import { AboutCard } from "@/components/about-card";
@@ -16,7 +19,7 @@ import { DemoDisabled } from "@/components/demo";
 import { RowActions, useCrudDialog } from "@/components/crud-page";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { fxQuery, activityQuery, rowsQuery } from "@/lib/queries";
+import { fxQuery, activityQuery, rowsQuery, usersQueryKey } from "@/lib/queries";
 import { exportBackupJson } from "@/lib/finance.functions";
 import { money } from "@/lib/format";
 import { usePrivacy } from "@/lib/privacy";
@@ -87,7 +90,13 @@ const ENDPOINTS = [
   },
 ];
 
-type ActivityRow = { id: string; action: unknown; detail: unknown; created_at: string };
+type ActivityRow = {
+  id: string;
+  action: unknown;
+  detail: unknown;
+  created_at: string;
+  actor?: string | null;
+};
 
 function SettingsPage() {
   usePrivacy();
@@ -95,6 +104,13 @@ function SettingsPage() {
   const categories = useSuspenseQuery(rowsQuery("categories")).data as Category[];
   const { usdIdr } = useSuspenseQuery(fxQuery()).data;
   const activity = (useQuery(activityQuery(30)).data ?? []) as ActivityRow[];
+  // v18: show the actor's full name (else username); shares the Pengguna card's query.
+  const listUsers = useServerFn(listUsersFn);
+  const users = useQuery({ queryKey: usersQueryKey, queryFn: () => listUsers(), retry: false });
+  const actorName = (u: string) => {
+    const hit = users.data?.users.find((x) => x.username === u);
+    return hit ? displayNameOf(hit) : u;
+  };
   const crud = useCrudDialog("categories", { kind: "expense", color: "#d0703c" });
   const backup = useServerFn(exportBackupJson);
   const [origin, setOrigin] = useState("");
@@ -243,6 +259,11 @@ function SettingsPage() {
                       {activityDetail(a.detail, (n, c) => money(n, c))}
                     </span>
                   ) : null}
+                  {a.actor ? (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      · {actorName(a.actor)}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="num shrink-0 text-xs text-muted-foreground">
                   {new Date(a.created_at).toLocaleString(lang === "en" ? "en-US" : "id-ID", {
@@ -266,6 +287,10 @@ function SettingsPage() {
 
       <DemoDisabled>
         <IntegrationsCard />
+      </DemoDisabled>
+
+      <DemoDisabled>
+        <UsersCard />
       </DemoDisabled>
 
       <DemoDisabled>

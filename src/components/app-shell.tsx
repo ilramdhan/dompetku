@@ -33,8 +33,10 @@ import { ProfileLink } from "@/components/user-avatar";
 import { DemoBanner } from "@/components/demo";
 import { VersionBadge, VersionRailLabel, useVersionText } from "@/components/version-badge";
 import { cn } from "@/lib/utils";
+import { useAccess } from "@/hooks/use-access";
+import { canOpenPath } from "@/lib/permissions";
 
-const NAV = [
+const ALL_NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/transactions", label: "Transaksi", icon: Receipt },
   { to: "/reports", label: "Laporan", icon: BarChart3 },
@@ -184,8 +186,15 @@ function useCompactHeader(): { scrolled: boolean; compact: boolean } {
   return state;
 }
 
+/** Navigation for the role (members only see the modules they may open; UI only). */
+function useNav() {
+  const { role } = useAccess();
+  return ALL_NAV.filter((n) => canOpenPath(role, n.to));
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useI18n();
+  const NAV = useNav();
   const doLogout = useServerFn(logout);
   const tagline = useTagline();
   const navigate = useNavigate();

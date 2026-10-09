@@ -1105,6 +1105,66 @@ const DICT: Record<string, string> = {
     "The app_users table doesn't exist yet — run the v17 section of supabase/schema.sql.",
   "Profil berubah di tempat lain, coba lagi.": "The profile changed elsewhere, please try again.",
   "Foto harus PNG/JPEG/WebP maksimal 200 KB": "Photo must be PNG/JPEG/WebP, max. 200 KB",
+  /* v18 multi-user & wallet access */
+  Pengguna: "Users",
+  Anggota: "Member",
+  Pemilik: "Owner",
+  Akses: "Access",
+  Lihat: "View",
+  "Akses dompet": "Wallet access",
+  "Akses penuh ke semua data.": "Full access to all data.",
+  "Akses ditolak": "Access denied",
+  "Tanpa akses": "No access",
+  "Dompet lain": "Other wallet",
+  "Tambah anggota": "Add member",
+  "Hapus anggota": "Delete member",
+  "Tambahkan anggota keluarga dan pilih dompet yang boleh mereka lihat atau kelola.":
+    "Add family members and choose which wallets they may view or manage.",
+  "Jalankan bagian v17 dan v18 di supabase/schema.sql untuk menambahkan anggota.":
+    "Run the v17 and v18 sections of supabase/schema.sql to add members.",
+  "Fitur multi-user belum aktif — jalankan bagian v17 dan v18 di supabase/schema.sql.":
+    "Multi-user is not enabled yet — run the v17 and v18 sections of supabase/schema.sql.",
+  "Akun login dan hak aksesnya dihapus. Transaksi yang sudah dicatat tetap ada.":
+    "Their login and access are removed. Recorded transactions are kept.",
+  "Anggota diaktifkan": "Member activated",
+  "Anggota dinonaktifkan": "Member deactivated",
+  "Anggota ditambahkan. Atur akses dompetnya.": "Member added. Now set their wallet access.",
+  "Anggota wajib mengganti password sementara saat login pertama.":
+    "The member must change the temporary password at first login.",
+  "Belum ada akun.": "No accounts yet.",
+  "Belum punya akses dompet.": "No wallet access yet.",
+  "Akun dihapus": "Deleted account",
+  "Menunggu ganti password": "Password change pending",
+  "Opsional. Jika kosong, username yang ditampilkan.":
+    "Optional. When empty, the username is shown.",
+  "Password sementara": "Temporary password",
+  "Password direset. Anggota keluar dari semua perangkat.":
+    "Password reset. The member was signed out everywhere.",
+  "Reset password": "Reset password",
+  "Username tidak bisa diubah setelah dibuat.": "The username can't be changed later.",
+  "Username 3–32 karakter: huruf kecil, angka, titik, garis bawah, atau strip":
+    "Username: 3–32 characters of lower-case letters, digits, dot, underscore or dash",
+  "Username sudah dipakai": "Username is already taken",
+  "Pengguna tidak ditemukan": "User not found",
+  "Pemilik tidak bisa diubah dari sini": "The owner can't be changed here",
+  "Akun tidak ditemukan": "Account not found",
+  "Transaksi tidak ditemukan": "Transaction not found",
+  "Lihat: saldo, transaksi, dan laporan dompet. Kelola: juga mencatat, mengubah, dan menghapus transaksinya.":
+    "View: the wallet's balance, transactions and report. Manage: also record, edit and delete its transactions.",
+  "Transfer butuh akses Kelola di kedua dompet.": "Transfers need Manage access on both wallets.",
+  "Ganti password sementara": "Change your temporary password",
+  "Buat password baru milik Anda sebelum memakai aplikasi.":
+    "Create your own new password before using the app.",
+  "Admin membuatkan password sementara. Masukkan password itu, lalu buat password baru.":
+    "The admin gave you a temporary password. Enter it, then choose a new password.",
+  "Password Anda disimpan sebagai hash di database.":
+    "Your password is stored as a hash in the database.",
+  "Saldo dompet (12 bulan)": "Wallet balance (12 months)",
+  "Anggota ditambahkan": "Member added",
+  "Anggota diubah": "Member updated",
+  "Anggota dihapus": "Member deleted",
+  "Password anggota direset": "Member password reset",
+  "Akses dompet diubah": "Wallet access changed",
 };
 
 const LangContext = createContext<{

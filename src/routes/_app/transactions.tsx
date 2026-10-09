@@ -61,6 +61,8 @@ import { usePrivacy } from "@/lib/privacy";
 import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/head";
 import type { Account, Category } from "@/lib/schemas";
+import { useAccess } from "@/hooks/use-access";
+import { canWriteTx, walletLabel } from "@/lib/permissions";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const PAGE_SIZE = 50;
@@ -118,6 +120,10 @@ function TransactionsPage() {
   const csvRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
   const ask = useConfirm();
+  // v18: members see only permitted wallets; edit/delete needs manage (server-enforced too).
+  const { isAdmin, access } = useAccess();
+  const canWrite = isAdmin || Object.values(access.grants).includes("manage");
+  const canEdit = (tx: any) => canWriteTx(access, tx);
 
   async function pickCsv(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -235,7 +241,9 @@ function TransactionsPage() {
         subtitle={t("Input manual, scan nota, atau kiriman dari bot — semua tercatat di sini.")}
         actions={
           <>
-            <ReceiptScanner onDraft={(draft) => setDlg({ open: true, draft, id: null })} />
+            {isAdmin ? (
+              <ReceiptScanner onDraft={(draft) => setDlg({ open: true, draft, id: null })} />
+            ) : null}
             <input
               ref={csvRef}
               type="file"
@@ -248,20 +256,24 @@ function TransactionsPage() {
               <Button variant="outline" onClick={download}>
                 <Download className="size-4" /> {t("Excel (CSV)")}
               </Button>
-              <Button
-                variant="outline"
-                disabled={importing || demo}
-                title={demo ? t("Tidak tersedia di mode demo") : undefined}
-                onClick={() => csvRef.current?.click()}
-              >
-                <Upload className="size-4" /> {importing ? t("Mengimpor…") : t("Impor CSV")}
-              </Button>
+              {isAdmin ? (
+                <Button
+                  variant="outline"
+                  disabled={importing || demo}
+                  title={demo ? t("Tidak tersedia di mode demo") : undefined}
+                  onClick={() => csvRef.current?.click()}
+                >
+                  <Upload className="size-4" /> {importing ? t("Mengimpor…") : t("Impor CSV")}
+                </Button>
+              ) : null}
               <Button variant="outline" onClick={() => window.print()}>
                 <Printer className="size-4" /> PDF
               </Button>
-              <Button variant="outline" onClick={cashWithdraw}>
-                <Banknote className="size-4" /> {t("Tarik tunai")}
-              </Button>
+              {canWrite ? (
+                <Button variant="outline" onClick={cashWithdraw}>
+                  <Banknote className="size-4" /> {t("Tarik tunai")}
+                </Button>
+              ) : null}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -270,26 +282,32 @@ function TransactionsPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-48">
-                <DropdownMenuItem onSelect={cashWithdraw}>
-                  <Banknote className="size-4" /> {t("Tarik tunai")}
-                </DropdownMenuItem>
+                {canWrite ? (
+                  <DropdownMenuItem onSelect={cashWithdraw}>
+                    <Banknote className="size-4" /> {t("Tarik tunai")}
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem onSelect={() => void download()}>
                   <Download className="size-4" /> {t("Excel (CSV)")}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={importing || demo}
-                  onSelect={() => csvRef.current?.click()}
-                >
-                  <Upload className="size-4" /> {importing ? t("Mengimpor…") : t("Impor CSV")}
-                </DropdownMenuItem>
+                {isAdmin ? (
+                  <DropdownMenuItem
+                    disabled={importing || demo}
+                    onSelect={() => csvRef.current?.click()}
+                  >
+                    <Upload className="size-4" /> {importing ? t("Mengimpor…") : t("Impor CSV")}
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem onSelect={() => window.print()}>
                   <Printer className="size-4" /> PDF
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button onClick={() => setDlg({ open: true, draft: newTxDraft(), id: null })}>
-              <Plus className="size-4" /> {t("Catat")}
-            </Button>
+            {canWrite ? (
+              <Button onClick={() => setDlg({ open: true, draft: newTxDraft(), id: null })}>
+                <Plus className="size-4" /> {t("Catat")}
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -445,8 +463,8 @@ function TransactionsPage() {
                   <p className="truncate text-xs text-muted-foreground">
                     {dateLabel(tx.occurred_at, locale)} ·{" "}
                     {tx.kind === "transfer"
-                      ? `${tx.account?.name ?? "?"} → ${tx.to_account?.name ?? "?"}`
-                      : `${tx.category?.name ?? t("Tanpa kategori")}${tx.account?.name ? ` · ${tx.account.name}` : ""}`}
+                      ? `${walletLabel(tx.account, t, "?")} → ${walletLabel(tx.to_account, t, "?")}`
+                      : `${tx.category?.name ?? t("Tanpa kategori")}${tx.account ? ` · ${walletLabel(tx.account, t)}` : ""}`}
                   </p>
                 </div>
                 {tx.split_group ? (
@@ -488,45 +506,47 @@ function TransactionsPage() {
                     <p className="num text-xs text-muted-foreground">{money(tx.amount_idr)}</p>
                   ) : null}
                 </div>
-                <div className="no-print col-start-2 col-end-4 flex shrink-0 justify-self-end sm:col-auto sm:flex-row">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={t("Ubah")}
-                    onClick={() =>
-                      setDlg({
-                        open: true,
-                        id: tx.id,
-                        draft: {
-                          kind: tx.kind,
-                          amount: tx.amount,
-                          currency: tx.currency,
-                          occurred_at: tx.occurred_at,
-                          account_id: tx.account_id,
-                          to_account_id: tx.to_account_id,
-                          category_id: tx.category_id,
-                          description: tx.description,
-                          merchant: tx.merchant,
-                          notes: tx.notes,
-                          source: tx.source,
-                          items: tx.items,
-                          receipt_path: tx.receipt_path,
-                          receipt_paths: receiptPaths(tx),
-                        },
-                      })
-                    }
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={t("Hapus")}
-                    onClick={() => remove(tx.id, tx.split_group)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
+                {canEdit(tx) ? (
+                  <div className="no-print col-start-2 col-end-4 flex shrink-0 justify-self-end sm:col-auto sm:flex-row">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={t("Ubah")}
+                      onClick={() =>
+                        setDlg({
+                          open: true,
+                          id: tx.id,
+                          draft: {
+                            kind: tx.kind,
+                            amount: tx.amount,
+                            currency: tx.currency,
+                            occurred_at: tx.occurred_at,
+                            account_id: tx.account_id,
+                            to_account_id: tx.to_account_id,
+                            category_id: tx.category_id,
+                            description: tx.description,
+                            merchant: tx.merchant,
+                            notes: tx.notes,
+                            source: tx.source,
+                            items: tx.items,
+                            receipt_path: tx.receipt_path,
+                            receipt_paths: receiptPaths(tx),
+                          },
+                        })
+                      }
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={t("Hapus")}
+                      onClick={() => remove(tx.id, tx.split_group)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
