@@ -9,6 +9,16 @@ Starting with v1.0.0, versioned entries (`## [x.y.z]`) are generated automatical
 > [!NOTE]
 > When an entry mentions a **schema section** (`v2`…`v13`), self-hosters must run that section of [`supabase/schema.sql`](supabase/schema.sql) on their Supabase project. Every section is safe to run more than once, and the app keeps working (with the feature disabled) until you do.
 
+## [1.5.0](https://github.com/ilramdhan/dompetku/compare/v1.4.0...v1.5.0) (2026-10-09)
+
+
+### Features
+
+* **auth:** multi-user accounts with wallet-level access control ([#28](https://github.com/ilramdhan/dompetku/issues/28)) ([fe07014](https://github.com/ilramdhan/dompetku/commit/fe070140f06db1b0da066895c3fd1d08dad1109a))
+* **pockets:** envelope pockets inside wallets with threshold alerts ([#29](https://github.com/ilramdhan/dompetku/issues/29)) ([3877a80](https://github.com/ilramdhan/dompetku/commit/3877a80877368cfab8fe075dd5c8d784d6370290))
+* **profile:** add profile page with avatar and password change ([#27](https://github.com/ilramdhan/dompetku/issues/27)) ([07ab1aa](https://github.com/ilramdhan/dompetku/commit/07ab1aae1a6aa5e9ed3f81cbdec12ed2a30ebe88))
+* **settings:** manage bot and integration config from the web UI ([#26](https://github.com/ilramdhan/dompetku/issues/26)) ([4732e0d](https://github.com/ilramdhan/dompetku/commit/4732e0d4311459500df487f6891fd637a091b794))
+
 ## [1.4.0](https://github.com/ilramdhan/dompetku/compare/v1.3.0...v1.4.0) (2026-10-05)
 
 
