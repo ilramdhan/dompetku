@@ -13,6 +13,8 @@ import { z } from "zod";
  * account_reconciliations) come last: their parents (accounts/categories/budgets) are earlier.
  * bot_drafts, activity_log and ai_usage (v15 logs) are never exported or restored, nor is
  * integration_settings (v16): it holds encrypted API keys that must never leave the server in a file.
+ * app_users (v17) is exported with profile fields only: SECRET_COLUMNS (password_hash,
+ * session_version) are stripped on export and on restore, and replace mode never deletes it.
  */
 export const RESTORE_TABLES = [
   "accounts",
@@ -32,6 +34,7 @@ export const RESTORE_TABLES = [
   "budget_alerts",
   "account_reconciliations",
   "app_settings",
+  "app_users",
 ] as const;
 export type RestoreTable = (typeof RESTORE_TABLES)[number];
 
@@ -64,6 +67,7 @@ export const CONFLICT_KEYS: Record<RestoreTable, string[]> = {
   budget_alerts: ["id"],
   account_reconciliations: ["id"],
   app_settings: ["id"],
+  app_users: ["id"],
 };
 
 /**
@@ -77,6 +81,7 @@ export const NATURAL_KEYS: Partial<Record<RestoreTable, string[]>> = {
   debt_payments: ["debt_id", "installment_no"],
   transactions: ["external_id"],
   budget_alerts: ["budget_id", "month", "level"],
+  app_users: ["username"],
 };
 
 /** FK column → referenced table, used to rewrite ids remapped by natural keys. */
@@ -99,8 +104,31 @@ export const GENERATED_COLUMNS: Partial<Record<RestoreTable, string[]>> = {
   transactions: ["items_search"],
 };
 
-/** Strips generated columns from rows before an upsert. */
+/**
+ * Credential columns that never leave the server in a backup file and are never written back
+ * by a restore (a restore must not change the login password or log sessions out).
+ */
+export const SECRET_COLUMNS: Partial<Record<RestoreTable, string[]>> = {
+  app_users: ["password_hash", "session_version"],
+};
+
+/** Tables whose rows are kept in "replace" mode (deleting them would reset the password to env). */
+export const KEEP_ON_REPLACE: readonly RestoreTable[] = ["app_users"];
+
+/** Removes SECRET_COLUMNS from exported/restored rows. */
+export function stripSecrets(table: string, rows: Row[]): Row[] {
+  const cols = SECRET_COLUMNS[table as RestoreTable];
+  if (!cols?.length) return rows;
+  return rows.map((r) => {
+    const out: Row = { ...r };
+    for (const c of cols) delete out[c];
+    return out;
+  });
+}
+
+/** Strips generated and secret columns from rows before an upsert. */
 export function stripGenerated(table: RestoreTable, rows: Row[]): Row[] {
+  rows = stripSecrets(table, rows);
   const cols = GENERATED_COLUMNS[table];
   if (!cols?.length) return rows;
   return rows.map((r) => {

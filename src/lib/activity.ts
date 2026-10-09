@@ -45,6 +45,9 @@ const SPECIAL: Record<string, string> = {
   "integration.delete": "Pengaturan integrasi dihapus (kembali ke env)",
   "integration.webhook_set": "Webhook Telegram dipasang",
   "integration.webhook_delete": "Webhook Telegram dilepas",
+  "profile.update": "Profil diubah",
+  "auth.password_change": "Password diganti",
+  "auth.password_reset_login": "Login dengan APP_PASSWORD_RESET",
 };
 
 export function activityLabel(action: string, t: (s: string) => string = (s) => s): string {

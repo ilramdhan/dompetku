@@ -105,6 +105,7 @@ const WIPE = [
   "transactions",
   "accounts",
   "activity_log",
+  "app_users",
   "categories",
 ];
 const DEFAULT_CATEGORIES = defaultCategoriesFromSchema(

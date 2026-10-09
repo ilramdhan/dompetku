@@ -25,6 +25,7 @@ import {
 } from "./finance.functions";
 import { getRecurring } from "./recurring.functions";
 import { getAccountReport, getReconcileTransactions } from "./account-report.functions";
+import { getProfile } from "./profile.functions";
 import type { CrudTable } from "./schemas";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -36,6 +37,9 @@ export const rowsQuery = (table: CrudTable) =>
     queryFn: () => listRows({ data: { table } }),
     staleTime: REFERENCE_FRESH,
   });
+/** Logged-in user's profile (v17); also feeds the header avatar. */
+export const profileQuery = () =>
+  queryOptions({ queryKey: ["profile"], queryFn: () => getProfile(), staleTime: 5 * 60_000 });
 export const dashboardQuery = (month: string) =>
   queryOptions({
     queryKey: ["dashboard", month],
@@ -179,6 +183,8 @@ const AFFECTS: Record<string, string[]> = {
   account_reconciliations: ["account-report", "activity"],
   // v14 settings: branding (logo/name), the settings card itself, and "today"-based views.
   app_settings: ["branding", "app-settings", "activity", "dashboard", "reminders"],
+  // v17 profile: the profile page, the header avatar and the activity log.
+  app_users: ["profile", "activity"],
 };
 
 export function invalidateFor(qc: QueryClient, table: string) {

@@ -7,11 +7,13 @@
  *   3. `finishRestore()` — logs `backup.restore`.
  * bot_drafts, activity_log and ai_usage (v15 logs) are never exported or restored, nor is
  * integration_settings (v16): it holds encrypted API keys that must never leave the server in a file.
+ * app_users (v17) is restored without password_hash/session_version and kept in replace mode.
  */
 import { db } from "./db.server";
 import { isMissingTable, logActivity } from "./finance.server";
 import {
   CONFLICT_KEYS,
+  KEEP_ON_REPLACE,
   NATURAL_KEYS,
   RESTORE_TABLES,
   applyRemap,
@@ -31,6 +33,7 @@ import {
 export async function clearForReplace() {
   const cleared: string[] = [];
   for (const t of [...RESTORE_TABLES].reverse()) {
+    if (KEEP_ON_REPLACE.includes(t)) continue;
     const key = CONFLICT_KEYS[t][0]!;
     const res = await db().from(t).delete().not(key, "is", null);
     if (res.error) {

@@ -1637,7 +1637,9 @@ export async function exportBackup() {
     "budget_alerts",
     "account_reconciliations",
     "app_settings",
+    "app_users",
   ] as const;
+  const { stripSecrets } = await import("./backup");
   const data: Record<string, any[]> = {};
   // Tables keyed without an `id` column (fx_rates, gold_prices) use their composite primary key for stable paging.
   const orderKeys: Partial<Record<(typeof tables)[number], string[]>> = {
@@ -1659,7 +1661,8 @@ export async function exportBackup() {
   tables.forEach((t, i) => {
     const r = results[i]!;
     if (r.error && !isMissingTable(r.error)) throw new Error(r.error.message);
-    data[t] = (r.data ?? []) as any[];
+    // v17 app_users: profile fields only, never password_hash / session_version.
+    data[t] = stripSecrets(t, (r.data ?? []) as any[]);
   });
   await logActivity("backup.export", null, { tables: tables.length });
   return { exportedAt: new Date().toISOString(), app: "dompetku", version: 1, data };
