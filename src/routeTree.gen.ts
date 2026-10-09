@@ -41,6 +41,7 @@ import { Route as ApiPublicN8nRemindersSendEmailRouteImport } from './routes/api
 import { Route as ApiPublicN8nReportRouteImport } from './routes/api/public/n8n/report'
 import { Route as ApiPublicN8nSummaryRouteImport } from './routes/api/public/n8n/summary'
 import { Route as ApiPublicN8nTransactionsRouteImport } from './routes/api/public/n8n/transactions'
+import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -204,6 +205,12 @@ const ApiPublicN8nTransactionsRoute =
     path: '/api/public/n8n/transactions',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicTelegramWebhookRoute =
+  ApiPublicTelegramWebhookRouteImport.update({
+    id: '/api/public/telegram/webhook',
+    path: '/api/public/telegram/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/api/public/n8n/report': typeof ApiPublicN8nReportRoute
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
+  '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -270,6 +278,7 @@ export interface FileRoutesByTo {
   '/api/public/n8n/report': typeof ApiPublicN8nReportRoute
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
+  '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -305,6 +314,7 @@ export interface FileRoutesById {
   '/api/public/n8n/report': typeof ApiPublicN8nReportRoute
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
+  '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -340,6 +350,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/report'
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
+    | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -373,6 +384,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/report'
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
+    | '/api/public/telegram/webhook'
   id:
     | '__root__'
     | '/'
@@ -407,6 +419,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/report'
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
+    | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -427,6 +440,7 @@ export interface RootRouteChildren {
   ApiPublicN8nReportRoute: typeof ApiPublicN8nReportRoute
   ApiPublicN8nSummaryRoute: typeof ApiPublicN8nSummaryRoute
   ApiPublicN8nTransactionsRoute: typeof ApiPublicN8nTransactionsRoute
+  ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -655,6 +669,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicN8nTransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/telegram/webhook': {
+      id: '/api/public/telegram/webhook'
+      path: '/api/public/telegram/webhook'
+      fullPath: '/api/public/telegram/webhook'
+      preLoaderRoute: typeof ApiPublicTelegramWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -714,6 +735,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicN8nReportRoute: ApiPublicN8nReportRoute,
   ApiPublicN8nSummaryRoute: ApiPublicN8nSummaryRoute,
   ApiPublicN8nTransactionsRoute: ApiPublicN8nTransactionsRoute,
+  ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
