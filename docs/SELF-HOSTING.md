@@ -145,7 +145,7 @@ A **fork** is your own copy of the project on GitHub. Vercel will build the webs
 **What success looks like:** the result panel says **Success. No rows returned** (you may also see a small table from the last statement). In **Table Editor** you now see tables such as `accounts`, `categories`, `transactions`, `debts`, `subscriptions`, `budgets`, `goals` … and the `categories` table already has default categories.
 
 <details>
-<summary><strong>What are the sections v1 … v17?</strong></summary>
+<summary><strong>What are the sections v1 … v18?</strong></summary>
 
 The file grew with the app. Every section uses `if not exists` / `on conflict do nothing` / `create or replace`, so **the whole file is idempotent: running it again is always safe** and never deletes data. Run the whole file each time you update.
 
@@ -168,6 +168,7 @@ The file grew with the app. Every section uses `if not exists` / `on conflict do
 | v15       | AI usage log and per-chat daily bot AI quota                                                                                             |
 | v16       | Integration settings (bot, AI, email, n8n keys) editable in Settings → Integrasi; secrets encrypted                                      |
 | v17       | Profile (name, address, photo) and changing the login password in the app (`app_users`)                                                  |
+| v18       | Multi-user for families: members with per-wallet view/manage access (`account_permissions`), needs v17                                   |
 
 If a later section has not been run, the related page shows a hint instead of crashing, and the rest of the app keeps working.
 
@@ -305,7 +306,17 @@ Adds a 6-digit code from an authenticator app after your password.
 > [!WARNING]
 > Save the key in your password manager as a backup. If you lose your phone, recovery is: remove or replace `APP_TOTP_SECRET` in Vercel and redeploy. Codes tolerate ±30 seconds of clock drift; wrong codes count toward the login limit (8 failures per 15 minutes).
 
-### 5.6 Optional: import history
+### 5.6 Optional: family members (multi-user, v18)
+
+Run sections **v17 and v18** of `schema.sql` first. Then, logged in as the owner (`APP_USERNAME`):
+
+1. Open **Settings → Pengguna** → **Add member**: a lower-case username (cannot be changed later), an optional full name and a **temporary password** (min. 10 characters).
+2. Click **Access** on the member and choose, per wallet, **No access**, **View** (balance, transactions, account report) or **Manage** (also record, edit and delete transactions). Transfers need Manage on both wallets.
+3. Give the member the username and temporary password. At the first login they must choose their own password.
+
+Members only see the dashboard, transactions, accounts and reports, computed over their wallets. Everything else (gold, receivables, goals, debts, budgets, settings, CSV import, backup), the Telegram bot and the n8n API stay owner-only. Deactivate, reset the password or delete a member from the same card; their sessions end immediately. 2FA (`APP_TOTP_SECRET`) protects the owner only.
+
+### 5.7 Optional: import history
 
 **Transactions → Import CSV** accepts a CSV with date, type, amount, category, account, notes, currency. You get a preview; duplicates and invalid rows are skipped.
 

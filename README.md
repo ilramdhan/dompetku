@@ -23,8 +23,9 @@ coffee by sending _"kopi 25rb"_ to your own Telegram bot, or snap a photo of a r
 fill in the details. Everything lives in **your own** Supabase database and **your own** Vercel
 deployment, so your financial data stays yours.
 
-It is built for **one person** (you): a single login defined in environment variables, no sign-up
-pages, no shared servers. The interface is available in **Indonesian and English** (switch any
+It is built for **you and your family**: the owner login is defined in environment variables, and
+the owner can add **family members** from the web UI, each with access to only the wallets you
+choose (view or manage). No sign-up pages, no shared servers. The interface is available in **Indonesian and English** (switch any
 time), and amounts support **IDR and USD**.
 
 > [!NOTE]
@@ -119,6 +120,9 @@ or dark). Regenerate them with `npm run screenshots` (see [Regenerating screensh
 - **Gold savings** with daily world (XAU) and Antam prices, optionally linked to an account.
 - **Receivables** (money others owe you) with partial payments.
 - **Net worth** that counts account balances, gold and outstanding receivables.
+- **Multi-user (family)**: add members in Settings → Pengguna and give each one view or manage
+  access per wallet; members only see the dashboard, transactions, accounts and reports of their
+  wallets (schema v18).
 
 ### Automation
 

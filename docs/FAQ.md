@@ -41,7 +41,7 @@ No. The [self-hosting guide](SELF-HOSTING.md) uses only web dashboards (GitHub, 
 <details>
 <summary><strong>Can several people use it (multi-user)?</strong></summary>
 
-No — it is designed as a **single-user** app. There is one login defined by `APP_USERNAME` / `APP_PASSWORD` (the password can be changed later in **Profile**, schema v17), and all data belongs to that user. A couple could share that one login, but there are no separate users or permissions. For separate people, each person deploys their own copy (each with its own Supabase project).
+Yes, for a family (schema v17 + v18). The `APP_USERNAME` login is always the **owner** and sees everything. In **Settings → Pengguna** the owner adds members with a temporary password (they must change it at first login) and picks, per wallet, **View** (balance, transactions, account report) or **Manage** (also record/edit/delete; transfers need Manage on both wallets). Members only get the dashboard, transactions, accounts and reports, computed over their wallets; gold, receivables, goals, debts, budgets, settings, the bot and the n8n API stay owner-only. Two-step login (2FA) currently protects the owner only — member 2FA is future work. Without v18, it stays a single-user app exactly as before.
 
 </details>
 
@@ -143,6 +143,13 @@ With schema v17, open **Profile → Change password**: the new password is store
 <summary><strong>I changed my password in the app and forgot it.</strong></summary>
 
 Your hosting account is the recovery path: in Vercel set `APP_PASSWORD_RESET=true` → redeploy → log in with `APP_USERNAME` / `APP_PASSWORD` from the env → **Profile → Change password** → remove `APP_PASSWORD_RESET` → redeploy. While the switch is on the stored hash is ignored, so don't leave it on. See [ENVIRONMENT.md](ENVIRONMENT.md#password-changed-in-the-app-v17).
+
+</details>
+
+<details>
+<summary><strong>A family member forgot their password or lost their phone.</strong></summary>
+
+As the owner, open **Settings → Pengguna** → the key icon → set a new temporary password. All of that member's sessions end immediately, and they must choose a new password at their next login. To block someone at once, switch them to inactive or delete them; their recorded transactions stay.
 
 </details>
 

@@ -1,4 +1,5 @@
 <!-- LOVABLE:BEGIN -->
+
 > [!IMPORTANT]
 > This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
 > published git history — force pushing, or rebasing/amending/squashing commits
@@ -7,11 +8,13 @@
 >
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
+
 <!-- LOVABLE:END -->
 
 ## Architecture rules
+
 - All DB access goes through server code with the service-role client in `src/lib/db.server.ts`; RLS is on with no policies — the browser never talks to Supabase directly (single-user app, keeps data private).
-- Auth is a single env-defined user (APP_USERNAME/APP_PASSWORD) with an HMAC-signed httpOnly cookie; every data server fn uses `requireAuth` middleware.
+- Auth: the env user (APP_USERNAME) is always the owner/admin (never demoted/deleted; TOTP, bot and n8n act for it); v18 family members live in `app_users` (role 'member', own scrypt hash, `must_change_password`, immutable lower-case username, shown as `display_name || username`) with HMAC cookies marked `r:"member"`. `requireAuth` resolves `{ user, userId, role, access, can }` via `resolvePrincipal()` (users.server.ts, ~30 s cache, fails closed for members); admin-only fns use `requireAdmin`, profile/password fns `requireSession`.
 - External automation (n8n bots/reminders) uses `/api/public/n8n/*` routes guarded by `N8N_API_KEY`; keep business logic in `finance.server.ts` so web and bot share it.
 - Schema lives in `supabase/schema.sql` (user runs it on their own Supabase); update it whenever tables change.
 - Vercel builds switch nitro preset via the VERCEL env in vite.config.ts, so the same code runs on Lovable and Vercel.
@@ -22,7 +25,7 @@
 - Direct reminder email uses Resend over fetch (RESEND_API_KEY/EMAIL_FROM/EMAIL_TO, optional); n8n can instead consume the ready-made email payload endpoints.
 - Language switch (ID/EN) goes through `LanguageProvider`/`useI18n` in `src/lib/i18n.tsx`; dictionary keys are the original Indonesian strings, `t()` returns the input unchanged for id — wrap all new UI text in `t(...)` and register new keys in the dictionary.
 - PWA is manifest-only (public/manifest.webmanifest + public/icons, favicon.png referenced from `__root.tsx`); no service worker is used, keep it that way so previews stay safe.
-- Reads of optional tables (activity_log, gold_*, receivables*) go through `isMissingTable()` and degrade to empty/`{ready:false}` so pages never crash before the user runs a new schema section.
+- Reads of optional tables (activity_log, gold__, receivables_) go through `isMissingTable()` and degrade to empty/`{ready:false}` so pages never crash before the user runs a new schema section.
 - Gold prices (world XAU + Antam) live in `src/lib/assets.server.ts`, cached one row per day per source in `gold_prices` with last-cache then estimate fallback; pure gold/receivable math lives in `src/lib/assets.ts`.
 - Linked receivables move money as expense/income transactions in category "Piutang"; net worth adds outstanding linked receivables and gold value back so they count as assets.
 - After CRUD, invalidate via `invalidateFor(qc, table)` (table→query-key map in queries.ts), never a blanket `invalidateQueries()`.
@@ -52,5 +55,8 @@
 - Scrolling: html/body use `overflow-x: clip` (with `hidden` fallback) so `position: sticky` works; smooth scroll is app-wide CSS under `prefers-reduced-motion: no-preference`, while router scroll restoration stays `instant`. The mobile header collapses its brand/tool row (`inert`) once scrolled so the nav pills stay pinned; `<BackToTop>` (`components/back-to-top.tsx`, hook in `hooks/use-scrolled-past.ts`) is rendered by both AppShell and LandingShell.
 - Small fully-loaded entity lists (debts, goals, subscriptions, recurring, reminders) paginate client-side via `useClientPage` (`hooks/use-client-page.ts`, pure `clampOffset`/`pageSlice` in `paginate.ts`); summaries stay computed from the full list. `<Pagination>` scrolls the list top into view on page change.
 - Dashboard "Rasio terhadap pemasukan" uses pure `incomeRatios()` in `src/lib/ratio.ts` (tested) over the existing `byCategory`; leftover = income − expense (goal deposits are transfers). Stat cards share a label/value/footer layout with month-over-month deltas from `d.trend`.
-- Integration settings (v16): whitelisted keys in pure `integrations.ts` (catalog, validators, precedence, cipher format); read only via `getIntegration()`/`getIntegrations()` (integrations.server.ts, ~60 s cache) as DB > env > default — never `process.env` for those keys. Secrets are AES-256-GCM (`secret-box.server.ts`, SETTINGS_ENCRYPTION_KEY or HKDF(SESSION_SECRET)), write-only (status returns a masked hint), fall back to env when undecryptable, and `integration_settings` is never backed up. Bootstrap/security vars (SUPABASE_*, SESSION_SECRET, APP_*, DEMO_MODE, SENTRY_DSN) stay env-only. Optional Telegram direct mode (`/api/public/telegram/webhook`, `telegram.ts`/`telegram.server.ts`) verifies the derived secret header and reuses `handleBotUpdate`; the n8n path is unchanged.
+- Integration settings (v16): whitelisted keys in pure `integrations.ts` (catalog, validators, precedence, cipher format); read only via `getIntegration()`/`getIntegrations()` (integrations.server.ts, ~60 s cache) as DB > env > default — never `process.env` for those keys. Secrets are AES-256-GCM (`secret-box.server.ts`, SETTINGS_ENCRYPTION_KEY or HKDF(SESSION_SECRET)), write-only (status returns a masked hint), fall back to env when undecryptable, and `integration_settings` is never backed up. Bootstrap/security vars (SUPABASE__, SESSION_SECRET, APP__, DEMO_MODE, SENTRY_DSN) stay env-only. Optional Telegram direct mode (`/api/public/telegram/webhook`, `telegram.ts`/`telegram.server.ts`) verifies the derived secret header and reuses `handleBotUpdate`; the n8n path is unchanged.
 - Profile & password (v17 `app_users`, foundation for multi-user #21): the APP_USERNAME user is always owner/admin; its row is created lazily on first profile save/password change (never on login). `checkCredentials` (users.server.ts) uses the scrypt `password_hash` when set (pure format/policy in `password.ts`), else APP_PASSWORD; `APP_PASSWORD_RESET=true` ignores the hash. Cookies carry `sv`; `requireAuth` compares it with a ~45 s cached `session_version` (missing `sv` = 1, missing row/table = valid, never fail closed); a password change bumps it and re-issues the current cookie. Backups include profile fields but strip `password_hash`/`session_version` (`SECRET_COLUMNS`) and replace mode keeps `app_users`.
+- RBAC (v18): one pure resolver `can(subject, permission, resource)` in `permissions.ts` (`wallet:view|manage`, `module:<name>`, ROLE_CAPABILITIES); wallet grants in `account_permissions` (add future grant types as new typed tables, not free-form columns). Every `createServerFn` must be classified in `server-fn-access.ts` (public/session/member/admin); `server-fn-access.test.ts` fails otherwise. New fns default to `requireAdmin`.
+- Member data scoping: member fns call `accountScope(ctx)` / `assert*` from `rbac.server.ts` and pass the scope into finance/report helpers (null = owner, unchanged); scoped aggregates always use the JS path; transfers to hidden wallets go through `maskTx()` ("Dompet lain"); member receipt uploads live under `m/<user id>/`. Never take the scope from client input.
+- Activity actor (v18 `activity_log.actor`, optional): `requireAuth` runs the handler in AsyncLocalStorage (`request-context.server.ts`) so `logActivity()` records the acting username; bot/n8n stay null.
