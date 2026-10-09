@@ -13,7 +13,7 @@ so you can follow along even if you are new to web development.
 - [Tech stack](#tech-stack)
 - [System diagram](#system-diagram)
 - [Directory structure](#directory-structure)
-- [Database schema sections (v1–v16)](#database-schema-sections-v1v16)
+- [Database schema sections (v1–v17)](#database-schema-sections-v1v17)
 - [Key flows](#key-flows)
 - [Conventions and contributor rules](#conventions-and-contributor-rules)
 - [Testing and CI](#testing-and-ci)
@@ -128,7 +128,7 @@ collapsed. Lovable planning drafts in `.lovable/` are omitted.
 │   ├── icons/                     # PWA icons (collapsed)
 │   ├── manifest.webmanifest       # PWA manifest (no service worker)
 │   └── robots.txt
-├── supabase/schema.sql            # Full database schema, sections v1–v16, safe to re-run
+├── supabase/schema.sql            # Full database schema, sections v1–v17, safe to re-run
 ├── src/
 │   ├── server.ts                  # Server entry wrapper: catches SSR errors → logError + error page
 │   ├── start.ts                   # Global request middleware: security headers, error page, CSRF
@@ -180,6 +180,8 @@ File-name suffixes tell you where code may run:
 | `database.types.ts`                                                           | Generated DB types (`npm run gen:types`); optional columns/tables added by hand.                                       |
 | `session.server.ts`, `auth.functions.ts`, `auth-middleware.ts`                | Credential check, HMAC-signed cookie, login/logout/2FA server functions, `requireAuth`.                                |
 | `totp.ts` / `totp.server.ts`                                                  | Pure TOTP (RFC 6238) helpers / verification against `APP_TOTP_SECRET`.                                                 |
+| `password.ts` / `password.server.ts`, `session.ts`                            | Pure scrypt hash format + password policy / hashing; pure cookie payload + session-version check.                      |
+| `profile.ts`, `profile.functions.ts`, `users.server.ts`                       | v17 profile & password change: validation/initials, server fns, `app_users` access with env fallback.                  |
 | `login-throttle.ts` / `login-throttle.server.ts`                              | Brute-force limit (8 failures per 15 min) counted from `activity_log`, with in-memory fallback.                        |
 | `session-cache.ts`                                                            | 5-minute client-side cache of the session check to avoid a round-trip on every navigation.                             |
 | `api-key.server.ts`                                                           | `x-api-key` / Bearer check against `N8N_API_KEY` (timing-safe, ≥ 24 chars required).                                   |
@@ -206,7 +208,7 @@ File-name suffixes tell you where code may run:
 | `i18n.tsx`                                                                    | `LanguageProvider` / `useI18n`, ID→EN dictionary.                                                                      |
 | `dates.ts`, `head.ts`, `utils.ts`                                             | Date helpers, page `<head>` helper, `cn()` class merge.                                                                |
 
-## Database schema sections (v1–v16)
+## Database schema sections (v1–v17)
 
 `supabase/schema.sql` is one file, organised in sections that are **safe to re-run** (`if not
 exists` everywhere). A fresh install runs the whole file once. Existing installs run any newer
@@ -231,20 +233,24 @@ the section is run.
 | v14     | `app_settings` (single row: name, tagline, logo data URL, time zone, base currency, landing, bot default account, reminder days).                                                                                               |
 | v15     | `ai_usage` log (one row per AI call: source, chat, kind, model, tokens) for the bot daily AI quota.                                                                                                                             |
 | v16     | `integration_settings` (key/value/is_secret): bot, AI, email and n8n values from Settings → Integrasi over env; secrets AES-256-GCM encrypted, excluded from backups.                                                           |
+| v17     | `app_users` (username, display_name, address, avatar data URL, password_hash, role, is_active, session_version): profile + in-app password change; backups carry profile fields only.                                           |
 
 ## Key flows
 
 ### Authentication and request security
 
 1. The login form calls the `login` server function. It first checks the **throttle** (8 failures
-   in 15 minutes locks login), then compares username/password with `APP_USERNAME` /
-   `APP_PASSWORD` using timing-safe hashing.
+   in 15 minutes locks login), then compares username/password with `APP_USERNAME` and either the
+   v17 `app_users.password_hash` (scrypt, when set) or `APP_PASSWORD` (timing-safe hashing).
+   `APP_PASSWORD_RESET=true` ignores the stored hash (recovery).
 2. If `APP_TOTP_SECRET` is set, a 6-digit TOTP code is also required (any authenticator app).
-3. On success the server sets `dk_session`: a base64url payload `{u, exp}` plus an
+3. On success the server sets `dk_session`: a base64url payload `{u, exp, sv}` plus an
    **HMAC-SHA256 signature** with `SESSION_SECRET` (≥ 32 chars). The cookie is `httpOnly`,
    `secure`, `SameSite=None; Partitioned` (so Lovable's iframe preview works) and lasts 7 days.
-4. Every data server function uses the `requireAuth` middleware, which verifies the signature and
-   expiry. Failures throw `Unauthorized`; `router.tsx` then clears the client session cache and
+4. Every data server function uses the `requireAuth` middleware, which verifies the signature,
+   expiry and session version (`sv` vs `app_users.session_version`, cached ~45 s; a missing `sv`
+   counts as 1 and a missing row/table accepts the cookie, so upgrading logs nobody out). A password
+   change bumps the version, signing out every other device. Failures throw `Unauthorized`; `router.tsx` then clears the client session cache and
    redirects to `/login`.
 5. Global request middleware in `src/start.ts` adds **CSRF protection** to server functions
    (TanStack's `createCsrfMiddleware`) and baseline security headers (`X-Content-Type-Options`,

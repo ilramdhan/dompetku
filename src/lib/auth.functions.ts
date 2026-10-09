@@ -3,8 +3,8 @@ import { z } from "zod";
 import { requireAuth } from "./auth-middleware";
 
 export const getSession = createServerFn({ method: "GET" }).handler(async () => {
-  const { readSession } = await import("./session.server");
-  const s = readSession();
+  const { readValidSession } = await import("./session.server");
+  const s = await readValidSession();
   return { authenticated: !!s, user: s?.u ?? null };
 });
 
@@ -25,8 +25,13 @@ const totpStep = z.object({
 export const login = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.union([passwordStep, totpStep]).parse(d))
   .handler(async ({ data }) => {
-    const { checkCredentials, createSession, createLoginChallenge, readLoginChallenge } =
-      await import("./session.server");
+    const {
+      checkCredentials,
+      createSession,
+      createLoginChallenge,
+      readLoginChallenge,
+      sessionVersionFor,
+    } = await import("./session.server");
     const { configuredTotpSecret, verifyLoginTotp } = await import("./totp.server");
     const { logActivity } = await import("./finance.server");
     const { recentLoginFailures, noteLoginFailure } = await import("./login-throttle.server");
@@ -52,12 +57,12 @@ export const login = createServerFn({ method: "POST" })
         await slow();
         return { ok: false as const, locked: false as const, badCode: true as const };
       }
-      createSession(username);
+      createSession(username, await sessionVersionFor(username));
       await logActivity("auth.login", "auth", { name: username.slice(0, 60) });
       return { ok: true as const };
     }
 
-    if (!checkCredentials(data.username, data.password)) {
+    if (!(await checkCredentials(data.username, data.password))) {
       noteLoginFailure();
       await logActivity("auth.login_failed", "auth", { name: data.username.slice(0, 60) });
       await slow();
@@ -71,7 +76,7 @@ export const login = createServerFn({ method: "POST" })
         challenge: createLoginChallenge(data.username),
       };
     }
-    createSession(data.username);
+    createSession(data.username, await sessionVersionFor(data.username));
     await logActivity("auth.login", "auth", { name: data.username.slice(0, 60) });
     return { ok: true as const };
   });

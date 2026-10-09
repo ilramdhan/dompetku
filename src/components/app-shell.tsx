@@ -29,6 +29,7 @@ import { togglePrivate, usePrivacy } from "@/lib/privacy";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { BackToTop } from "@/components/back-to-top";
+import { ProfileLink } from "@/components/user-avatar";
 import { DemoBanner } from "@/components/demo";
 import { VersionBadge, VersionRailLabel, useVersionText } from "@/components/version-badge";
 import { cn } from "@/lib/utils";
@@ -255,6 +256,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               <LanguageToggle className="h-11 w-full gap-1 px-1 text-ink-muted hover:bg-sidebar-accent" />
               <PrivacyToggle className="size-11 p-0 text-ink-muted hover:bg-sidebar-accent" />
             </div>
+            <ProfileLink
+              labelled
+              className="justify-center rounded-lg px-3 py-2 text-sm text-ink-muted hover:bg-sidebar-accent lg:justify-start"
+              avatarClassName="size-7"
+            />
             <Button
               type="button"
               variant="ghost"
@@ -302,6 +308,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <LanguageToggle className="h-9 shrink-0 gap-1.5 px-2" />
                     <ThemeToggle className="size-9 shrink-0 p-0" />
                     <PrivacyToggle className="size-9 shrink-0 p-0" />
+                    <ProfileLink
+                      className="size-9 shrink-0 justify-center rounded-md"
+                      avatarClassName="size-7"
+                    />
                     <Button
                       type="button"
                       size="icon"

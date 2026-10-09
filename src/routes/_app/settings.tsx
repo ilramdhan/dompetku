@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Download, History, Plus } from "lucide-react";
+import { ChevronRight, Download, History, Plus, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/app-shell";
@@ -124,6 +124,19 @@ function SettingsPage() {
   return (
     <>
       <PageHeader title={t("Pengaturan")} />
+      <Link
+        to="/profile"
+        className="mb-4 flex min-w-0 items-center gap-3 rounded-xl border bg-card p-4 text-card-foreground transition-colors hover:bg-muted/50"
+      >
+        <UserRound className="size-5 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">{t("Profil & password")}</span>
+          <span className="block truncate text-sm text-muted-foreground">
+            {t("Nama, alamat, foto profil, dan password.")}
+          </span>
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      </Link>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {(["expense", "income"] as const).map((kind) => (
           <Card key={kind} className="min-w-0 p-5">

@@ -1045,6 +1045,66 @@ const DICT: Record<string, string> = {
   "Pengaturan integrasi dihapus (kembali ke env)": "Integration setting removed (back to env)",
   "Webhook Telegram dipasang": "Telegram webhook set",
   "Webhook Telegram dilepas": "Telegram webhook removed",
+  Profil: "Profile",
+  "Profil diubah": "Profile updated",
+  "Password diganti": "Password changed",
+  "Login dengan APP_PASSWORD_RESET": "Login with APP_PASSWORD_RESET",
+  "Profil & password": "Profile & password",
+  "Nama, alamat, foto profil, dan password.": "Name, address, profile photo and password.",
+  "Jalankan bagian v17 di supabase/schema.sql untuk mengubah profil dan password. Sampai saat itu login tetap memakai APP_USERNAME/APP_PASSWORD dari env.":
+    "Run the v17 section of supabase/schema.sql to edit your profile and password. Until then login keeps using APP_USERNAME/APP_PASSWORD from env.",
+  "Data diri": "Personal details",
+  "Foto terlalu besar (maks. 200 KB)": "Photo is too large (max. 200 KB)",
+  "Unggah foto": "Upload photo",
+  "Hapus foto": "Remove photo",
+  "PNG/JPEG/WebP, dipotong persegi dan diperkecil otomatis (maks. 200 KB).":
+    "PNG/JPEG/WebP, cropped square and resized automatically (max. 200 KB).",
+  "Username untuk login, diatur lewat env APP_USERNAME.":
+    "Login username, set by the APP_USERNAME env var.",
+  "Nama lengkap": "Full name",
+  "Ditampilkan di aplikasi. Kosongkan untuk memakai username.":
+    "Shown across the app. Leave empty to use the username.",
+  Alamat: "Address",
+  "Sembunyikan password": "Hide password",
+  "Tampilkan password": "Show password",
+  "Sangat lemah": "Very weak",
+  Lemah: "Weak",
+  Cukup: "Fair",
+  Kuat: "Strong",
+  "Sangat kuat": "Very strong",
+  "Ganti password": "Change password",
+  "Password diganti. Perangkat lain sudah dikeluarkan.":
+    "Password changed. Other devices have been signed out.",
+  "Password disimpan sebagai hash di database; APP_PASSWORD di env tidak lagi dipakai.":
+    "Your password is stored as a hash in the database; APP_PASSWORD in env is no longer used.",
+  "Saat ini login memakai APP_PASSWORD dari env. Setelah diganti, password baru disimpan sebagai hash di database.":
+    "Login currently uses APP_PASSWORD from env. Once changed, the new password is stored as a hash in the database.",
+  "APP_PASSWORD_RESET=true aktif: password dari env dipakai. Ganti password lalu hapus variabel itu dan deploy ulang.":
+    "APP_PASSWORD_RESET=true is on: the env password is used. Change your password, then remove that variable and redeploy.",
+  "Password saat ini": "Current password",
+  "Password baru": "New password",
+  "Kekuatan:": "Strength:",
+  "Ulangi password baru": "Repeat new password",
+  "Password tidak sama": "Passwords don't match",
+  "Setelah diganti, semua perangkat lain otomatis keluar.":
+    "After changing it, every other device is signed out automatically.",
+  "Password saat ini salah": "Current password is wrong",
+  "Password minimal 10 karakter": "Password must be at least 10 characters",
+  "Password maksimal 200 karakter": "Password must be at most 200 characters",
+  "Password tidak boleh diawali/diakhiri spasi": "Password can't start or end with a space",
+  "Password tidak boleh sama dengan username": "Password can't be the same as the username",
+  "Password tidak boleh satu karakter berulang": "Password can't be one repeated character",
+  "Password baru harus berbeda dari password lama": "New password must differ from the current one",
+  "Password terlalu umum": "Password is too common",
+  "Minimal 10 karakter": "At least 10 characters",
+  "Huruf besar dan kecil": "Upper and lower case letters",
+  "Mengandung angka": "Contains a number",
+  "Mengandung simbol": "Contains a symbol",
+  "16 karakter atau lebih": "16 characters or more",
+  "Tabel app_users belum ada — jalankan bagian v17 di supabase/schema.sql.":
+    "The app_users table doesn't exist yet — run the v17 section of supabase/schema.sql.",
+  "Profil berubah di tempat lain, coba lagi.": "The profile changed elsewhere, please try again.",
+  "Foto harus PNG/JPEG/WebP maksimal 200 KB": "Photo must be PNG/JPEG/WebP, max. 200 KB",
 };
 
 const LangContext = createContext<{
