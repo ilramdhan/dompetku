@@ -94,7 +94,10 @@ export async function handleBotUpdate(u: BotUpdate): Promise<BotReply> {
     const r = await (await fin()).botCommand(text);
     return reply(r.message);
   }
-  return draftFromText(u, text);
+  // v19: a trailing "#kantong" tag picks a pocket; the rest is parsed as before.
+  const { splitPocketTag } = await import("./pockets");
+  const tagged = splitPocketTag(text);
+  return draftFromText(u, tagged.text, tagged.pocket);
 }
 
 /* ---------------- Drafts ---------------- */
@@ -201,7 +204,11 @@ const AI_QUOTA =
   '⏳ Kuota AI harian untuk chat ini sudah habis. Pakai format singkat seperti "kopi 25rb" (tanpa AI). Foto struk baru bisa dibaca lagi besok.';
 const aiUsage = () => import("./ai-usage.server");
 
-async function draftFromText(u: BotUpdate, text: string): Promise<BotReply> {
+async function draftFromText(
+  u: BotUpdate,
+  text: string,
+  pocket: string | null = null,
+): Promise<BotReply> {
   const externalId = draftKey(u.chat_id, u.update_id);
   const prev = await existingDraft(externalId);
   if (prev) return previewReply(prev);
@@ -252,6 +259,7 @@ async function draftFromText(u: BotUpdate, text: string): Promise<BotReply> {
       };
   }
   if (!payload) return reply(NO_AMOUNT);
+  if (pocket) payload.pocket = pocket;
   return previewReply(await storeDraft(externalId, u.chat_id, payload, "telegram", null));
 }
 
@@ -415,6 +423,7 @@ async function saveDraft(row: DraftRow): Promise<BotReply> {
     raw: { via: p.via, draft_id: row.id },
     external_id: `draft:${row.id}`,
     receipt_path: row.receipt_path,
+    pocket: p.pocket ?? null,
   });
   await db()
     .from("bot_drafts")
@@ -427,8 +436,14 @@ async function saveDraft(row: DraftRow): Promise<BotReply> {
   // v11: append budget threshold alerts (never throws; "" when none or on failure).
   const { budgetAlertsFor, budgetAlertLines } = await import("./budget.server");
   const alerts = r.duplicate ? "" : budgetAlertLines(await budgetAlertsFor(r.transaction));
+  // v19: pocket threshold alerts (never throws; "" when none).
+  const { pocketAlertsFor } = await import("./pockets.server");
+  const { pocketAlertLines } = await import("./pockets");
+  const pocketLines = r.duplicate
+    ? ""
+    : pocketAlertLines(await pocketAlertsFor(r.transaction as never));
   return edit(
-    `${r.message}${acc ? ` • ${acc}` : ""}${alerts}`,
+    `${r.message}${acc ? ` • ${acc}` : ""}${alerts}${pocketLines && !alerts ? "\n" : ""}${pocketLines}`,
     undoKeyboard(r.transaction.id),
     "Tersimpan",
   );
