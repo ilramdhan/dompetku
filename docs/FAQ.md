@@ -41,7 +41,7 @@ No. The [self-hosting guide](SELF-HOSTING.md) uses only web dashboards (GitHub, 
 <details>
 <summary><strong>Can several people use it (multi-user)?</strong></summary>
 
-No — it is designed as a **single-user** app. There is one login defined by `APP_USERNAME` / `APP_PASSWORD`, and all data belongs to that user. A couple could share that one login, but there are no separate users or permissions. For separate people, each person deploys their own copy (each with its own Supabase project).
+No — it is designed as a **single-user** app. There is one login defined by `APP_USERNAME` / `APP_PASSWORD` (the password can be changed later in **Profile**, schema v17), and all data belongs to that user. A couple could share that one login, but there are no separate users or permissions. For separate people, each person deploys their own copy (each with its own Supabase project).
 
 </details>
 
@@ -135,7 +135,14 @@ On the **free plan**, Supabase pauses projects that have had **no activity for a
 <details>
 <summary><strong>Someone might know my password. What do I do?</strong></summary>
 
-In Vercel, change `APP_PASSWORD` **and** `SESSION_SECRET` (changing the secret logs out every existing session), then redeploy. Consider enabling 2FA (`APP_TOTP_SECRET`, see [SELF-HOSTING §5.5](SELF-HOSTING.md#55-two-step-login-2fa)). If you think the Supabase secret key leaked, rotate it in Supabase and update `SUPABASE_SERVICE_ROLE_KEY`.
+With schema v17, open **Profile → Change password**: the new password is stored as a hash and every other device is signed out immediately. Without v17, change `APP_PASSWORD` **and** `SESSION_SECRET` in Vercel (changing the secret logs out every existing session), then redeploy. Consider enabling 2FA (`APP_TOTP_SECRET`, see [SELF-HOSTING §5.5](SELF-HOSTING.md#55-two-step-login-2fa)). If you think the Supabase secret key leaked, rotate it in Supabase and update `SUPABASE_SERVICE_ROLE_KEY`.
+
+</details>
+
+<details>
+<summary><strong>I changed my password in the app and forgot it.</strong></summary>
+
+Your hosting account is the recovery path: in Vercel set `APP_PASSWORD_RESET=true` → redeploy → log in with `APP_USERNAME` / `APP_PASSWORD` from the env → **Profile → Change password** → remove `APP_PASSWORD_RESET` → redeploy. While the switch is on the stored hash is ignored, so don't leave it on. See [ENVIRONMENT.md](ENVIRONMENT.md#password-changed-in-the-app-v17).
 
 </details>
 
