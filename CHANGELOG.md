@@ -9,6 +9,14 @@ Starting with v1.0.0, versioned entries (`## [x.y.z]`) are generated automatical
 > [!NOTE]
 > When an entry mentions a **schema section** (`v2`…`v13`), self-hosters must run that section of [`supabase/schema.sql`](supabase/schema.sql) on their Supabase project. Every section is safe to run more than once, and the app keeps working (with the feature disabled) until you do.
 
+## [1.5.1](https://github.com/ilramdhan/dompetku/compare/v1.5.0...v1.5.1) (2026-10-09)
+
+
+### Documentation
+
+* add what's new in v1.5 images (ID and EN) ([#33](https://github.com/ilramdhan/dompetku/issues/33)) ([40c4428](https://github.com/ilramdhan/dompetku/commit/40c4428a63de2d7521f2175003bde4a79bedd9ce))
+* v1.5 screenshots and demo seed for pockets and members ([#35](https://github.com/ilramdhan/dompetku/issues/35)) ([13de9a8](https://github.com/ilramdhan/dompetku/commit/13de9a8503e2c9aea0073bd025ddcd81429a49b8))
+
 ## [1.5.0](https://github.com/ilramdhan/dompetku/compare/v1.4.0...v1.5.0) (2026-10-09)
 
 
