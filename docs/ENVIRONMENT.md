@@ -15,6 +15,28 @@ Every setting Dompetku reads from its environment. New to this? An **environment
 
 Step-by-step setup: [SELF-HOSTING.md](SELF-HOSTING.md). Template: [`.env.example`](../.env.example).
 
+## Setting integrations from the web UI (v16)
+
+After running the **v16** section of `supabase/schema.sql`, **Settings → Integrasi** can store the bot, AI, email and n8n values below in the database — like Vercel environment variables, but without editing `.env` or redeploying. Changes apply within ~60 s per server instance (immediately on the instance that saved them).
+
+**Precedence:** value saved in Settings (if valid) → env var → built-in default. Nothing saved (or no v16 table) = exactly the env behaviour you have today. **Remove** in Settings deletes the database value and falls back to env.
+
+| Can be set in Settings → Integrasi                                                                 | Env only (never manageable from the UI)                                                                                                  |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `N8N_API_KEY`\*, `BOT_ALLOWED_CHAT_IDS`, `BOT_TEXT_AI`, `BOT_AI_DAILY_LIMIT`                       | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (needed to read the database at all)                                                         |
+| `AI_API_URL`, `AI_API_KEY`\*, `AI_MODEL`, `AI_MODEL_TEXT`                                          | `SESSION_SECRET`, `SETTINGS_ENCRYPTION_KEY`, `APP_USERNAME`, `APP_PASSWORD`, `APP_TOTP_SECRET` (guard access to the settings themselves) |
+| `RESEND_API_KEY`\*, `EMAIL_FROM`, `EMAIL_TO`                                                       | `DEMO_MODE`, `SENTRY_DSN`, `APP_TIMEZONE`/`BOT_DEFAULT_ACCOUNT` (those two are in Settings → Aplikasi, v14), `FALLBACK_USD_IDR`, …       |
+| `TELEGRAM_BOT_TOKEN`\* (optional, [Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n)) |                                                                                                                                          |
+
+\* **Secrets** are write-only, like Vercel: they are encrypted at rest (AES-256-GCM, random IV per value) and the server never sends them back to the browser — Settings only shows the source (Database / Env / Belum diatur) and the last 4 characters. The `integration_settings` table is **not** included in JSON backups, so re-enter secrets after restoring onto a new instance.
+
+| Name                      | Required? | Example                     | What it does                                                                                                                                                                                                        | Security                                                                                                                                                                                                                    |
+| ------------------------- | --------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SETTINGS_ENCRYPTION_KEY` | No        | `<openssl rand -base64 48>` | Key material (≥ 32 chars) for encrypting secrets saved in Settings → Integrasi and for the Telegram webhook secret. When empty (or shorter), a key is derived from `SESSION_SECRET` with HKDF and a separate label. | **Secret.** Changing it (or `SESSION_SECRET` when this is empty) makes saved secrets unreadable: the app then falls back to env and Settings asks you to re-enter them. Set it if you ever plan to rotate `SESSION_SECRET`. |
+
+> [!WARNING]
+> **Rotating `SESSION_SECRET`** without `SETTINGS_ENCRYPTION_KEY` logs you out **and** invalidates every secret saved in Settings → Integrasi (and the Telegram webhook secret). Nothing crashes — env values are used — but re-enter the secrets and click **Pasang webhook** again afterwards.
+
 ## Required
 
 | Name                        | Example                                       | What it does                                                                                                         | How to obtain                                                                               | Security                                                                                                        |
@@ -57,6 +79,7 @@ Provider examples (Gemini, OpenAI, OpenRouter, Ollama): [SELF-HOSTING §6.2](SEL
 | `BOT_DEFAULT_ACCOUNT`  | No                          | `BCA`                         | Account name used when a message doesn't mention one. Must match an existing account name. Can be overridden in Settings → App (v14).                                                            |
 | `BOT_TEXT_AI`          | No (default `auto`)         | `auto` \| `always` \| `never` | When chat messages may use AI: only when ambiguous, always, or never (zero AI tokens for chat; receipts still use AI).                                                                           |
 | `BOT_AI_DAILY_LIMIT`   | No (default `50`)           | `50` \| `0`                   | Max bot AI calls (chat parsing + photo OCR) per chat per app-local day; the bot then asks for the quick format. `0` = unlimited. Counted in `ai_usage` (v15); without it, today's AI/OCR drafts. |
+| `TELEGRAM_BOT_TOKEN`   | Only for direct mode        | `123456789:AA…`               | Enables [Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n): Telegram calls `POST /api/public/telegram/webhook` on the app itself, no n8n relay. Not needed with n8n. **Secret.**    |
 
 ## Regional (optional)
 
@@ -115,7 +138,7 @@ These live in the **n8n** environment (not Vercel) and are read by the workflow 
 | Name                        | Used by            | Example                       | What it does                                                                                               |
 | --------------------------- | ------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `FINTRACK_URL`              | 01, 02, 05         | `https://your-app.vercel.app` | Base URL of your Dompetku deployment (no trailing slash).                                                  |
-| `TELEGRAM_BOT_TOKEN`        | 01, 02, 03, 04     | `<token from @BotFather>`     | Telegram Bot API token. **Secret.**                                                                        |
+| `TELEGRAM_BOT_TOKEN`        | 01, 02, 03, 04     | `<token from @BotFather>`     | Telegram Bot API token. **Secret.** (The app reads its own `TELEGRAM_BOT_TOKEN` only for direct mode.)     |
 | `TELEGRAM_ALLOWED_CHAT_IDS` | 01                 | `123456789`                   | Comma-separated chat IDs n8n forwards to the app (first filter; the app re-checks `BOT_ALLOWED_CHAT_IDS`). |
 | `TELEGRAM_ADMIN_CHAT_ID`    | 02, 03             | `123456789`                   | Chat that receives scheduled reminders/reports and workflow error alerts.                                  |
 | `BACKUP_EMAIL_FROM`         | 05 (email variant) | `noreply@mail.example.com`    | Sender for emailed backups.                                                                                |

@@ -3,7 +3,7 @@
  * - Always: one single-line JSON entry via console.error (readable/filterable in Vercel logs).
  * - Optional: when SENTRY_DSN is set, the event is POSTed to Sentry's envelope endpoint
  *   (fire-and-forget, 3 s timeout). Never throws.
- * No Telegram alerts: the app holds no bot token (n8n relays all Telegram traffic), so use the
+ * No Telegram alerts: n8n relays Telegram traffic by default (direct mode is optional), so use the
  * n8n error workflow or Sentry alert rules for notifications.
  */
 import { buildLogEvent, buildSentryEnvelope, formatLogLine, parseSentryDsn } from "./monitoring";
