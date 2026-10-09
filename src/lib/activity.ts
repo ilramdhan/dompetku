@@ -48,6 +48,11 @@ const SPECIAL: Record<string, string> = {
   "profile.update": "Profil diubah",
   "auth.password_change": "Password diganti",
   "auth.password_reset_login": "Login dengan APP_PASSWORD_RESET",
+  "user.create": "Anggota ditambahkan",
+  "user.update": "Anggota diubah",
+  "user.delete": "Anggota dihapus",
+  "user.password_reset": "Password anggota direset",
+  "permission.update": "Akses dompet diubah",
 };
 
 export function activityLabel(action: string, t: (s: string) => string = (s) => s): string {

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireAuth } from "./auth-middleware";
+import { requireAdmin } from "./auth-middleware";
 import { appSettingsInputSchema } from "./app-settings";
 
 /** Public (no login): only non-sensitive branding fields for landing, login and <head>. */
@@ -9,14 +9,14 @@ export const getPublicBranding = createServerFn({ method: "GET" }).handler(async
 });
 
 export const getAppSettingsFull = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .handler(async () => {
     const { readAppSettings } = await import("./app-settings.server");
     return readAppSettings();
   });
 
 export const saveAppSettingsFn = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => appSettingsInputSchema.parse(d))
   .handler(async ({ data }) => {
     (await import("./demo.server")).assertNotDemo();

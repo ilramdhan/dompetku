@@ -21,7 +21,13 @@ export const saveSplitTransaction = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const rbac = await import("./rbac.server");
+    rbac.assertTxWrite(context, data.values);
+    rbac.assertReceiptPathsAllowed(context, [
+      ...(data.values.receipt_paths ?? []),
+      data.values.receipt_path,
+    ]);
     const { saveSplitTransaction } = await import("./split.server");
     const res = await saveSplitTransaction(data.values, data.rows);
     return { group: res.group, count: res.transactions.length };
@@ -33,7 +39,14 @@ export const deleteTransaction = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z.object({ id: z.string().uuid(), wholeGroup: z.boolean().default(false) }).parse(d),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const rbac = await import("./rbac.server");
+    // Members need manage on the row; a whole split group is checked row by row server-side.
+    await rbac.assertTxIdWrite(context, data.id);
     const { deleteTransactionRows } = await import("./split.server");
-    return deleteTransactionRows(data.id, data.wholeGroup);
+    return deleteTransactionRows(
+      data.id,
+      data.wholeGroup,
+      context.role === "admin" ? undefined : (row) => rbac.assertTxWrite(context, row),
+    );
   });

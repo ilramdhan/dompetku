@@ -8,13 +8,14 @@ async function ensureBucket() {
 }
 
 /** Simpan foto nota (data URL base64) ke Supabase Storage, kembalikan path-nya. */
-export async function uploadReceipt(dataUrl: string): Promise<{ path: string }> {
+export async function uploadReceipt(dataUrl: string, prefix = ""): Promise<{ path: string }> {
   const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(dataUrl);
   if (!m) throw new Error("Format gambar tidak didukung (JPEG/PNG/WebP).");
   const buf = Buffer.from(m[2]!, "base64");
   if (buf.length > 5_000_000) throw new Error("Gambar maksimal 5 MB.");
   const ext = m[1] === "image/png" ? "png" : m[1] === "image/webp" ? "webp" : "jpg";
-  const path = `${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}.${ext}`;
+  // v18: members upload under `m/<user id>/` so they can only reference their own uploads.
+  const path = `${prefix}${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}.${ext}`;
   await ensureBucket();
   const { error } = await db().storage.from(BUCKET).upload(path, buf, { contentType: m[1]! });
   if (error) throw new Error(error.message);

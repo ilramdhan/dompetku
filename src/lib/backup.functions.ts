@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireAuth } from "./auth-middleware";
+import { requireAdmin } from "./auth-middleware";
 import { REPLACE_CONFIRM_WORD, RESTORE_CHUNK_ROWS, RESTORE_TABLES } from "./backup";
 
 /**
@@ -36,7 +36,7 @@ const restoreInput = z.discriminatedUnion("step", [
 ]);
 
 export const restoreBackup = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => restoreInput.parse(d))
   .handler(async ({ data }) => {
     (await import("./demo.server")).assertNotDemo();

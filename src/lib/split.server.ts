@@ -138,7 +138,12 @@ export async function removeOrphanPhotos(
  * Deletes a transaction (or its whole split group when `wholeGroup`), removing photos that no
  * remaining sibling uses. Returns the number of rows deleted.
  */
-export async function deleteTransactionRows(id: string, wholeGroup: boolean) {
+export async function deleteTransactionRows(
+  id: string,
+  wholeGroup: boolean,
+  /** v18: throws when the caller may not delete a row (members; split rows share one wallet). */
+  check?: (row: TxRow) => void,
+) {
   const one = await db().from("transactions").select("*").eq("id", id).maybeSingle();
   if (one.error) throw new Error(one.error.message);
   if (!one.data) return { deleted: 0 };
@@ -148,6 +153,7 @@ export async function deleteTransactionRows(id: string, wholeGroup: boolean) {
     if (g.error) throw new Error(g.error.message);
     rows = g.data ?? rows;
   }
+  if (check) for (const r of rows) check(r);
   const ids = rows.map((r) => r.id);
   const del = await db().from("transactions").delete().in("id", ids);
   if (del.error) throw new Error(del.error.message);
