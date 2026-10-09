@@ -49,8 +49,10 @@ import {
   rowsQuery,
   txCountQuery,
   txQuery,
+  pocketOptionsQuery,
   type TxFilter,
 } from "@/lib/queries";
+import type { Pocket } from "@/lib/pockets";
 import { exportTransactionsCsv, importTransactionsCsv } from "@/lib/finance.functions";
 import { deleteTransaction } from "@/lib/split.functions";
 import { receiptPaths } from "@/lib/receipts";
@@ -85,17 +87,23 @@ function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
+  const [pocketId, setPocketId] = useState("");
   const [offset, setOffset] = useState(0);
   const [sort, setSort] = useState<"occurred_at" | "amount" | "description">("occurred_at");
   const [direction, setDirection] = useState<SortDirection>("desc");
   const categories = (useQuery(rowsQuery("categories")).data ?? []) as Category[];
   const accounts = (useQuery(rowsQuery("accounts")).data ?? []) as Account[];
+  // v19 Kantong: badge names + optional filter (empty before v19 is run → filter hidden).
+  const pockets = (useQuery(pocketOptionsQuery()).data ?? []) as Pocket[];
+  const pocketName = new Map(pockets.map((p) => [p.id, p.name]));
+  const pocketChoices = accountId ? pockets.filter((p) => p.account_id === accountId) : pockets;
   const filter: TxFilter = {
     month,
     ...(kind !== "all" ? { kind } : {}),
     ...(search.trim() ? { search: search.trim() } : {}),
     ...(categoryId ? { category_id: categoryId } : {}),
     ...(accountId ? { account_id: accountId } : {}),
+    ...(pocketId ? { pocket_id: pocketId } : {}),
     offset,
     sort,
     direction,
@@ -377,6 +385,7 @@ function TransactionsPage() {
           value={accountId}
           onValueChange={(v) => {
             setAccountId(v === "all" ? "" : v);
+            setPocketId("");
             setOffset(0);
           }}
         >
@@ -392,6 +401,28 @@ function TransactionsPage() {
             ))}
           </SelectContent>
         </Select>
+        {pocketChoices.length ? (
+          <Select
+            value={pocketId}
+            onValueChange={(v) => {
+              setPocketId(v === "all" ? "" : v);
+              setOffset(0);
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-40" aria-label={t("Kantong")}>
+              <SelectValue placeholder={t("Semua kantong")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("Semua kantong")}</SelectItem>
+              {pocketChoices.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                  {accountId ? "" : ` · ${accounts.find((a) => a.id === p.account_id)?.name ?? ""}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
         <Input
           className="min-w-0 flex-1 sm:max-w-xs"
           placeholder={t("Cari deskripsi / merchant / item…")}
@@ -467,6 +498,15 @@ function TransactionsPage() {
                       : `${tx.category?.name ?? t("Tanpa kategori")}${tx.account ? ` · ${walletLabel(tx.account, t)}` : ""}`}
                   </p>
                 </div>
+                {tx.pocket_id && pocketName.has(tx.pocket_id) ? (
+                  <Badge
+                    variant="outline"
+                    className="col-start-2 w-fit max-w-32 truncate text-[10px] sm:col-auto"
+                    title={t("Kantong")}
+                  >
+                    {pocketName.get(tx.pocket_id)}
+                  </Badge>
+                ) : null}
                 {tx.split_group ? (
                   <Badge
                     variant="outline"
@@ -531,6 +571,7 @@ function TransactionsPage() {
                             items: tx.items,
                             receipt_path: tx.receipt_path,
                             receipt_paths: receiptPaths(tx),
+                            pocket_id: tx.pocket_id ?? null,
                           },
                         })
                       }
