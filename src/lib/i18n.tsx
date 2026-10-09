@@ -1059,7 +1059,11 @@ const DICT: Record<string, string> = {
   "Hapus foto": "Remove photo",
   "PNG/JPEG/WebP, dipotong persegi dan diperkecil otomatis (maks. 200 KB).":
     "PNG/JPEG/WebP, cropped square and resized automatically (max. 200 KB).",
-  "Username diatur lewat env APP_USERNAME.": "The username is set by the APP_USERNAME env var.",
+  "Username untuk login, diatur lewat env APP_USERNAME.":
+    "Login username, set by the APP_USERNAME env var.",
+  "Nama lengkap": "Full name",
+  "Ditampilkan di aplikasi. Kosongkan untuk memakai username.":
+    "Shown across the app. Leave empty to use the username.",
   Alamat: "Address",
   "Sembunyikan password": "Hide password",
   "Tampilkan password": "Show password",

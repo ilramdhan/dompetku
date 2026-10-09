@@ -201,11 +201,11 @@ function ProfileCard({ profile, ready }: { profile: Profile; ready: boolean }) {
           <Label htmlFor="pf-user">{t("Username")}</Label>
           <Input id="pf-user" value={profile.username} readOnly disabled />
           <p className="text-xs text-muted-foreground">
-            {t("Username diatur lewat env APP_USERNAME.")}
+            {t("Username untuk login, diatur lewat env APP_USERNAME.")}
           </p>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="pf-name">{t("Nama")}</Label>
+          <Label htmlFor="pf-name">{t("Nama lengkap")}</Label>
           <Input
             id="pf-name"
             maxLength={80}
@@ -213,6 +213,9 @@ function ProfileCard({ profile, ready }: { profile: Profile; ready: boolean }) {
             value={form.display_name}
             onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
           />
+          <p className="text-xs text-muted-foreground">
+            {t("Ditampilkan di aplikasi. Kosongkan untuk memakai username.")}
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="pf-addr">{t("Alamat")}</Label>
