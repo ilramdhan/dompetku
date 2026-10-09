@@ -48,6 +48,10 @@ export const changePassword = createServerFn({ method: "POST" })
       return { ok: false as const, error: res.error };
     }
     const { createSession } = await import("./session.server");
-    createSession(context.user, res.session_version, context.role === "member");
+    createSession(
+      context.user,
+      res.session_version,
+      context.role === "member" ? context.userId : null,
+    );
     return { ok: true as const };
   });
