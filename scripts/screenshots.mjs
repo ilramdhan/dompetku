@@ -92,6 +92,22 @@ const SHOTS = [
   { name: "gold", path: "/gold" },
   { name: "recurring", path: "/recurring" },
   { name: "settings", path: "/settings" },
+  // v1.5: integrations, profile, members, Kantong (current month: pockets reset monthly).
+  { name: "settings-integrations", path: "/settings", then: scrollToHeading("Integrasi") },
+  { name: "settings-users", path: "/settings", then: scrollToHeading("Pengguna") },
+  { name: "profile", path: "/profile" },
+  {
+    name: "accounts-pockets",
+    path: accountNamed("GoPay"),
+    charts: true,
+    then: scrollToHeading("Kantong"),
+  },
+  { name: "transaction-pocket", path: "/transactions", then: openPocketSelect },
+  {
+    name: "dashboard-pockets",
+    path: "/dashboard",
+    then: scrollToHeading("Kantong perlu perhatian"),
+  },
   { name: "dashboard-mobile", path: "/dashboard", mobile: true, charts: true, prevMonth: true },
   { name: "transactions-mobile", path: "/transactions", mobile: true, prevMonth: true },
   { name: "telegram-bot", path: "/__telegram-mock", mock: true, mobile: true },
@@ -104,6 +120,43 @@ async function firstAccount(page) {
   const link = page.locator('a[href^="/accounts/"]').first();
   await link.waitFor({ timeout: 20_000 });
   return link.getAttribute("href");
+}
+
+/** Wallet detail URL of the account card whose text contains `name`. */
+function accountNamed(name) {
+  return async (page) => {
+    await page.goto(`${BASE}/accounts`, { waitUntil: "networkidle" });
+    const link = page.locator('a[href^="/accounts/"]', { hasText: name }).first();
+    await link.waitFor({ timeout: 20_000 });
+    return link.getAttribute("href");
+  };
+}
+
+/** Scrolls the card with an exact `<h2>` text near the top, below the sticky header. */
+function scrollToHeading(text) {
+  return async (page) => {
+    const h = page.locator("main h2", { hasText: new RegExp(`^\\s*${text}\\s*$`) }).first();
+    await h.waitFor({ timeout: 20_000 });
+    await h.evaluate((el) => {
+      const card = el.closest("[class*='rounded']") ?? el;
+      window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 24);
+    });
+    await page.waitForTimeout(400);
+  };
+}
+
+/** New expense on GoPay with the Kantong select opened. */
+async function openPocketSelect(page) {
+  await page.getByRole("button", { name: "Catat" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator("#account_id").click();
+  await page.getByRole("option", { name: "GoPay (IDR)", exact: true }).click();
+  await dialog.locator("#amount").fill("24000");
+  await dialog.locator("#category_id").click();
+  await page.getByRole("option", { name: "Transportasi", exact: true }).click();
+  await dialog.locator("#pocket_id").click();
+  await page.getByRole("option", { name: "Transport", exact: true }).waitFor();
+  await page.waitForTimeout(400);
 }
 
 async function newContext(browser, { mobile, theme }) {
@@ -216,6 +269,7 @@ async function capture(browser, theme) {
       await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
     }
     await settle(page, shot);
+    if (shot.then) await shot.then(page);
     if (shot.fullPage) {
       await loadLazy(page);
       await page.waitForTimeout(500);

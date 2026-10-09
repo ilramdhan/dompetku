@@ -87,6 +87,18 @@ point it at a database you care about. The public demo uses the same script dail
   for today and yesterday.
 - **Receivables:** one partially repaid, one fully repaid, one unlinked; money moves as `Piutang`
   transactions.
+- **Kantong (v19):** GoPay has `Makan` and `Transport` (monthly) and Tunai a running `Parkir`
+  envelope; the last three months of matching GoPay food/ride expenses and the parking rows carry
+  `pocket_id`. Allocations fit inside the wallet balance, and `Transport` sits below its threshold
+  this month (with a `pocket_alerts` row), so the dashboard shows "Kantong perlu perhatian".
+- **Family member (v17/v18):** `sari` (Sari Wulandari, role `member`, active,
+  `must_change_password` false) with `manage` access to GoPay in `account_permissions`. Its
+  password is a random string hashed with scrypt in the app's format and never printed, so the
+  account only fills the Pengguna screen (an admin can reset it there to sign in as the member).
+- **Not seeded:** `integration_settings` stays empty, so Settings → Integrasi shows every value as
+  env/default/"Belum diatur"; no secret is ever written.
+- Each optional section is skipped with a log line when its tables are missing (schema v17–v19
+  not run), and `--reset` wipes pockets, pocket alerts and `app_users` too.
 - **Other:** a three-way split receipt (`split_group`), daily USD→IDR `fx_rates`, two account
   reconciliation checkpoints, and recent `activity_log` entries.
 
@@ -114,7 +126,10 @@ animations and toasts, waits for data, skeletons and charts, and writes `<name>.
 `<name>-dark.png`:
 
 - **Desktop 1440×900:** dashboard, transactions, budgets, reports, accounts-detail (first account),
-  goals, gold, recurring, settings, and `landing` (full page, logged out).
+  goals, gold, recurring, settings, and `landing` (full page, logged out). v1.5 screens:
+  `settings-integrations` and `settings-users` (Settings scrolled to that card), `profile`,
+  `accounts-pockets` (GoPay detail scrolled to Kantong), `transaction-pocket` (new GoPay expense
+  with the Kantong select open) and `dashboard-pockets` (current month, scrolled to the alert).
 - **Mobile 390×844 @2x:** dashboard-mobile, transactions-mobile, landing-mobile, telegram-bot.
 
 Dashboard, transactions and account detail step back one month so the shots show a full month.
