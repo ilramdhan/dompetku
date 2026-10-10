@@ -264,6 +264,8 @@ Every variable, with details and security notes: **[ENVIRONMENT.md](ENVIRONMENT.
 2. When you see **Congratulations!**, click **Continue to Dashboard**.
 3. Your address is shown under **Domains**, e.g. `https://dompetku-yourname.vercel.app`. Bookmark it.
 
+**Optional — search engines:** the landing page is indexable by default. To add a canonical URL and a `/sitemap.xml` (for Google Search Console), set `PUBLIC_SITE_URL` to this address (or your custom domain) and redeploy. Keep your instance out of search entirely by switching the landing page off in **Settings**.
+
 **Check the region:** Project → **Settings → Functions → Function Region** should show the region from `vercel.json` (Singapore `sin1` by default).
 
 ### 4.4 First login

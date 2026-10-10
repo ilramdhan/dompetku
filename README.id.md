@@ -140,6 +140,23 @@ Kalau Dompetku bermanfaat buatmu:
   [Saweria](https://saweria.co/ilramadhan) atau [Ko-fi](https://ko-fi.com/ilramdhan_).
 - 💬 Kirim masukan, ide atau laporan bug di [GitHub Issues](https://github.com/ilramdhan/dompetku/issues).
 
+## Kontributor
+
+Terima kasih untuk semua yang sudah ikut membangun Dompetku. Ingin ikut? Pilih [good first issue](https://github.com/ilramdhan/dompetku/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+
+<a href="https://github.com/ilramdhan/dompetku/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ilramdhan/dompetku" alt="Kontributor Dompetku">
+</a>
+
+## Riwayat star
+
+<a href="https://star-history.com/#ilramdhan/dompetku&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ilramdhan/dompetku&type=Date&theme=dark">
+    <img src="https://api.star-history.com/svg?repos=ilramdhan/dompetku&type=Date" alt="Grafik riwayat star GitHub Dompetku" width="600">
+  </picture>
+</a>
+
 ## Lisensi
 
 Dirilis di bawah [Lisensi MIT](LICENSE). Hak cipta (c) 2026 Ilham Ramadhan.

@@ -55,6 +55,8 @@ time), and amounts support **IDR and USD**.
 - [Contributing](#contributing)
 - [Security](#security)
 - [License](#license)
+- [Contributors](#contributors)
+- [Star history](#star-history)
 - [Acknowledgements](#acknowledgements)
 
 ## What's new in v1.5
@@ -324,6 +326,23 @@ Every instance also serves short, public [privacy policy](src/components/legal/l
 (`/privacy`) and terms (`/terms`) pages written for a self-hosted deployment; they are linked from
 the landing page footer. Edit `src/components/legal/legal-content.ts` (and the matching English
 strings in `src/lib/i18n.tsx`) if your instance needs different wording.
+
+## Contributors
+
+Thanks to everyone who has helped build Dompetku. Want to join them? Pick a [good first issue](https://github.com/ilramdhan/dompetku/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+
+<a href="https://github.com/ilramdhan/dompetku/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ilramdhan/dompetku" alt="Dompetku contributors">
+</a>
+
+## Star history
+
+<a href="https://star-history.com/#ilramdhan/dompetku&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ilramdhan/dompetku&type=Date&theme=dark">
+    <img src="https://api.star-history.com/svg?repos=ilramdhan/dompetku&type=Date" alt="Dompetku GitHub star history chart" width="600">
+  </picture>
+</a>
 
 ## Acknowledgements
 
