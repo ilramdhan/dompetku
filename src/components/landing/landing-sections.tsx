@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
-import { docsUrl } from "@/lib/landing";
+import { docsUrl, LANDING_FAQ } from "@/lib/landing";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { AuthButton, DemoLink, LANDING_NAV, SectionLink } from "./landing-header";
@@ -631,36 +631,13 @@ export function TechStack() {
 
 /* ---------------------------------------------------------------- FAQ */
 
-const FAQ = [
-  {
-    q: "Apakah benar-benar gratis?",
-    a: "Ya. Kodenya open source (MIT) dan semua layanan yang dibutuhkan punya tier gratis. Biaya kecil hanya muncul bila Anda memakai AI berbayar untuk OCR struk.",
-  },
-  {
-    q: "Siapa yang bisa melihat data saya?",
-    a: "Hanya Anda. Data tersimpan di proyek Supabase milik Anda dan hanya diakses lewat server aplikasi Anda sendiri — pembuat aplikasi pun tidak bisa melihatnya.",
-  },
-  {
-    q: "Apakah saya perlu bisa coding?",
-    a: "Tidak. Panduan self-host menjelaskan setiap klik, dari membuat akun sampai aplikasi online.",
-  },
-  {
-    q: "Apakah bot Telegram wajib?",
-    a: "Tidak. Bot, OCR, pengingat, dan backup terjadwal semuanya opsional dan bisa ditambahkan kapan saja.",
-  },
-  {
-    q: "Bisakah dipakai di ponsel?",
-    a: "Bisa. Tampilannya responsif dan bisa di-install ke layar utama sebagai PWA.",
-  },
-];
-
 export function Faq() {
   const { t } = useI18n();
   return (
     <section id="faq" aria-labelledby="faq-title" className={cn(container, "py-16 sm:py-24")}>
       <SectionHeading id="faq-title" eyebrow="FAQ" title="Pertanyaan yang sering diajukan" />
       <Accordion type="single" collapsible className="mx-auto mt-10 max-w-3xl">
-        {FAQ.map((f, i) => (
+        {LANDING_FAQ.map((f, i) => (
           <AccordionItem key={f.q} value={`q${i}`}>
             <AccordionTrigger className="py-5 text-left font-display text-base font-semibold hover:no-underline focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:text-lg">
               {t(f.q)}

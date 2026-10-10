@@ -56,3 +56,30 @@ export type ScreenshotName = (typeof SCREENSHOTS)[number];
 export function screenshotSrc(name: ScreenshotName, dark = false): string {
   return `/screenshots/${name}${dark ? "-dark" : ""}.png`;
 }
+
+/**
+ * Landing FAQ (Indonesian source strings = i18n keys). Shared by the FAQ section and the
+ * FAQPage JSON-LD in the document head (src/lib/seo.ts).
+ */
+export const LANDING_FAQ: ReadonlyArray<{ q: string; a: string }> = [
+  {
+    q: "Apakah benar-benar gratis?",
+    a: "Ya. Kodenya open source (MIT) dan semua layanan yang dibutuhkan punya tier gratis. Biaya kecil hanya muncul bila Anda memakai AI berbayar untuk OCR struk.",
+  },
+  {
+    q: "Siapa yang bisa melihat data saya?",
+    a: "Hanya Anda. Data tersimpan di proyek Supabase milik Anda dan hanya diakses lewat server aplikasi Anda sendiri — pembuat aplikasi pun tidak bisa melihatnya.",
+  },
+  {
+    q: "Apakah saya perlu bisa coding?",
+    a: "Tidak. Panduan self-host menjelaskan setiap klik, dari membuat akun sampai aplikasi online.",
+  },
+  {
+    q: "Apakah bot Telegram wajib?",
+    a: "Tidak. Bot, OCR, pengingat, dan backup terjadwal semuanya opsional dan bisa ditambahkan kapan saja.",
+  },
+  {
+    q: "Bisakah dipakai di ponsel?",
+    a: "Bisa. Tampilannya responsif dan bisa di-install ke layar utama sebagai PWA.",
+  },
+];

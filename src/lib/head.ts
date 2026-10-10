@@ -1,13 +1,14 @@
-export function pageHead(title: string, description: string) {
-  const t = `${title} — Dompetku`;
-  return {
-    meta: [
-      { title: t },
-      { name: "description", content: description },
-      { property: "og:title", content: t },
-      { property: "og:description", content: description },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  };
+import { seoHead } from "./seo";
+
+export type PageHeadOptions = {
+  /** true → `index, follow` (public pages); omitted → inherit the root `noindex, nofollow`. */
+  index?: boolean | undefined;
+  /** Route path for canonical/og:url (only emitted with `index` and a site URL). */
+  path?: string | undefined;
+  /** Normalised PUBLIC_SITE_URL (from `getSeoConfig`), or null. */
+  siteUrl?: string | null | undefined;
+};
+
+export function pageHead(title: string, description: string, opts: PageHeadOptions = {}) {
+  return seoHead({ title: `${title} — Dompetku`, description, ...opts });
 }

@@ -82,6 +82,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "description",
         content: "Catat pemasukan, pengeluaran, cicilan, dan langganan dalam satu tempat.",
       },
+      // Default for every page (app, login, 404). Public pages (/, /privacy, /terms) override it
+      // with "index, follow" via seo.ts — except on a demo instance.
       { name: "robots", content: "noindex, nofollow" },
       { property: "og:type", content: "website" },
       { property: "og:image", content: "/icons/og-image.png" },
