@@ -9,6 +9,13 @@ Starting with v1.0.0, versioned entries (`## [x.y.z]`) are generated automatical
 > [!NOTE]
 > When an entry mentions a **schema section** (`v2`…`v13`), self-hosters must run that section of [`supabase/schema.sql`](supabase/schema.sql) on their Supabase project. Every section is safe to run more than once, and the app keeps working (with the feature disabled) until you do.
 
+## [1.7.2](https://github.com/ilramdhan/dompetku/compare/v1.7.1...v1.7.2) (2026-10-10)
+
+
+### Bug Fixes
+
+* **bot:** let users edit the description of receipt and chat previews ([#69](https://github.com/ilramdhan/dompetku/issues/69)) ([0c47799](https://github.com/ilramdhan/dompetku/commit/0c4779910b4b75206a42a2ba632950969104e3ec))
+
 ## [1.7.1](https://github.com/ilramdhan/dompetku/compare/v1.7.0...v1.7.1) (2026-10-10)
 
 
