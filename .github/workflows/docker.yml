@@ -1,0 +1,126 @@
+name: Docker
+
+# Publishes the self-hosting image ghcr.io/ilramdhan/dompetku (linux/amd64 + linux/arm64).
+# - Release Please calls this workflow (workflow_call) right after it creates a release:
+#   releases/tags created with GITHUB_TOKEN do not trigger `release` or `push` events.
+# - A release published by hand fires `release: published`; a v* tag pushed by hand fires `push`.
+# - workflow_dispatch rebuilds a given tag (or the selected branch, without semver/latest tags).
+# - PRs that touch the image only build it (no push).
+# See docs/SELF-HOSTING.md#docker.
+
+on:
+  release:
+    types: [published]
+  push:
+    tags: ["v*"]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to build, e.g. v1.6.0
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build (e.g. v1.6.0). Empty = selected branch, no semver/latest tags.
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - docker-compose.yml
+      - .github/workflows/docker.yml
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/ilramdhan/dompetku
+  # Release tag being published: explicit input, the release event, or a pushed v* tag.
+  TAG: ${{ inputs.tag || github.event.release.tag_name || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '' }}
+
+jobs:
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: docker-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          build-args: GITHUB_SHA=${{ github.event.pull_request.head.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # A manual release fires both `release` and `push` (tag); one build per tag is enough.
+    concurrency:
+      group: docker-publish-${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG || github.ref }}
+
+      - name: Resolve commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.TAG }},enable=${{ env.TAG != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }},enable=${{ env.TAG != '' }}
+            type=semver,pattern={{major}},value=${{ env.TAG }},enable=${{ env.TAG != '' }}
+            type=sha,format=short
+          flavor: |
+            latest=${{ env.TAG != '' }}
+          labels: |
+            org.opencontainers.image.title=Dompetku
+            org.opencontainers.image.description=Self-hosted personal finance tracker (web app, Telegram bot, receipt OCR)
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.commit.outputs.sha }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: GITHUB_SHA=${{ steps.commit.outputs.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
