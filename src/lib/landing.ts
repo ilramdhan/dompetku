@@ -57,6 +57,24 @@ export function screenshotSrc(name: ScreenshotName, dark = false): string {
   return `/screenshots/${name}${dark ? "-dark" : ""}.png`;
 }
 
+/** Widths of the generated `-<w>.webp/.avif` variants (scripts/optimize-screenshots.mjs). */
+export const SHOT_WIDTHS: Record<"desktop" | "mobile", readonly number[]> = {
+  desktop: [480, 960, 1440],
+  mobile: [480],
+};
+
+/** `srcset` string for one screenshot in the given format. */
+export function screenshotSrcSet(
+  name: ScreenshotName,
+  dark: boolean,
+  variant: "desktop" | "mobile",
+  ext: "webp" | "avif",
+): string {
+  return SHOT_WIDTHS[variant]
+    .map((w) => `/screenshots/${name}${dark ? "-dark" : ""}-${w}.${ext} ${w}w`)
+    .join(", ");
+}
+
 /**
  * Landing FAQ (Indonesian source strings = i18n keys). Shared by the FAQ section and the
  * FAQPage JSON-LD in the document head (src/lib/seo.ts).
