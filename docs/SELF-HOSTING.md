@@ -17,7 +17,8 @@ This guide takes you from zero to your own private copy of **Dompetku** (a perso
 7. [Running locally (for developers)](#7-running-locally-for-developers)
 8. [Updating your instance](#8-updating-your-instance) ([upgrading from v1.4](#81-upgrading-from-v14-integrasi-profile-family-members-kantong))
 9. [Using Lovable](#9-using-lovable)
-10. [Troubleshooting](#10-troubleshooting)
+10. [Docker (your own server)](#10-docker-your-own-server)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -462,7 +463,74 @@ This project was originally built with [Lovable](https://lovable.dev) and still 
 
 ---
 
-## 10. Troubleshooting
+## 10. Docker (your own server)
+
+Prefer a VPS, home server or NAS over Vercel? Dompetku ships an official image,
+`ghcr.io/ilramdhan/dompetku` (linux/amd64 and linux/arm64, runs as a non-root user), published
+for every release. It's the same app built with Nitro's `node-server` preset and listening on
+port **3000**. Vercel and Lovable deployments are unaffected.
+
+What stays the same:
+
+- **Supabase is still external.** Do [section 2](#2-create-the-database-supabase) first, including
+  running `supabase/schema.sql`. Run it again after each upgrade.
+- **Configuration is environment variables only**, exactly the ones in [ENVIRONMENT.md](ENVIRONMENT.md).
+  At minimum: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_USERNAME`, `APP_PASSWORD` and
+  `SESSION_SECRET` ([section 3](#3-generate-your-secrets)). Nothing is baked into the image, and the
+  container keeps no data of its own (no volume needed).
+
+### 10.1 Docker Compose (recommended)
+
+```sh
+curl -O https://raw.githubusercontent.com/ilramdhan/dompetku/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/ilramdhan/dompetku/main/.env.example
+# edit .env: fill in the required values
+docker compose up -d
+```
+
+Open <http://localhost:3000> on the same machine and log in. Working from a clone of the repo instead?
+`docker compose up -d --build` builds the image locally rather than pulling it.
+
+### 10.2 Plain `docker run`
+
+```sh
+docker run -d --name dompetku --restart unless-stopped \
+  --env-file .env -p 3000:3000 ghcr.io/ilramdhan/dompetku:latest
+```
+
+Tags: `latest` (newest release), `1`, `1.5` and `1.5.1` (pin a version), and `sha-<commit>`. The
+image has a `HEALTHCHECK` (`docker ps` shows `healthy`). Server errors are JSON log lines in the
+container output (`docker logs dompetku`).
+
+### 10.3 HTTPS and reverse proxy
+
+> [!IMPORTANT]
+> The login cookie is `Secure`, so browsers only keep it over **HTTPS** (or on `http://localhost`).
+> Over plain `http://<server-ip>:3000` the login page accepts your password but sends you straight back.
+
+Put the container behind a reverse proxy that terminates TLS, for example
+[Caddy](https://caddyserver.com) (`reverse_proxy localhost:3000`), Nginx Proxy Manager, Traefik or a
+Cloudflare Tunnel, and open the app on its `https://` address. You can then stop exposing
+port 3000 publicly (e.g. `127.0.0.1:3000:3000` in `docker-compose.yml`).
+
+The **Telegram bot** needs a public HTTPS address too: Telegram only delivers webhooks to `https://`
+URLs reachable from the internet, so a LAN IP or `localhost` won't work for
+[Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n). With n8n, Telegram talks to n8n,
+and n8n then needs to reach this app (`x-api-key` requests to `/api/public/n8n/*`); see [N8N.md](N8N.md).
+
+### 10.4 Updating
+
+```sh
+docker compose pull && docker compose up -d
+```
+
+Then run the latest `supabase/schema.sql` again and check [CHANGELOG.md](../CHANGELOG.md), just
+as in [section 8](#8-updating-your-instance). Vercel's 4.5 MB request limit and function timeouts
+don't apply to the container, so you can skip those rows in Troubleshooting.
+
+---
+
+## 11. Troubleshooting
 
 | Symptom                                                                                               | Likely cause                                                                                                                                              | Fix                                                                                                                                                                    |
 | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
