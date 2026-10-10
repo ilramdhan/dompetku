@@ -191,8 +191,8 @@ or dark). Regenerate them with `npm run screenshots` (see [Regenerating screensh
 ### Automation
 
 - **Telegram bot**: record transactions by chat (`kopi 25rb`, `gaji masuk 8jt ke BCA`) or by sending
-  a receipt photo. Every entry is shown as a **preview with buttons** before it is saved; `/undo`
-  removes the last one. Slash commands give balances, reports, bills, budgets and more.
+  a receipt photo. Every entry is shown as a **preview with buttons** before it is saved (change the
+  category, account, type or description — even for a receipt); `/undo` removes the last one. Slash commands give balances, reports, bills, budgets and more.
 - **Receipt OCR** in the web app and the bot, using any OpenAI-compatible AI provider (for example
   Google Gemini or OpenAI).
 - **Reminders** for upcoming bills via Telegram or email, plus daily, weekly and monthly reports,

@@ -198,6 +198,13 @@ No. AI output is snapped onto your **existing** categories and accounts (falling
 </details>
 
 <details>
+<summary><strong>How do I change the description ("Ket") of a bot preview, e.g. after a receipt photo?</strong></summary>
+
+Tap **✏️ Keterangan** under the preview, then send the new description as a normal message (max 200 characters), e.g. `dini bayar baju`. The bot replies with an updated preview; tap ✅ to save. The amount, merchant, items and receipt photo stay as they were. Send `/batal` or tap **⬅️ Kembali** to cancel; the bot stops waiting after 10 minutes, and any other button or command also ends the edit. This works for receipt, AI and quick text previews alike and needs no n8n change.
+
+</details>
+
+<details>
 <summary><strong>Does it support WhatsApp?</strong></summary>
 
 Not out of the box. The bot endpoint (`POST /api/public/n8n/bot`) returns plain text plus Telegram-style buttons, and the provided n8n workflows target Telegram. Simpler endpoints (`/message`, `/ocr`, `/command`, `/reminders`) return a ready-to-send `message`, so a WhatsApp flow in n8n is possible but you'd build it yourself.
