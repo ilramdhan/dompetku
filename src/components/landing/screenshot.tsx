@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { screenshotSrc, type ScreenshotName } from "@/lib/landing";
+import { screenshotSrc, screenshotSrcSet, type ScreenshotName } from "@/lib/landing";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -82,13 +82,17 @@ export function ScreenshotPlaceholder({ variant = "desktop" }: { variant?: Varia
 
 /** One <img> that swaps itself for the placeholder when the file is missing. */
 function ShotImg({
-  src,
+  name,
+  dark,
+  sizes,
   alt,
   variant,
   priority = false,
   className,
 }: {
-  src: string;
+  name: ScreenshotName;
+  dark: boolean;
+  sizes: string;
   alt: string;
   variant: Variant;
   priority?: boolean;
@@ -109,50 +113,72 @@ function ShotImg({
       </div>
     );
   return (
-    <img
-      ref={ref}
-      src={src}
-      alt={alt}
-      width={w}
-      height={h}
-      loading={priority ? "eager" : "lazy"}
-      decoding="async"
-      fetchPriority={priority ? "high" : "auto"}
-      onError={() => setFailed(true)}
-      className={cn("block h-auto w-full bg-muted", className)}
-    />
+    <picture>
+      <source
+        type="image/avif"
+        srcSet={screenshotSrcSet(name, dark, variant, "avif")}
+        sizes={sizes}
+      />
+      <source
+        type="image/webp"
+        srcSet={screenshotSrcSet(name, dark, variant, "webp")}
+        sizes={sizes}
+      />
+      <img
+        ref={ref}
+        src={screenshotSrc(name, dark)}
+        alt={alt}
+        width={w}
+        height={h}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        fetchPriority={priority ? "high" : "auto"}
+        onError={() => setFailed(true)}
+        className={cn("block h-auto w-full bg-muted", className)}
+      />
+    </picture>
   );
 }
 
 /**
  * Light + dark screenshot pair: the theme is a `.dark` class on <html>, so both images are
- * rendered and CSS shows the matching one (lazy images that stay hidden are never fetched).
+ * rendered and CSS shows the matching one. A hidden `loading="lazy"` image is never fetched,
+ * but a hidden eager one is, so only the light (default) variant gets eager + fetchpriority
+ * high; the dark one is always lazy (it loads as soon as it becomes visible in dark mode).
+ * Each is a `<picture>` (AVIF/WebP, responsive srcset) falling back to the original PNG.
  */
 export function Screenshot({
   name,
   alt,
   variant = "desktop",
   priority = false,
+  sizes,
 }: {
   name: ScreenshotName;
   alt: string;
   variant?: Variant;
   priority?: boolean;
+  sizes?: string;
 }) {
+  const s = sizes ?? (variant === "mobile" ? "224px" : "(min-width: 1024px) 640px, 100vw");
   return (
     <>
       <ShotImg
-        src={screenshotSrc(name)}
+        name={name}
+        dark={false}
+        sizes={s}
         alt={alt}
         variant={variant}
         priority={priority}
         className="dark:hidden"
       />
       <ShotImg
-        src={screenshotSrc(name, true)}
+        name={name}
+        dark
+        sizes={s}
         alt={alt}
         variant={variant}
-        priority={priority}
+        priority={false}
         className="hidden dark:block"
       />
     </>
