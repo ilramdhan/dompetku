@@ -127,7 +127,7 @@ collapsed. Lovable planning drafts in `.lovable/` are omitted.
 │   ├── fonts/                     # Self-hosted woff2 fonts + LICENSE-OFL.txt
 │   ├── icons/                     # PWA icons (collapsed)
 │   ├── manifest.webmanifest       # PWA manifest (no service worker)
-│   └── robots.txt
+│   └── (robots.txt and sitemap.xml are server routes in src/routes)
 ├── supabase/schema.sql            # Full database schema, sections v1–v19, safe to re-run
 ├── src/
 │   ├── server.ts                  # Server entry wrapper: catches SSR errors → logError + error page
