@@ -41,13 +41,33 @@ const vercelNitro = {
   vercel: { functionRules: { "/api/public/n8n/bot": { maxDuration: 60 } } },
 };
 
+// Cache headers for non-hashed static files (issue #55). Nitro `routeRules` apply to every preset
+// (node-server, Lovable, Vercel); the Vercel build also gets them via vercel.json. Hashed
+// `/assets/*` get immutable caching. Fonts are never overwritten (rename a font file when
+// changing it); screenshots/icons/logos may change, so they revalidate weekly.
+const IMMUTABLE = "public, max-age=31536000, immutable";
+const MODERATE = "public, max-age=604800, stale-while-revalidate=86400";
+const routeRules = {
+  "/assets/**": { headers: { "cache-control": IMMUTABLE } },
+  "/fonts/**": { headers: { "cache-control": IMMUTABLE } },
+  "/screenshots/**": { headers: { "cache-control": MODERATE } },
+  "/icons/**": { headers: { "cache-control": MODERATE } },
+  "/logo.svg": { headers: { "cache-control": MODERATE } },
+  "/logo-mono.svg": { headers: { "cache-control": MODERATE } },
+  "/favicon.png": { headers: { "cache-control": MODERATE } },
+};
+
+// Declared separately because the Lovable wrapper's types omit `routeRules`/`vercel`; it passes nitro options through.
+const nitroFull = onVercel ? { ...vercelNitro, routeRules } : { routeRules };
+const nitroOptions = nitroFull as { preset?: string };
+
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
   },
-  ...(onVercel ? { nitro: vercelNitro } : {}),
+  nitro: nitroOptions,
   // Merged by the Lovable wrapper (mergeConfig) on top of its own VITE_* define injection.
   vite: { define: versionDefine },
 });

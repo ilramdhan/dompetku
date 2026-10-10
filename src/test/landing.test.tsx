@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -41,6 +42,8 @@ async function load(path: string) {
     context: { queryClient },
     history: createMemoryHistory({ initialEntries: [path] }),
   });
+  // Same wiring as src/router.tsx (it also provides the QueryClientProvider).
+  setupRouterSsrQueryIntegration({ router, queryClient });
   await router.load();
   return router;
 }
