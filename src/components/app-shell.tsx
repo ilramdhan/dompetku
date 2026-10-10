@@ -77,7 +77,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       aria-label={dark ? t("Mode terang") : t("Mode gelap")}
       className={
         className ??
-        "flex w-full justify-start gap-3 px-3 py-2 text-sm text-ink-muted hover:bg-sidebar-accent"
+        "flex w-full justify-start gap-3 px-3 py-2 text-sm text-sidebar-muted hover:bg-sidebar-accent"
       }
     >
       {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -102,7 +102,7 @@ export function PrivacyToggle({ className }: { className?: string }) {
           aria-keyshortcuts="Shift+H"
           className={
             className ??
-            "flex w-full justify-start gap-3 px-3 py-2 text-sm text-ink-muted hover:bg-sidebar-accent"
+            "flex w-full justify-start gap-3 px-3 py-2 text-sm text-sidebar-muted hover:bg-sidebar-accent"
           }
         >
           {hidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -123,10 +123,10 @@ export function LanguageToggle({ className }: { className?: string }) {
       type="button"
       variant="ghost"
       onClick={() => setLang(lang === "id" ? "en" : "id")}
-      aria-label={t("Ganti bahasa")}
+      aria-label={`${className === undefined ? (lang === "id" ? "EN" : "ID") : lang.toUpperCase()} - ${t("Ganti bahasa")}`}
       className={
         className ??
-        "flex w-full justify-start gap-3 px-3 py-2 text-sm text-ink-muted hover:bg-sidebar-accent"
+        "flex w-full justify-start gap-3 px-3 py-2 text-sm text-sidebar-muted hover:bg-sidebar-accent"
       }
     >
       <Languages className="size-4" />
@@ -208,7 +208,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     "flex items-center justify-center gap-3 rounded-lg p-2.5 text-sm transition-colors hover:bg-sidebar-accent lg:justify-start lg:px-3 lg:py-2";
   const versionText = useVersionText();
   const sideTool =
-    "flex w-full justify-center gap-3 px-3 py-2 text-sm text-ink-muted hover:bg-sidebar-accent lg:justify-start";
+    "flex w-full justify-center gap-3 px-3 py-2 text-sm text-sidebar-muted hover:bg-sidebar-accent lg:justify-start";
   const { scrolled, compact } = useCompactHeader();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navRef = useRef<HTMLElement>(null);
@@ -230,7 +230,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <AppLogo className="size-9 lg:size-8" />
               <AppName className="hidden min-w-0 truncate lg:inline" />
             </p>
-            <p className="hidden truncate text-xs text-ink-muted lg:block">{tagline}</p>
+            <p className="hidden truncate text-xs text-sidebar-muted lg:block">{tagline}</p>
           </div>
           <nav className="flex flex-1 flex-col gap-1">
             {NAV.map((n) => (
@@ -261,13 +261,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               <PrivacyToggle />
             </div>
             <div className="flex flex-col items-center gap-0.5 lg:hidden">
-              <ThemeToggle className="size-11 p-0 text-ink-muted hover:bg-sidebar-accent" />
-              <LanguageToggle className="h-11 w-full gap-1 px-1 text-ink-muted hover:bg-sidebar-accent" />
-              <PrivacyToggle className="size-11 p-0 text-ink-muted hover:bg-sidebar-accent" />
+              <ThemeToggle className="size-11 p-0 text-sidebar-muted hover:bg-sidebar-accent" />
+              <LanguageToggle className="h-11 w-full gap-1 px-1 text-sidebar-muted hover:bg-sidebar-accent" />
+              <PrivacyToggle className="size-11 p-0 text-sidebar-muted hover:bg-sidebar-accent" />
             </div>
             <ProfileLink
               labelled
-              className="justify-center rounded-lg px-3 py-2 text-sm text-ink-muted hover:bg-sidebar-accent lg:justify-start"
+              className="justify-center rounded-lg px-3 py-2 text-sm text-sidebar-muted hover:bg-sidebar-accent lg:justify-start"
               avatarClassName="size-7"
             />
             <Button

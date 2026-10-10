@@ -186,7 +186,7 @@ function DebtsPage() {
                     </span>
                     <span>{Math.round(pct)}%</span>
                   </div>
-                  <Progress value={pct} />
+                  <Progress value={pct} aria-label={`${d.name} ${Math.round(pct)}%`} />
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   {d.status === "active" ? (

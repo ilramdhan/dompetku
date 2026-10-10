@@ -42,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Segmented } from "@/components/segmented";
 import {
   errMsg,
   invalidateFor,
@@ -347,21 +347,21 @@ function TransactionsPage() {
             <ChevronRight className="size-4" />
           </Button>
         </div>
-        <Tabs
-          className="min-w-0 max-w-full"
+        <Segmented
+          className="no-scrollbar w-full max-w-full justify-start overflow-x-auto sm:w-auto"
+          label={t("Jenis transaksi")}
           value={kind}
           onValueChange={(v) => {
             setKind(v as typeof kind);
             setOffset(0);
           }}
-        >
-          <TabsList className="no-scrollbar w-full max-w-full justify-start overflow-x-auto sm:w-auto">
-            <TabsTrigger value="all">{t("Semua")}</TabsTrigger>
-            <TabsTrigger value="income">{t("Masuk")}</TabsTrigger>
-            <TabsTrigger value="expense">{t("Keluar")}</TabsTrigger>
-            <TabsTrigger value="transfer">{t("Transfer")}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+          options={[
+            { value: "all", label: t("Semua") },
+            { value: "income", label: t("Masuk") },
+            { value: "expense", label: t("Keluar") },
+            { value: "transfer", label: t("Transfer") },
+          ]}
+        />
         <Select
           value={categoryId}
           onValueChange={(v) => {
@@ -369,7 +369,7 @@ function TransactionsPage() {
             setOffset(0);
           }}
         >
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-40" aria-label={t("Kategori")}>
             <SelectValue placeholder={t("Semua kategori")} />
           </SelectTrigger>
           <SelectContent>
@@ -389,7 +389,7 @@ function TransactionsPage() {
             setOffset(0);
           }}
         >
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-40" aria-label={t("Akun")}>
             <SelectValue placeholder={t("Semua akun")} />
           </SelectTrigger>
           <SelectContent>

@@ -12,6 +12,8 @@ import {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const month = z.string().regex(/^\d{4}-\d{2}$/);
 const optUuid = z.string().uuid().nullable().optional();
+/** Laporan/Rekap wallet filter (#62); intersected with the caller's scope by `reportScope`. */
+const reportAccount = z.string().max(64).nullable().optional();
 const optDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -325,10 +327,15 @@ export const scanReceipt = createServerFn({ method: "POST" })
 
 export const getYearly = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
-  .inputValidator((d: unknown) => z.object({ year: z.string().regex(/^\d{4}$/) }).parse(d))
-  .handler(async ({ data }) => {
+  .inputValidator((d: unknown) =>
+    z.object({ year: z.string().regex(/^\d{4}$/), account: reportAccount }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
     const { computeYearly } = await import("./finance.server");
-    return (await computeYearly(data.year)) as any;
+    const { accountScope } = await import("./rbac.server");
+    const { reportScope } = await import("./report-filter");
+    const { account } = reportScope(accountScope(context), data.account);
+    return (await computeYearly(data.year, account)) as any;
   });
 
 export const importTransactionsCsv = createServerFn({ method: "POST" })
@@ -367,21 +374,30 @@ export const getReceiptUrl = createServerFn({ method: "GET" })
 export const getCategoryTrend = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .inputValidator((d: unknown) =>
-    z.object({ months: z.number().int().min(3).max(24), end: month }).parse(d),
+    z
+      .object({ months: z.number().int().min(3).max(24), end: month, account: reportAccount })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { categoryTrend } = await import("./finance.server");
     const { accountScope } = await import("./rbac.server");
-    return categoryTrend(data.months, data.end, accountScope(context));
+    const { reportScope } = await import("./report-filter");
+    // Scope comes from the session; the requested wallet is only intersected with it.
+    const r = reportScope(accountScope(context), data.account);
+    return categoryTrend(data.months, data.end, r.scope, r.account);
   });
 
 export const getYearlySummary = createServerFn({ method: "GET" })
   .middleware([requireAuth])
-  .inputValidator((d: unknown) => z.object({ year: z.number().int().min(2000).max(2100) }).parse(d))
+  .inputValidator((d: unknown) =>
+    z.object({ year: z.number().int().min(2000).max(2100), account: reportAccount }).parse(d),
+  )
   .handler(async ({ data, context }) => {
     const { yearlySummary } = await import("./finance.server");
     const { accountScope } = await import("./rbac.server");
-    return yearlySummary(data.year, accountScope(context));
+    const { reportScope } = await import("./report-filter");
+    const r = reportScope(accountScope(context), data.account);
+    return yearlySummary(data.year, r.scope, r.account);
   });
 
 export const importCsvTransactions = createServerFn({ method: "POST" })

@@ -94,7 +94,11 @@ function BudgetsPage() {
                     · {t("Batas efektif")} {money(b.effective)}
                   </p>
                 ) : null}
-                <Progress className="mt-3" value={Math.min(100, b.percent)} />
+                <Progress
+                  className="mt-3"
+                  value={Math.min(100, b.percent)}
+                  aria-label={`${b.category} ${Math.round(b.percent)}%`}
+                />
                 <p className="mt-2 break-words text-xs text-muted-foreground">
                   {b.percent >= 100
                     ? `${t("Lewat")} ${money(b.spent - b.effective)}`

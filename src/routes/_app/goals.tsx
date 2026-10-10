@@ -218,7 +218,11 @@ function GoalCard({
         <span className="num text-xl font-semibold">{money(saved)}</span>{" "}
         <span className="text-sm text-muted-foreground">/ {money(target)}</span>
       </p>
-      <Progress className="mt-3" value={Math.min(100, pct)} />
+      <Progress
+        className="mt-3"
+        value={Math.min(100, pct)}
+        aria-label={`${g.name} ${Math.round(pct)}%`}
+      />
       <p className="mt-2 break-words text-xs text-muted-foreground">
         {Math.round(pct)}%{g.deadline ? ` · ${t("tenggat")} ${dateLabel(g.deadline, locale)}` : ""}
         {p.daysLeft !== null && p.status !== "done"

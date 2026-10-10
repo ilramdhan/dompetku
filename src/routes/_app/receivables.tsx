@@ -168,7 +168,11 @@ function ReceivablesPage() {
                   </p>
                 </div>
               </div>
-              <Progress className="mt-4" value={r.progress} />
+              <Progress
+                className="mt-4"
+                value={r.progress}
+                aria-label={`${r.name} ${Math.round(r.progress)}%`}
+              />
               <div className="mt-4 flex flex-wrap gap-2">
                 {r.status === "active" ? (
                   <>

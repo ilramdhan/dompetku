@@ -94,16 +94,18 @@ export const receivablesQuery = (offset = 0, limit = 24) =>
     queryKey: ["receivables", offset, limit],
     queryFn: () => getReceivables({ data: { offset, limit } }),
   });
-export const trendQuery = (months: number, end: string) =>
+/** `account` = Laporan/Rekap wallet filter (#62); omitted = all wallets (same key and request as before). */
+const withAccount = (account?: string) => (account ? { account } : {});
+export const trendQuery = (months: number, end: string, account?: string) =>
   queryOptions({
-    queryKey: ["trend", months, end],
-    queryFn: () => getCategoryTrend({ data: { months, end } }),
+    queryKey: account ? ["trend", months, end, account] : ["trend", months, end],
+    queryFn: () => getCategoryTrend({ data: { months, end, ...withAccount(account) } }),
     staleTime: FRESH,
   });
-export const yearlySummaryQuery = (year: number) =>
+export const yearlySummaryQuery = (year: number, account?: string) =>
   queryOptions({
-    queryKey: ["yearly-summary", year],
-    queryFn: () => getYearlySummary({ data: { year } }),
+    queryKey: account ? ["yearly-summary", year, account] : ["yearly-summary", year],
+    queryFn: () => getYearlySummary({ data: { year, ...withAccount(account) } }),
     staleTime: FRESH,
   });
 export const netWorthQuery = (months: number, end: string) =>
@@ -166,10 +168,10 @@ export const reconcileTxQuery = (id: string, from: string, to: string) =>
     queryKey: ["account-recon", id, from, to],
     queryFn: () => getReconcileTransactions({ data: { id, from, to } }),
   });
-export const yearlyQuery = (year: string) =>
+export const yearlyQuery = (year: string, account?: string) =>
   queryOptions({
-    queryKey: ["yearly", year],
-    queryFn: () => getYearly({ data: { year } }),
+    queryKey: account ? ["yearly", year, account] : ["yearly", year],
+    queryFn: () => getYearly({ data: { year, ...withAccount(account) } }),
     staleTime: FRESH,
   });
 
