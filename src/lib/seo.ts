@@ -7,6 +7,7 @@
  * absolute og:image and the sitemap need the instance's own public origin (env PUBLIC_SITE_URL)
  * because every self-hosted copy lives on a different domain; without it they are omitted.
  */
+import { DEFAULT_LANG, langHref, LANGS, ogLocale, otherLang, type Lang } from "./lang";
 import { DEFAULT_REPO_URL } from "./landing";
 
 export const ROBOTS_INDEX = "index, follow";
@@ -89,7 +90,20 @@ export function seoConfigFrom(env: SeoEnv): SeoConfig {
 }
 
 type Meta = Record<string, unknown>;
-type Link = { rel: string; href: string };
+type Link = { rel: string; href: string; hrefLang?: string };
+
+/** Absolute URL of `path` in `lang` (`/` for Indonesian, `/?lang=en` for English). */
+export function langUrl(site: string, path: string, lang: Lang): string {
+  return absoluteUrl(site, langHref(path, lang));
+}
+
+/** hreflang alternates for a public page: every language plus x-default (→ Indonesian). */
+export function hreflangLinks(site: string, path: string): Link[] {
+  return [
+    ...LANGS.map((l) => ({ rel: "alternate", hrefLang: l, href: langUrl(site, path, l) })),
+    { rel: "alternate", hrefLang: "x-default", href: langUrl(site, path, DEFAULT_LANG) },
+  ];
+}
 
 export type SeoHeadInput = {
   title: string;
@@ -101,11 +115,14 @@ export type SeoHeadInput = {
   index?: boolean | undefined;
   /** Large preview card with the og-image (landing) instead of a plain summary card. */
   largeImage?: boolean | undefined;
+  /** Page language (`?lang=` on public pages); drives og:locale, canonical and hreflang. */
+  lang?: Lang | undefined;
 };
 
 /** Title/description/Open Graph/Twitter tags plus robots, canonical and og:url when applicable. */
 export function seoHead(input: SeoHeadInput): { meta: Meta[]; links: Link[] } {
   const { title, description, path, index, largeImage } = input;
+  const lang = input.lang ?? DEFAULT_LANG;
   const site = normalizeSiteUrl(input.siteUrl);
   const meta: Meta[] = [
     { title },
@@ -114,8 +131,8 @@ export function seoHead(input: SeoHeadInput): { meta: Meta[]; links: Link[] } {
     { property: "og:description", content: description },
     { property: "og:type", content: "website" },
     { property: "og:site_name", content: SITE_NAME },
-    { property: "og:locale", content: OG_LOCALE },
-    { property: "og:locale:alternate", content: OG_LOCALE_ALT },
+    { property: "og:locale", content: ogLocale(lang) },
+    { property: "og:locale:alternate", content: ogLocale(otherLang(lang)) },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
   ];
@@ -134,9 +151,10 @@ export function seoHead(input: SeoHeadInput): { meta: Meta[]; links: Link[] } {
   }
   const links: Link[] = [];
   if (site && path && index) {
-    const url = absoluteUrl(site, path);
+    // Each language is its own canonical URL; hreflang ties the variants together.
+    const url = langUrl(site, path, lang);
     meta.push({ property: "og:url", content: url });
-    links.push({ rel: "canonical", href: url });
+    links.push({ rel: "canonical", href: url }, ...hreflangLinks(site, path));
   }
   return { meta, links };
 }
@@ -147,8 +165,10 @@ export function softwareAppJsonLd(opts: {
   description: string;
   siteUrl?: string | null | undefined;
   version?: string;
+  lang?: Lang;
 }): Record<string, unknown> {
   const site = normalizeSiteUrl(opts.siteUrl);
+  const lang = opts.lang ?? DEFAULT_LANG;
   const ld: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -156,7 +176,8 @@ export function softwareAppJsonLd(opts: {
     description: opts.description,
     applicationCategory: "FinanceApplication",
     operatingSystem: "Web, Android, iOS",
-    inLanguage: ["id", "en"],
+    inLanguage: lang,
+    availableLanguage: [...LANGS],
     isAccessibleForFree: true,
     license: "https://opensource.org/licenses/MIT",
     codeRepository: DEFAULT_REPO_URL,
@@ -164,7 +185,7 @@ export function softwareAppJsonLd(opts: {
   };
   if (opts.version && opts.version !== "0.0.0") ld["softwareVersion"] = opts.version;
   if (site) {
-    ld["url"] = absoluteUrl(site, "/");
+    ld["url"] = langUrl(site, "/", lang);
     ld["image"] = absoluteUrl(site, OG_IMAGE);
   } else {
     ld["url"] = DEFAULT_REPO_URL;
@@ -172,12 +193,15 @@ export function softwareAppJsonLd(opts: {
   return ld;
 }
 
-/** schema.org FAQPage from question/answer pairs (Indonesian source strings). */
-export function faqJsonLd(faq: ReadonlyArray<{ q: string; a: string }>): Record<string, unknown> {
+/** schema.org FAQPage from question/answer pairs already in `lang` (default Indonesian). */
+export function faqJsonLd(
+  faq: ReadonlyArray<{ q: string; a: string }>,
+  lang: Lang = DEFAULT_LANG,
+): Record<string, unknown> {
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    inLanguage: "id",
+    inLanguage: lang,
     mainEntity: faq.map((f) => ({
       "@type": "Question",
       name: f.q,
@@ -194,21 +218,33 @@ const xmlEscape = (s: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 
-/** sitemap.xml for `paths` under `siteUrl`; `lastmod` is an optional ISO date. */
+/**
+ * sitemap.xml for `paths` under `siteUrl`; `lastmod` is an optional ISO date. Every path is
+ * listed once per language (`/`, `/?lang=en`), each with the full set of `xhtml:link` hreflang
+ * alternates as Google requires.
+ */
 export function sitemapXml(
   siteUrl: string,
   paths: ReadonlyArray<string> = PUBLIC_PATHS,
   lastmod?: string,
 ): string {
   const day = lastmod && /^\d{4}-\d{2}-\d{2}/.test(lastmod) ? lastmod.slice(0, 10) : null;
-  const urls = paths.map((p) => {
-    const loc = `<loc>${xmlEscape(absoluteUrl(siteUrl, p))}</loc>`;
-    const mod = day ? `<lastmod>${day}</lastmod>` : "";
-    return `  <url>${loc}${mod}</url>`;
+  const urls = paths.flatMap((p) => {
+    const alts = hreflangLinks(siteUrl, p)
+      .map(
+        (a) =>
+          `<xhtml:link rel="alternate" hreflang="${a.hrefLang ?? ""}" href="${xmlEscape(a.href)}"/>`,
+      )
+      .join("");
+    return LANGS.map((l) => {
+      const loc = `<loc>${xmlEscape(langUrl(siteUrl, p, l))}</loc>`;
+      const mod = day ? `<lastmod>${day}</lastmod>` : "";
+      return `  <url>${loc}${mod}${alts}</url>`;
+    });
   });
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
     ...urls,
     "</urlset>",
     "",

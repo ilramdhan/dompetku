@@ -4,6 +4,7 @@ import { LANDING_FAQ } from "@/lib/landing";
 import {
   absoluteUrl,
   faqJsonLd,
+  hreflangLinks,
   normalizeSiteUrl,
   robotsContent,
   robotsTxt,
@@ -69,7 +70,31 @@ describe("seoHead / pageHead", () => {
     expect(metaOf(h.meta, "og:url")).toBe("https://x.test/privacy");
     expect(metaOf(h.meta, "og:site_name")).toBe("Dompetku");
     expect(metaOf(h.meta, "og:locale")).toBe("id_ID");
-    expect(h.links).toEqual([{ rel: "canonical", href: "https://x.test/privacy" }]);
+    expect(h.links).toEqual([
+      { rel: "canonical", href: "https://x.test/privacy" },
+      { rel: "alternate", hrefLang: "id", href: "https://x.test/privacy" },
+      { rel: "alternate", hrefLang: "en", href: "https://x.test/privacy?lang=en" },
+      { rel: "alternate", hrefLang: "x-default", href: "https://x.test/privacy" },
+    ]);
+  });
+  it("points canonical/og:url/og:locale at the English variant for lang=en", () => {
+    const h = seoHead({
+      title: "T",
+      description: "d",
+      path: "/",
+      index: true,
+      siteUrl: "https://x.test",
+      lang: "en",
+    });
+    expect(h.links[0]).toEqual({ rel: "canonical", href: "https://x.test/?lang=en" });
+    expect(metaOf(h.meta, "og:url")).toBe("https://x.test/?lang=en");
+    expect(metaOf(h.meta, "og:locale")).toBe("en_US");
+    expect(metaOf(h.meta, "og:locale:alternate")).toBe("id_ID");
+    expect(hreflangLinks("https://x.test", "/").map((l) => l.href)).toEqual([
+      "https://x.test/",
+      "https://x.test/?lang=en",
+      "https://x.test/",
+    ]);
   });
   it("skips canonical without a site URL or when not indexable", () => {
     expect(pageHead("T", "d", { index: true, path: "/terms" }).links).toEqual([]);
@@ -107,8 +132,15 @@ describe("JSON-LD", () => {
       url: "https://x.test/",
       image: "https://x.test/icons/og-image.png",
       softwareVersion: "1.5.1",
+      inLanguage: "id",
       offers: { "@type": "Offer", price: "0" },
     });
+  });
+  it("uses the page language for the English landing", () => {
+    const ld = softwareAppJsonLd({ description: "d", siteUrl: "https://x.test", lang: "en" });
+    expect(ld["inLanguage"]).toBe("en");
+    expect(ld["url"]).toBe("https://x.test/?lang=en");
+    expect(faqJsonLd([{ q: "Q", a: "A" }], "en")["inLanguage"]).toBe("en");
   });
   it("falls back to the repository URL and drops an unknown version", () => {
     const ld = softwareAppJsonLd({ description: "d", version: "0.0.0" });
@@ -131,13 +163,26 @@ describe("JSON-LD", () => {
 describe("sitemap.xml", () => {
   it("lists the public pages as absolute, escaped URLs", () => {
     const xml = sitemapXml("https://x.test", undefined, "2026-10-10T08:00:00Z");
-    expect(xml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
-    expect(xml).toContain("<url><loc>https://x.test/</loc><lastmod>2026-10-10</lastmod></url>");
+    expect(xml).toContain('xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"');
+    expect(xml).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
+    expect(xml).toContain("<url><loc>https://x.test/</loc><lastmod>2026-10-10</lastmod>");
     expect(xml).toContain("<loc>https://x.test/privacy</loc>");
     expect(xml).toContain("<loc>https://x.test/terms</loc>");
     expect(xml).not.toContain("dashboard");
     expect(sitemapXml("https://x.test", ["/a&b"])).toContain("<loc>https://x.test/a&amp;b</loc>");
     expect(sitemapXml("https://x.test", ["/"], "bogus")).not.toContain("lastmod");
+  });
+  it("lists every language variant with xhtml:link hreflang alternates", () => {
+    const xml = sitemapXml("https://x.test", ["/"]);
+    expect(xml.match(/<url>/g)).toHaveLength(2);
+    expect(xml).toContain("<loc>https://x.test/?lang=en</loc>");
+    expect(xml).toContain(
+      '<xhtml:link rel="alternate" hreflang="en" href="https://x.test/?lang=en"/>',
+    );
+    expect(xml).toContain(
+      '<xhtml:link rel="alternate" hreflang="x-default" href="https://x.test/"/>',
+    );
+    expect(sitemapXml("https://x.test").match(/<url>/g)).toHaveLength(6);
   });
 });
 

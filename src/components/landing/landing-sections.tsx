@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { langSearch } from "@/lib/lang";
 import { docsUrl, LANDING_FAQ } from "@/lib/landing";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
@@ -698,7 +699,7 @@ const LEGAL_LINKS = [
 ] as const;
 
 export function LandingFooter({ repo, onLanding = true }: { repo: string; onLanding?: boolean }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const link =
     "rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
   const docs = [
@@ -753,7 +754,7 @@ export function LandingFooter({ repo, onLanding = true }: { repo: string; onLand
           <ul className="mt-3 space-y-2">
             {LEGAL_LINKS.map((l) => (
               <li key={l.to}>
-                <Link to={l.to} className={link}>
+                <Link to={l.to} search={langSearch(lang)} className={link}>
                   {t(l.label)}
                 </Link>
               </li>
@@ -782,7 +783,7 @@ export function LandingFooter({ repo, onLanding = true }: { repo: string; onLand
             </li>
             {LEGAL_LINKS.map((l) => (
               <li key={l.to}>
-                <Link to={l.to} className={link}>
+                <Link to={l.to} search={langSearch(lang)} className={link}>
                   {t(l.label)}
                 </Link>
               </li>

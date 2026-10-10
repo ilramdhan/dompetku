@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useRouterState,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
@@ -15,6 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { LanguageProvider, useI18n } from "@/lib/i18n";
+import { DEFAULT_LANG, urlLangFor, type Lang } from "@/lib/lang";
 import { PrivacySync } from "@/lib/privacy-sync";
 import { BrandingSync } from "@/components/app-logo";
 
@@ -120,9 +122,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+/** `?lang=` on a public page (/, /privacy, /terms); undefined elsewhere (the app ignores it). */
+function useUrlLang(): Lang | undefined {
+  return useRouterState({
+    select: (s) => urlLangFor(s.location.pathname, s.location.search as Record<string, unknown>),
+  });
+}
+
 function RootShell({ children }: { children: ReactNode }) {
+  // Server-rendered from the URL so crawlers see the right language; a stored `dk-lang` without
+  // a URL param is applied client-side by LanguageProvider (unchanged behaviour).
+  const lang = useUrlLang() ?? DEFAULT_LANG;
   return (
-    <html lang="id" suppressHydrationWarning>
+    <html lang={lang} suppressHydrationWarning>
       <head>
         <HeadContent />
         <meta name="theme-color" content="#1d3b2f" />
@@ -142,10 +154,11 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const urlLang = useUrlLang();
 
   return (
     <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
+      <LanguageProvider urlLang={urlLang}>
         <PrivacySync />
         <BrandingSync />
         <Outlet />

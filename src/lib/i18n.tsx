@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { LANG_STORAGE_KEY, parseLang, resolveLang, type Lang } from "./lang";
 
-export type Lang = "id" | "en";
+export type { Lang } from "./lang";
 
 /** Indonesian is the source language; keys are Indonesian strings. */
 const DICT: Record<string, string> = {
@@ -1206,6 +1207,15 @@ const DICT: Record<string, string> = {
   "Kantong sudah diarsipkan": "The pocket is archived",
   "Nama kantong sudah dipakai di dompet ini": "This wallet already has a pocket with that name",
   "Kantong tidak ditemukan": "Pocket not found",
+  /* SEO (document head of public pages, issue #44) */
+  "Dompetku — Pencatat Keuangan Open Source & Self-Hosted Expense Tracker":
+    "Dompetku — Open Source, Self-Hosted Personal Finance & Expense Tracker",
+  "Aplikasi pencatat keuangan pribadi gratis & open source: catat pengeluaran lewat bot Telegram, OCR struk, budget dan laporan. Self-hosted personal expense tracker.":
+    "Free, open source personal finance app: log expenses from a Telegram bot, scan receipts with OCR, set budgets and read reports. A self-hosted expense tracker.",
+  "Data apa yang disimpan instance Dompetku ini, di mana disimpan, dan layanan pihak ketiga yang mungkin dipakai.":
+    "What data this Dompetku instance stores, where it is stored, and which third-party services may be used.",
+  "Ketentuan penggunaan Dompetku: lisensi MIT, tanpa jaminan, bukan nasihat keuangan.":
+    "Terms of use for Dompetku: MIT license, no warranty, not financial advice.",
 };
 
 const LangContext = createContext<{
@@ -1226,26 +1236,47 @@ export function translateNow(s: string): string {
   return activeLang === "en" ? (DICT[s] ?? s) : s;
 }
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("id");
+/** Pure lookup for code outside React that knows the language (route `head()`, JSON-LD). */
+export function translate(s: string, lang: Lang): string {
+  return lang === "en" ? (DICT[s] ?? s) : s;
+}
+
+/**
+ * `urlLang` is the language requested by the URL (`?lang=` on public pages, see lang.ts). It is
+ * known on the server, so SSR renders it and hydration matches; it wins over the stored choice
+ * and is persisted like the switcher. Without it the stored `dk-lang` applies after hydration.
+ */
+export function LanguageProvider({
+  children,
+  urlLang,
+}: {
+  children: ReactNode;
+  urlLang?: Lang | undefined;
+}) {
+  const [stored, setStored] = useState<Lang>(() => resolveLang(urlLang, null));
   useEffect(() => {
     try {
-      const v = localStorage.getItem("dk-lang");
-      if (v === "en" || v === "id") setLangState(v);
+      if (urlLang) localStorage.setItem(LANG_STORAGE_KEY, urlLang);
+      const v = urlLang ?? parseLang(localStorage.getItem(LANG_STORAGE_KEY));
+      if (v) setStored(v);
     } catch {
-      /* ignore */
+      if (urlLang) setStored(urlLang);
     }
-  }, []);
+  }, [urlLang]);
+  const lang = urlLang ?? stored;
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
   const setLang = (l: Lang) => {
     try {
-      localStorage.setItem("dk-lang", l);
+      localStorage.setItem(LANG_STORAGE_KEY, l);
     } catch {
       /* ignore */
     }
-    setLangState(l);
+    setStored(l);
   };
   activeLang = lang;
-  const t = (s: string) => (lang === "en" ? (DICT[s] ?? s) : s);
+  const t = (s: string) => translate(s, lang);
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>;
 }
 
