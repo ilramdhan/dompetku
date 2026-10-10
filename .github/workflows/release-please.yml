@@ -2,8 +2,8 @@ name: Release Please
 
 # Opens/updates a "Release PR" from Conventional Commits on main.
 # Merging that PR bumps package.json, prepends CHANGELOG.md, tags vX.Y.Z
-# and publishes a GitHub Release. Nothing is published to npm and no
-# package is built — Dompetku is an app deployed per user (see docs/RELEASING.md).
+# and publishes a GitHub Release. Nothing is published to npm; the only
+# artifact is the self-hosting Docker image (docker.yml, called below).
 
 on:
   push:
@@ -22,6 +22,9 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -33,3 +36,15 @@ jobs:
       - name: Summary
         if: ${{ steps.release.outputs.release_created }}
         run: echo "Released ${{ steps.release.outputs.tag_name }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # Releases created with GITHUB_TOKEN don't trigger other workflows, so publish the
+  # Docker image (ghcr.io/ilramdhan/dompetku) from here.
+  docker:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}

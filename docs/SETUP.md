@@ -13,5 +13,5 @@ Quick links:
 | Two-step login (TOTP)                                | [SELF-HOSTING.md §5.5](SELF-HOSTING.md#55-two-step-login-2fa)                     |
 | Family members & wallet access (v18)                 | [SELF-HOSTING.md §5.6](SELF-HOSTING.md#56-optional-family-members-multi-user-v18) |
 | Pockets inside a wallet (v19)                        | [SELF-HOSTING.md §5.7](SELF-HOSTING.md#57-optional-pockets-kantong-v19)           |
-| Troubleshooting                                      | [SELF-HOSTING.md §10](SELF-HOSTING.md#10-troubleshooting)                         |
+| Troubleshooting                                      | [SELF-HOSTING.md §11](SELF-HOSTING.md#11-troubleshooting)                         |
 | Questions                                            | [FAQ.md](FAQ.md)                                                                  |

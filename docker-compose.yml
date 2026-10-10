@@ -1,0 +1,22 @@
+# Dompetku with Docker Compose. Supabase stays external (run supabase/schema.sql there first).
+#   cp .env.example .env   # fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, APP_*, SESSION_SECRET
+#   docker compose up -d   # pulls ghcr.io/ilramdhan/dompetku; `docker compose up -d --build` builds locally
+# Put it behind an HTTPS reverse proxy for anything beyond http://localhost (see docs/SELF-HOSTING.md).
+services:
+  app:
+    image: ghcr.io/ilramdhan/dompetku:latest
+    build:
+      context: .
+    env_file: .env
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    # Hardening: the server never writes to disk, so run it read-only with no extra privileges.
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
