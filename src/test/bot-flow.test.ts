@@ -83,7 +83,28 @@ function q(table: string) {
   return api;
 }
 vi.mock("../lib/db.server", () => ({
-  db: () => ({ from: q, storage: { from: () => ({ remove: async () => ({}) }) } }),
+  db: () => ({
+    from: q,
+    storage: {
+      createBucket: async () => ({ error: null }),
+      from: () => ({ remove: async () => ({}), upload: async () => ({ error: null }) }),
+    },
+  }),
+}));
+// Receipt OCR without a real AI endpoint (only reached by tests that send a photo past the quota).
+vi.mock("../lib/ocr.server", async (orig) => ({
+  ...(await orig<typeof import("../lib/ocr.server")>()),
+  parseReceipt: vi.fn(async () => ({
+    kind: "expense",
+    amount: 150000,
+    currency: "IDR",
+    category: "Lainnya",
+    account: null,
+    description: "Transfer BI-FAST ke Yusuf 123",
+    merchant: "Bank BCA",
+    date: null,
+    items: [{ name: "Transfer", qty: 1, price: 150000 }],
+  })),
 }));
 
 import {
@@ -420,5 +441,164 @@ describe("bot_drafts belum ada vs error DB lain", () => {
       }),
     ).rejects.toThrow(/statement timeout/);
     expect(tables["transactions"] ?? []).toHaveLength(0);
+  });
+});
+
+describe("✏️ Keterangan: ganti keterangan pratinjau (#68)", () => {
+  const photo = (update_id: number, chat_id = "111") =>
+    handleBotUpdate({
+      update_id,
+      chat_id,
+      image_base64: Buffer.from("fake-jpeg").toString("base64"),
+      mime_type: "image/jpeg",
+    });
+  const say = (update_id: number, text: string, chat_id = "111") =>
+    handleBotUpdate({ update_id, chat_id, text });
+  const draft = () => tables["bot_drafts"]![0]!;
+
+  it("foto nota → Keterangan → kirim teks → pratinjau baru → simpan memakai keterangan baru", async () => {
+    const p = await photo(100);
+    expect(p.text).toContain("🧾 Pratinjau nota");
+    expect(p.text).toContain("Ket: Transfer BI-FAST ke Yusuf 123");
+    expect(p.reply_markup!.inline_keyboard.flat().map((b) => b.callback_data)).toContain(
+      `d:e:${draft().id}`,
+    );
+    const id = draft().id;
+    const receipt = draft().receipt_path;
+    expect(receipt).toBeTruthy();
+
+    const prompt = await cb(`d:e:${id}`);
+    expect(prompt.method).toBe("edit");
+    expect(prompt.text).toContain("Kirim keterangan baru");
+    expect(prompt.text).toContain("Sekarang: Transfer BI-FAST ke Yusuf 123");
+    expect(prompt.reply_markup!.inline_keyboard.flat()).toEqual([
+      { text: "⬅️ Kembali", callback_data: `d:b:${id}` },
+    ]);
+    expect(draft().payload.awaiting.field).toBe("description");
+
+    const r = await say(101, "  dini\u0007  bayar   baju ");
+    expect(r.method).toBe("send");
+    expect(r.text).toContain("Ket: dini bayar baju");
+    expect(r.text).toContain("Merchant: Bank BCA");
+    expect(r.text).toContain("Transfer — ");
+    expect(r.text).not.toContain("awaiting");
+    expect(r.reply_markup!.inline_keyboard[0]![0]!.callback_data).toBe(`d:s:${id}`);
+    expect(tables["bot_drafts"]).toHaveLength(1); // no new draft from the text
+    expect(draft().payload.awaiting).toBeUndefined();
+
+    // webhook retry of the same text update: same preview, no new draft, nothing changes
+    const again = await say(101, "  dini\u0007  bayar   baju ");
+    expect(again.text).toContain("Ket: dini bayar baju");
+    expect(tables["bot_drafts"]).toHaveLength(1);
+
+    // the flag is gone: the next chat is a normal transaction again
+    await say(102, "kopi 25rb");
+    expect(tables["bot_drafts"]).toHaveLength(2);
+
+    const saved = await cb(`d:s:${id}`);
+    expect(saved.text).toContain("✅ Tercatat");
+    const tx = tables["transactions"]![0]!;
+    expect(tx.description).toBe("dini bayar baju");
+    expect(tx.merchant).toBe("Bank BCA");
+    expect(tx.receipt_path).toBe(receipt);
+    expect(tx.items).toEqual([{ name: "Transfer", qty: 1, price: 150000 }]);
+    expect(JSON.stringify(tx)).not.toContain("awaiting");
+  });
+
+  it("pratinjau chat teks juga bisa diganti keterangannya; Kembali membatalkan prompt", async () => {
+    await say(110, "kopi 25rb pakai gopay");
+    const id = draft().id;
+    await cb(`d:e:${id}`);
+    const back = await cb(`d:b:${id}`);
+    expect(back.text).toContain("Ket: Kopi");
+    expect(draft().payload.awaiting).toBeUndefined();
+    await say(111, "es teh 5rb"); // normal chat again
+    expect(tables["bot_drafts"]).toHaveLength(2);
+
+    await cb(`d:e:${id}`);
+    const r = await say(112, "kopi susu sama dini");
+    expect(r.text).toContain("Ket: kopi susu sama dini");
+    await cb(`d:s:${id}`);
+    expect(tables["transactions"]![0]!.description).toBe("kopi susu sama dini");
+  });
+
+  it("/batal membatalkan edit (bukan undo), perintah lain tetap jalan", async () => {
+    await say(120, "kopi 25rb");
+    const id = draft().id;
+    await cb(`d:s:${id}`); // a saved tx that /batal (= undo) must NOT delete
+    await say(121, "gaji 8jt");
+    const id2 = tables["bot_drafts"]![1]!.id;
+    await cb(`d:e:${id2}`);
+    const c = await say(122, "/batal");
+    expect(c.text).toContain("Edit keterangan dibatalkan.");
+    expect(c.text).toContain("Ket: Gaji");
+    expect(tables["transactions"]).toHaveLength(1);
+    expect(tables["bot_drafts"]![1]!.payload.awaiting).toBeUndefined();
+    const retry = await say(122, "/batal"); // retried update: still not an undo
+    expect(retry.text).toContain("dibatalkan");
+    expect(tables["transactions"]).toHaveLength(1);
+
+    await cb(`d:e:${id2}`);
+    const help = await say(123, "/help");
+    expect(help.text).toContain("/paylater");
+    expect(tables["bot_drafts"]![1]!.payload.awaiting).toBeUndefined();
+    await say(124, "es teh 5rb");
+    expect(tables["bot_drafts"]).toHaveLength(3);
+    expect(tables["bot_drafts"]![1]!.payload.description).toBe("Gaji");
+  });
+
+  it("flag kedaluwarsa (> 10 menit) diabaikan: chat diproses seperti biasa", async () => {
+    await say(130, "kopi 25rb");
+    const id = draft().id;
+    await cb(`d:e:${id}`);
+    const old = new Date(Date.now() - 11 * 60_000).toISOString();
+    draft().payload.awaiting.at = old;
+    draft().updated_at = old;
+    const r = await say(131, "es teh 5rb");
+    expect(r.text).toContain("Es teh");
+    expect(tables["bot_drafts"]).toHaveLength(2);
+    expect(draft().payload.description).toBe("Kopi");
+  });
+
+  it("chat lain tidak bisa membajak edit; draft tersimpan tidak bisa diedit", async () => {
+    process.env["BOT_ALLOWED_CHAT_IDS"] = "111,222";
+    await say(140, "kopi 25rb");
+    const id = draft().id;
+    const forged = await handleBotUpdate({
+      update_id: 141,
+      chat_id: "222",
+      callback_data: `d:e:${id}`,
+    });
+    expect(forged.text).toContain("tidak ditemukan");
+    expect(draft().payload.awaiting).toBeUndefined();
+
+    await cb(`d:e:${id}`);
+    await say(142, "es teh 5rb", "222"); // other chat → its own new draft
+    expect(tables["bot_drafts"]).toHaveLength(2);
+    expect(draft().payload.description).toBe("Kopi");
+    expect(draft().payload.awaiting).toBeTruthy();
+
+    await cb(`d:s:${id}`); // saving ends the prompt (draft no longer pending)
+    expect(tables["transactions"]![0]!.description).toBe("Kopi");
+    await say(143, "roti 10rb");
+    expect(tables["bot_drafts"]).toHaveLength(3);
+  });
+
+  it("teks kosong setelah dibersihkan meminta ulang", async () => {
+    await say(150, "kopi 25rb");
+    const id = draft().id;
+    await cb(`d:e:${id}`);
+    const r = await say(151, "\u200b\u200b");
+    expect(r.text).toContain("Kirim keterangan baru");
+    expect(draft().payload.awaiting).toBeTruthy();
+  });
+
+  it("tabel bot_drafts hilang: chat tetap memberi pesan v7 seperti sebelumnya", async () => {
+    failing["bot_drafts"] = {
+      code: "PGRST205",
+      message: "Could not find the table 'public.bot_drafts' in the schema cache",
+    };
+    await expect(say(160, "kopi 25rb")).rejects.toThrow(/bot_drafts belum ada.*v7/);
+    expect((await say(161, "/help")).text).toContain("/paylater");
   });
 });

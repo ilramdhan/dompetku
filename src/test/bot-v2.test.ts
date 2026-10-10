@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  botHelp,
   classifyBotCommand,
+  descriptionKeyboard,
+  descriptionPrompt,
+  isAwaitingFresh,
+  isEditCancel,
+  pickEditTarget,
+  sanitizeDescription,
+  withoutAwait,
+  type DraftPayload,
   guessCategory,
   matchCategory,
   parseCallback,
@@ -180,5 +189,99 @@ describe("UI Telegram", () => {
     );
     expect(t).toContain("BCA (default)");
     expect(t).toContain("⚡");
+  });
+});
+
+describe("✏️ Keterangan (pure)", () => {
+  const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+  const base: DraftPayload = {
+    kind: "expense",
+    amount: 150000,
+    currency: "IDR",
+    category: "Lainnya",
+    account: null,
+    description: "Transfer BI-FAST ke Yusuf",
+    merchant: "Bank BCA",
+    date: T,
+    items: [],
+    via: "ocr",
+  };
+  const now = Date.parse("2026-10-03T10:00:00Z");
+  const ago = (min: number) => new Date(now - min * 60_000).toISOString();
+
+  it("tombol Keterangan ada di pratinjau, ≤ 64 byte, dan bisa diurai", () => {
+    const kb = previewKeyboard(id).inline_keyboard;
+    expect(kb.map((r) => r.map((b) => b.text))).toEqual([
+      ["✅ Simpan", "❌ Batal"],
+      ["🏷 Kategori", "🏦 Akun"],
+      ["🔁 Masuk/Keluar", "✏️ Keterangan"],
+    ]);
+    const e = kb.flat().find((b) => b.text === "✏️ Keterangan")!;
+    expect(new TextEncoder().encode(e.callback_data).length).toBeLessThanOrEqual(64);
+    expect(parseCallback(e.callback_data)).toEqual({ kind: "draft", op: "e", id, idx: null });
+    expect(parseCallback(`d:z:${id}`)).toBeNull();
+    expect(descriptionKeyboard(id).inline_keyboard).toEqual([
+      [{ text: "⬅️ Kembali", callback_data: `d:b:${id}` }],
+    ]);
+  });
+
+  it("sanitizeDescription: trim, spasi, karakter kontrol, maks 200", () => {
+    expect(sanitizeDescription("  dini   bayar\n\tbaju  ")).toBe("dini bayar baju");
+    expect(sanitizeDescription("a\u0000b\u200bc\u202ed\ufeff")).toBe("a b c d");
+    expect(sanitizeDescription("   ")).toBeNull();
+    expect(sanitizeDescription(null)).toBeNull();
+    expect(sanitizeDescription("x".repeat(500))).toHaveLength(200);
+    // counts code points, so an emoji is never cut in half
+    const emo = sanitizeDescription("😀".repeat(250))!;
+    expect(Array.from(emo)).toHaveLength(200);
+    expect(emo).toBe("😀".repeat(200));
+  });
+
+  it("isAwaitingFresh: hanya flag deskripsi yang < 10 menit", () => {
+    const at = (m: number) => ({ awaiting: { field: "description" as const, at: ago(m) } });
+    expect(isAwaitingFresh(at(0), now)).toBe(true);
+    expect(isAwaitingFresh(at(9.9), now)).toBe(true);
+    expect(isAwaitingFresh(at(10), now)).toBe(false);
+    expect(isAwaitingFresh(at(-30), now)).toBe(false); // far future = bogus
+    expect(isAwaitingFresh({ awaiting: { field: "description", at: "nope" } }, now)).toBe(false);
+    expect(isAwaitingFresh({}, now)).toBe(false);
+    expect(isAwaitingFresh(null, now)).toBe(false);
+  });
+
+  it("withoutAwait membuang flag, sisanya utuh; pratinjau tidak menampilkannya", () => {
+    const p = { ...base, awaiting: { field: "description" as const, at: ago(1) } };
+    expect(withoutAwait(p)).toEqual(base);
+    expect(previewText(withoutAwait(p), null)).not.toMatch(/await/);
+  });
+
+  it("pickEditTarget: flag segar terbaru menang; retry update_id dikenali", () => {
+    const row = (id: string, status: string, payload: Partial<DraftPayload>) => ({
+      id,
+      status,
+      payload: { ...base, ...payload },
+    });
+    const rows = [
+      row("a", "pending", { awaiting: { field: "description", at: ago(5) } }),
+      row("b", "pending", { awaiting: { field: "description", at: ago(1) } }),
+      row("c", "saved", { awaiting: { field: "description", at: ago(0) } }),
+      row("d", "pending", { awaiting: { field: "description", at: ago(20) } }),
+      row("e", "pending", { awaiting_done: 77 }),
+    ];
+    expect(pickEditTarget(rows, 1, now)).toEqual({ row: rows[1], retry: false });
+    expect(pickEditTarget(rows.slice(3), 77, now)).toEqual({ row: rows[4], retry: true });
+    expect(pickEditTarget(rows.slice(3), 78, now)).toBeNull();
+    expect(pickEditTarget([], 1, now)).toBeNull();
+  });
+
+  it("prompt & pembatalan", () => {
+    const t = descriptionPrompt("Kopi");
+    expect(t).toContain("Kirim keterangan baru untuk transaksi ini (maks. 200 karakter)");
+    expect(t).toContain("Sekarang: Kopi");
+    expect(t).toContain("/batal");
+    expect(descriptionPrompt(null)).not.toContain("Sekarang");
+    for (const c of ["/batal", "/BATAL", "/batal@DompetkuBot", "batal", " /cancel "])
+      expect(isEditCancel(c)).toBe(true);
+    for (const c of ["/batalin", "batal beli kopi", "/undo"]) expect(isEditCancel(c)).toBe(false);
+    expect(botHelp()).toContain("✏️ keterangan");
   });
 });
