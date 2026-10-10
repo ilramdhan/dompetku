@@ -2,7 +2,9 @@ import { z } from "zod";
 import { parsePresets } from "./fees";
 import { firstDue } from "./recurring";
 
-export const CURRENCIES = ["IDR", "USD"] as const;
+import { CURRENCIES } from "./currencies";
+
+export { CURRENCIES };
 export const CRUD_TABLES = [
   "accounts",
   "categories",
