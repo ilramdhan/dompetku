@@ -2,9 +2,12 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { getSession } from "@/lib/auth.functions";
 import { canOpenPath } from "@/lib/permissions";
+import { FONT_MONO, fontPreloads } from "@/lib/fonts";
 import { clearSessionCache, getCachedSession, setCachedSession } from "@/lib/session-cache";
 
 export const Route = createFileRoute("/_app")({
+  // App pages render amounts (`.num`, JetBrains Mono) on first paint; the root preloads body/display only.
+  head: () => ({ links: fontPreloads(FONT_MONO) }),
   beforeLoad: async ({ location }) => {
     let s = getCachedSession();
     if (!s) {
