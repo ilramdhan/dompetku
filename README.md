@@ -1,11 +1,15 @@
 <div align="center">
 
+**English** · [Bahasa Indonesia](README.id.md)
+
 <img src="docs/assets/banner.png" alt="Dompetku — catat keuangan pribadi dengan rapi: Telegram bot, receipt OCR, dashboard, budgets and gold tracking" width="100%">
 
 # Dompetku
 
 **A private, self-hosted personal finance tracker with a Telegram bot and receipt OCR.**
 
+[![GitHub stars](https://img.shields.io/github/stars/ilramdhan/dompetku?style=social)](https://github.com/ilramdhan/dompetku/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/ilramdhan/dompetku)](https://github.com/ilramdhan/dompetku/releases/latest)
 [![CI](https://github.com/ilramdhan/dompetku/actions/workflows/ci.yml/badge.svg)](https://github.com/ilramdhan/dompetku/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![TanStack Start](https://img.shields.io/badge/TanStack-Start-ff4154)](https://tanstack.com/start)
@@ -16,6 +20,8 @@
 ### 🚀 [Live demo → demo.dompetku.ilramdhan.dev](https://demo.dompetku.ilramdhan.dev)
 
 Demo credentials are shown on the login page (one-click **Masuk ke demo**). Fake data, resets daily at 00:00 WIB.
+
+⭐ If Dompetku helps you, [star the repo](https://github.com/ilramdhan/dompetku/stargazers) — it helps others find it.
 
 </div>
 
@@ -80,46 +86,46 @@ All screenshots use the fictional [demo data](docs/DEMO-DATA.md) and follow your
 or dark). Regenerate them with `npm run screenshots` (see [Regenerating screenshots](docs/DEMO-DATA.md#regenerating-screenshots)).
 
 <p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/dashboard-dark.png"><img src="public/screenshots/dashboard.png" alt="Dashboard: balances, assets, cash flow and spending per category"></picture>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/dashboard-dark.png"><img src="public/screenshots/dashboard.png" alt="Dompetku dashboard — personal finance overview with balances, net worth, cash flow and spending per category"></picture>
 </p>
 
 <table>
   <tr>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/transactions-dark.png"><img src="public/screenshots/transactions.png" alt="Transactions"></picture><br><b>Transactions</b>: Search, filter and sort every transaction; CSV import/export and PDF.</td>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/reports-dark.png"><img src="public/screenshots/reports.png" alt="Reports"></picture><br><b>Reports</b>: Category trends over 6 or 12 months and a yearly recap.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/transactions-dark.png"><img src="public/screenshots/transactions.png" alt="Dompetku transactions list — personal expense tracker with search, filters, sorting and CSV/PDF export"></picture><br><b>Transactions</b>: Search, filter and sort every transaction; CSV import/export and PDF.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/reports-dark.png"><img src="public/screenshots/reports.png" alt="Dompetku reports — monthly spending trends per category over 6 or 12 months and a yearly recap"></picture><br><b>Reports</b>: Category trends over 6 or 12 months and a yearly recap.</td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/budgets-dark.png"><img src="public/screenshots/budgets.png" alt="Budgets"></picture><br><b>Budgets</b>: Monthly budgets with rollover and 80% / 100% alerts.</td>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/accounts-detail-dark.png"><img src="public/screenshots/accounts-detail.png" alt="Account detail"></picture><br><b>Account detail</b>: 12-month balance, spending per category and reconciliation.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/budgets-dark.png"><img src="public/screenshots/budgets.png" alt="Dompetku budgets — monthly budget per category with rollover and 80% / 100% alerts"></picture><br><b>Budgets</b>: Monthly budgets with rollover and 80% / 100% alerts.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/accounts-detail-dark.png"><img src="public/screenshots/accounts-detail.png" alt="Dompetku wallet detail — 12-month bank account balance chart, spending per category and reconciliation"></picture><br><b>Account detail</b>: 12-month balance, spending per category and reconciliation.</td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/goals-dark.png"><img src="public/screenshots/goals.png" alt="Savings goals"></picture><br><b>Savings goals</b>: Progress, monthly target and projected completion date.</td>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/gold-dark.png"><img src="public/screenshots/gold.png" alt="Gold"></picture><br><b>Gold</b>: Antam and world gold prices with unrealised profit.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/goals-dark.png"><img src="public/screenshots/goals.png" alt="Dompetku savings goals — progress bars, monthly target and projected completion date"></picture><br><b>Savings goals</b>: Progress, monthly target and projected completion date.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/gold-dark.png"><img src="public/screenshots/gold.png" alt="Dompetku gold tracker — Antam and world (XAU) gold prices with unrealised profit"></picture><br><b>Gold</b>: Antam and world gold prices with unrealised profit.</td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/recurring-dark.png"><img src="public/screenshots/recurring.png" alt="Recurring transactions"></picture><br><b>Recurring transactions</b>: Salary, rent and top-ups posted automatically when due.</td>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/settings-dark.png"><img src="public/screenshots/settings.png" alt="Settings"></picture><br><b>Settings</b>: Categories, app settings and optional two-factor login.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/recurring-dark.png"><img src="public/screenshots/recurring.png" alt="Dompetku recurring transactions — salary, rent and top-ups posted automatically when due"></picture><br><b>Recurring transactions</b>: Salary, rent and top-ups posted automatically when due.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/settings-dark.png"><img src="public/screenshots/settings.png" alt="Dompetku settings — categories, app settings and optional two-factor (TOTP) login"></picture><br><b>Settings</b>: Categories, app settings and optional two-factor login.</td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/accounts-pockets-dark.png"><img src="public/screenshots/accounts-pockets.png" alt="Wallet detail with Kantong"></picture><br><b>Kantong (pockets)</b>: Envelopes inside a wallet with what is left this month and a low-balance badge.</td>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/transaction-pocket-dark.png"><img src="public/screenshots/transaction-pocket.png" alt="Transaction form with the Kantong select open"></picture><br><b>Kantong on transactions</b>: Pick the wallet's pocket when recording an expense, income or transfer.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/accounts-pockets-dark.png"><img src="public/screenshots/accounts-pockets.png" alt="Dompetku wallet detail with Kantong (pockets) — envelope budgeting inside one wallet with low-balance badge"></picture><br><b>Kantong (pockets)</b>: Envelopes inside a wallet with what is left this month and a low-balance badge.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/transaction-pocket-dark.png"><img src="public/screenshots/transaction-pocket.png" alt="Dompetku transaction form with the Kantong (pocket) select open while recording an expense"></picture><br><b>Kantong on transactions</b>: Pick the wallet's pocket when recording an expense, income or transfer.</td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/dashboard-pockets-dark.png"><img src="public/screenshots/dashboard-pockets.png" alt="Dashboard pocket alert"></picture><br><b>Pocket alerts</b>: The dashboard flags pockets at or below their threshold this month.</td>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/settings-users-dark.png"><img src="public/screenshots/settings-users.png" alt="Settings: users and wallet access"></picture><br><b>Family members</b>: Add members and choose which wallets they can view or manage.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/dashboard-pockets-dark.png"><img src="public/screenshots/dashboard-pockets.png" alt="Dompetku dashboard pocket alert — pockets at or below their low-balance threshold this month"></picture><br><b>Pocket alerts</b>: The dashboard flags pockets at or below their threshold this month.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/settings-users-dark.png"><img src="public/screenshots/settings-users.png" alt="Dompetku family members settings — add users and choose which wallets each can view or manage"></picture><br><b>Family members</b>: Add members and choose which wallets they can view or manage.</td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/settings-integrations-dark.png"><img src="public/screenshots/settings-integrations.png" alt="Settings: integrations"></picture><br><b>Integrations</b>: Configure the Telegram bot, AI, email and n8n from the web UI; secrets stay encrypted.</td>
-    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/profile-dark.png"><img src="public/screenshots/profile.png" alt="Profile page"></picture><br><b>Profile</b>: Name, address, avatar and password change.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/settings-integrations-dark.png"><img src="public/screenshots/settings-integrations.png" alt="Dompetku integrations settings — configure Telegram bot, AI receipt OCR, email and n8n with encrypted secrets"></picture><br><b>Integrations</b>: Configure the Telegram bot, AI, email and n8n from the web UI; secrets stay encrypted.</td>
+    <td width="50%" valign="top"><picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/profile-dark.png"><img src="public/screenshots/profile.png" alt="Dompetku profile page — name, address, avatar and password change"></picture><br><b>Profile</b>: Name, address, avatar and password change.</td>
   </tr>
 </table>
 
 **On your phone and in Telegram**
 
 <p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/dashboard-mobile-dark.png"><img src="public/screenshots/dashboard-mobile.png" alt="Dashboard on mobile" width="240"></picture>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/transactions-mobile-dark.png"><img src="public/screenshots/transactions-mobile.png" alt="Transactions on mobile" width="240"></picture>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/telegram-bot-dark.png"><img src="public/screenshots/telegram-bot.png" alt="Telegram bot: preview with Save/Cancel, budget alert and /saldo" width="240"></picture>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/dashboard-mobile-dark.png"><img src="public/screenshots/dashboard-mobile.png" alt="Dompetku dashboard on a mobile phone — mobile-first personal finance app" width="240"></picture>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/transactions-mobile-dark.png"><img src="public/screenshots/transactions-mobile.png" alt="Dompetku transactions list on a mobile phone" width="240"></picture>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="public/screenshots/telegram-bot-dark.png"><img src="public/screenshots/telegram-bot.png" alt="Dompetku Telegram bot — expense preview with Save/Cancel buttons, budget alert and /saldo balance command" width="240"></picture>
 </p>
 
 ## Features
@@ -331,5 +337,6 @@ strings in `src/lib/i18n.tsx`) if your instance needs different wording.
 
 ---
 
-If Dompetku is useful to you, please consider giving it a star. Feedback, ideas and bug reports
+If Dompetku is useful to you, please consider giving it a star, or support its development via
+[GitHub Sponsors](https://github.com/sponsors/ilramdhan). Feedback, ideas and bug reports
 are welcome in [GitHub Issues](https://github.com/ilramdhan/dompetku/issues).

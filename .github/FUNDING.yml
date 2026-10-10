@@ -1,5 +1,4 @@
-# Jika Anda punya akun Ko-fi atau Buy Me A Coffee, cukup tulis username-nya
+# Sponsor button links: GitHub Sponsors first, then Ko-fi and Saweria.
+github: [ilramdhan]
 ko_fi: ilramdhan_
-
-# Untuk platform lokal seperti Saweria atau Trakteer, gunakan opsi 'custom' beserta link penuhnya
-custom: ['https://saweria.co/ilramadhan']
+custom: ["https://saweria.co/ilramadhan"]
