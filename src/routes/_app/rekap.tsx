@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
@@ -10,7 +10,13 @@ import { PENDING_MS, RekapSkeleton } from "@/components/skeletons";
 import { Empty } from "./dashboard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { yearlyQuery } from "@/lib/queries";
+import { rowsQuery, yearlyQuery } from "@/lib/queries";
+import { WalletFilter } from "@/components/wallet-filter";
+import {
+  isTransferCategory,
+  resolveReportAccount,
+  validateReportSearch,
+} from "@/lib/report-filter";
 import { currentMonth, shortMonth } from "@/lib/dates";
 import { money } from "@/lib/format";
 import { usePrivacy } from "@/lib/privacy";
@@ -24,8 +30,16 @@ export const Route = createFileRoute("/_app/rekap")({
       "Rekap Tahunan",
       "Total pemasukan, pengeluaran, dan rata-rata bulanan sepanjang tahun.",
     ),
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(yearlyQuery(currentMonth().slice(0, 4))),
+  validateSearch: validateReportSearch,
+  loaderDeps: ({ search }) => ({ account: search.account }),
+  loader: async ({ context, deps }) => {
+    const qc = context.queryClient;
+    // Unknown wallet ids fall back to all wallets.
+    const account = deps.account
+      ? resolveReportAccount(deps.account, await qc.ensureQueryData(rowsQuery("accounts")))
+      : undefined;
+    return qc.ensureQueryData(yearlyQuery(currentMonth().slice(0, 4), account));
+  },
   errorComponent: RouteError,
   pendingComponent: RekapSkeleton,
   pendingMs: PENDING_MS,
@@ -37,7 +51,14 @@ function RekapPage() {
   const { t, lang } = useI18n();
   const locale = lang === "en" ? "en-US" : "id-ID";
   const [year, setYear] = useState(currentMonth().slice(0, 4));
-  const { data: d } = useQuery({ ...yearlyQuery(year), placeholderData: (p) => p });
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const accounts = (useQuery(rowsQuery("accounts")).data ?? []) as { id: string; name: string }[];
+  const account = resolveReportAccount(search.account, accounts);
+  const setAccount = (a: string | undefined) =>
+    void navigate({ search: a ? { account: a } : {}, replace: true });
+  const { data: d } = useQuery({ ...yearlyQuery(year, account), placeholderData: (p) => p });
+  const catName = (name: string) => (isTransferCategory(name) ? t(name) : name);
   if (!d) return <RekapSkeleton />;
 
   return (
@@ -52,24 +73,37 @@ function RekapPage() {
         }
       />
 
-      <div className="mb-5 flex items-center gap-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => setYear(String(Number(year) - 1))}
-          aria-label={t("Sebelumnya")}
-        >
-          <ChevronLeft className="size-4" />
-        </Button>
-        <p className="min-w-24 text-center font-display text-lg font-semibold">{year}</p>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => setYear(String(Number(year) + 1))}
-          aria-label={t("Berikutnya")}
-        >
-          <ChevronRight className="size-4" />
-        </Button>
+      <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-2">
+        <div className="flex items-center gap-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setYear(String(Number(year) - 1))}
+            aria-label={t("Sebelumnya")}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <p className="min-w-24 text-center font-display text-lg font-semibold">{year}</p>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setYear(String(Number(year) + 1))}
+            aria-label={t("Berikutnya")}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+        <WalletFilter
+          value={account}
+          accounts={accounts}
+          onChange={setAccount}
+          className="sm:ml-auto"
+        />
+        {account ? (
+          <p className="w-full text-xs text-muted-foreground sm:text-right">
+            {t("Transfer dihitung sebagai uang masuk/keluar dompet ini.")}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -137,7 +171,7 @@ function RekapPage() {
             <div className="h-64 short:h-52">
               <DonutChart
                 data={d.byCategory.slice(0, 8).map((c: any, i: number) => ({
-                  name: c.name,
+                  name: catName(c.name),
                   value: c.value,
                   color: c.color ?? PIE[i % PIE.length],
                 }))}
@@ -162,7 +196,7 @@ function RekapPage() {
                       className="size-2.5 shrink-0 rounded-full"
                       style={{ background: c.color ?? PIE[i % PIE.length] }}
                     />
-                    <span className="truncate">{c.name}</span>
+                    <span className="truncate">{catName(c.name)}</span>
                   </span>
                   <span className="num shrink-0 text-muted-foreground">{money(c.value)}</span>
                 </li>
