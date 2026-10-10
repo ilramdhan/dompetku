@@ -33,6 +33,7 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
   },
   "backup.functions.ts": { restoreBackup: "admin" },
   "demo.functions.ts": { getDemoInfo: "public" },
+  "seo.functions.ts": { getSeoConfig: "public" },
   "finance.functions.ts": {
     listRows: "member",
     saveTransaction: "member",
