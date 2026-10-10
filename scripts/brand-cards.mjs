@@ -316,18 +316,57 @@ const wnIcon = {
   wallet: `<svg viewBox="0 0 24 24"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 7l12-4 2 4"/><circle cx="16.5" cy="13.5" r="1.2"/></svg>`,
 };
 
-/** 1200×1500 portrait "what's new in v1.5" card (shareable in chats); `lang` is "id" | "en". */
-export function whatsNewV15Html({ logo, font, lang }) {
-  const s = WHATS_NEW_V15[lang];
-  const feature = (ic, f, mock) => `<div class="wn">
+const wnFeature = (ic, f, mock) => `<div class="wn">
       <div class="wn-head"><span class="ic">${ic}</span>${f.title}</div>
       <p class="wn-body">${f.body}</p>
       <div class="mock">${mock}</div>
     </div>`;
-  const row = (l, r, last) =>
-    `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;${last ? "" : `border-bottom:1.5px solid ${C.border}`}"><span style="font:500 20px/1.2 Figtree">${l}</span><span style="font:700 19px/1 Figtree;color:${C.primary};white-space:nowrap">${r}</span></div>`;
 
-  const m1 = `${s.f1.rows.map(([l, r], i) => row(l, r, i === s.f1.rows.length - 1)).join("")}
+const wnRow = (l, r, last) =>
+  `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;${last ? "" : `border-bottom:1.5px solid ${C.border}`}"><span style="font:500 20px/1.2 Figtree">${l}</span><span style="font:700 19px/1 Figtree;color:${C.primary};white-space:nowrap">${r}</span></div>`;
+
+/** Shared 1200×1500 "what's new" layout: header, a 2×2 grid of feature cards and an ink footer. */
+function whatsNewShell({ logo, font, version, s, features }) {
+  return `<style>${baseCss(font)}
+    .wn{background:${C.card};border:1.5px solid ${C.border};border-radius:24px;padding:28px 28px 26px;
+      box-shadow:0 10px 30px -18px #1d3b2f40;display:flex;flex-direction:column}
+    .wn-head{display:flex;align-items:center;gap:14px;font:700 26px/1.1 "Bricolage Grotesque";letter-spacing:-.4px}
+    .wn .ic{width:44px;height:44px;border-radius:12px;flex:none}
+    .wn .ic svg{width:24px;height:24px}
+    .wn-body{font:400 22px/1.42 Figtree;color:${C.muted};margin-top:14px}
+    .mock{margin-top:auto;padding-top:20px}
+  </style>
+  <div class="canvas" style="width:1200px;height:1500px;padding:56px 64px 0">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      ${brand(logo, 64)}
+      <span class="pill" style="background:${C.gold};color:${C.ink};font-size:22px;font-weight:700">${version}</span>
+    </div>
+    <div class="eyebrow" style="margin-top:30px;font-size:17px">${s.eyebrow}</div>
+    <h1 class="display" style="font-weight:800;font-size:76px;line-height:1;letter-spacing:-2.5px;margin-top:14px">${s.title}</h1>
+    <p style="font:400 25px/1.4 Figtree;color:${C.muted};margin-top:16px;width:900px">${s.subtitle}</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:30px">
+      ${features.map(([ic, f, mock]) => wnFeature(ic, f, mock)).join("")}
+    </div>
+    <div style="position:absolute;left:0;right:0;bottom:0;background:${C.ink};color:${C.cream};padding:28px 64px;display:flex;align-items:center;gap:32px">
+      <div style="flex:1">
+        <div style="font:700 17px/1 Figtree;letter-spacing:3px;text-transform:uppercase;color:${C.gold}">${s.footTitle}</div>
+        ${s.steps
+          .map(
+            (t, i) =>
+              `<div style="display:flex;gap:12px;align-items:baseline;margin-top:${i ? 8 : 14}px;font:400 23px/1.35 Figtree"><span style="font:700 20px/1 'JetBrains Mono';color:${C.gold}">${i + 1}</span><span>${t}</span></div>`,
+          )
+          .join("")}
+      </div>
+      <span class="pill" style="background:${C.cream};color:${C.ink};flex:none">dompetku.ilramdhan.dev</span>
+    </div>
+  </div>`;
+}
+
+/** 1200×1500 portrait "what's new in v1.5" card (shareable in chats); `lang` is "id" | "en". */
+export function whatsNewV15Html({ logo, font, lang }) {
+  const s = WHATS_NEW_V15[lang];
+
+  const m1 = `${s.f1.rows.map(([l, r], i) => wnRow(l, r, i === s.f1.rows.length - 1)).join("")}
     <div style="margin-top:10px"><span class="tag" style="background:${C.primarySoft};color:${C.primary};font-size:18px">🔒 ${s.f1.saved}</span></div>`;
 
   const m2 = `<div style="display:flex;align-items:center;gap:18px">
@@ -368,40 +407,183 @@ export function whatsNewV15Html({ logo, font, lang }) {
     <div style="display:flex;justify-content:flex-end;margin-top:14px"><div class="bubble" style="background:${C.primary};color:${C.cream};font-size:19px">${s.f4.chat}</div></div>
     <div class="bubble" style="background:${C.goldSoft};color:${C.goldInk};font:600 19px/1.25 Figtree;margin-top:8px;width:fit-content">${s.f4.alert}</div>`;
 
-  return `<style>${baseCss(font)}
-    .wn{background:${C.card};border:1.5px solid ${C.border};border-radius:24px;padding:28px 28px 26px;
-      box-shadow:0 10px 30px -18px #1d3b2f40;display:flex;flex-direction:column}
-    .wn-head{display:flex;align-items:center;gap:14px;font:700 26px/1.1 "Bricolage Grotesque";letter-spacing:-.4px}
-    .wn .ic{width:44px;height:44px;border-radius:12px;flex:none}
-    .wn .ic svg{width:24px;height:24px}
-    .wn-body{font:400 22px/1.42 Figtree;color:${C.muted};margin-top:14px}
-    .mock{margin-top:auto;padding-top:20px}
-  </style>
-  <div class="canvas" style="width:1200px;height:1500px;padding:56px 64px 0">
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      ${brand(logo, 64)}
-      <span class="pill" style="background:${C.gold};color:${C.ink};font-size:22px;font-weight:700">v1.5</span>
+  return whatsNewShell({
+    logo,
+    font,
+    version: "v1.5",
+    s,
+    features: [
+      [
+        wnIcon.plug,
+        s.f1,
+        `<div style="background:${C.soft};border-radius:16px;padding:6px 18px 14px">${m1}</div>`,
+      ],
+      [
+        wnIcon.user,
+        s.f2,
+        `<div style="background:${C.soft};border-radius:16px;padding:18px">${m2}</div>`,
+      ],
+      [
+        wnIcon.users,
+        s.f3,
+        `<div style="background:${C.soft};border-radius:16px;padding:6px 18px">${m3}</div>`,
+      ],
+      [
+        wnIcon.wallet,
+        s.f4,
+        `<div style="background:${C.soft};border-radius:16px;padding:18px">${m4}</div>`,
+      ],
+    ],
+  });
+}
+
+/** Copy for the "what's new in v1.6" card; same layout as v1.5. Plain words only. */
+const WHATS_NEW_V16 = {
+  id: {
+    eyebrow: "Pembaruan v1.6",
+    title: "Apa yang baru?",
+    subtitle: "Pasang di server sendiri dengan satu perintah, dan lebih mudah ditemukan orang.",
+    f1: {
+      title: "Jalan di server sendiri",
+      body: "Image Docker resmi untuk VPS, server rumah, atau NAS. Cukup isi file .env lalu jalankan satu perintah.",
+      ok: "Berjalan · sehat",
+    },
+    f2: {
+      title: "Mudah ditemukan",
+      body: "Halaman depan kini muncul di Google, lengkap dengan versi bahasa Inggris dan pratinjau link yang rapi.",
+      desc: "Catat keuangan pribadi dengan rapi: bot Telegram, OCR nota, budget…",
+    },
+    f3: {
+      title: "AI lebih fleksibel",
+      body: "Bisa memakai router AI seperti 9router atau LiteLLM. Jawaban yang dikirim bertahap kini tetap terbaca.",
+      rows: [
+        ["Penyedia AI", "9router"],
+        ["Jawaban bertahap", "Didukung"],
+        ["Baca nota", "Berhasil ✓"],
+      ],
+    },
+    f4: {
+      title: "Dukung Dompetku",
+      body: "Suka dengan Dompetku? Beri bintang di GitHub atau traktir kopi lewat GitHub Sponsors, Ko-fi, atau Saweria.",
+      star: "Beri bintang",
+      sponsor: "Sponsor",
+    },
+    footTitle: "Untuk yang sudah pakai",
+    steps: [
+      "Tidak ada perubahan database — cukup perbarui aplikasinya.",
+      "Opsional: isi <b>PUBLIC_SITE_URL</b> agar halaman depan terindeks Google.",
+    ],
+  },
+  en: {
+    eyebrow: "Update v1.6",
+    title: "What's new?",
+    subtitle: "Run it on your own server with one command, and let more people find it.",
+    f1: {
+      title: "Run it on your own server",
+      body: "An official Docker image for your VPS, home server or NAS. Fill in your .env file and run one command.",
+      ok: "Running · healthy",
+    },
+    f2: {
+      title: "Easier to find",
+      body: "The landing page now shows up on Google, with an English version and tidy link previews.",
+      desc: "A private, self-hosted finance tracker: Telegram bot, receipt OCR, budgets…",
+    },
+    f3: {
+      title: "More flexible AI",
+      body: "Works with AI routers like 9router or LiteLLM. Answers sent in small pieces are now read correctly.",
+      rows: [
+        ["AI provider", "9router"],
+        ["Streamed answers", "Supported"],
+        ["Read receipt", "Done ✓"],
+      ],
+    },
+    f4: {
+      title: "Support Dompetku",
+      body: "Enjoying Dompetku? Give it a star on GitHub or buy a coffee via GitHub Sponsors, Ko-fi or Saweria.",
+      star: "Star",
+      sponsor: "Sponsor",
+    },
+    footTitle: "For existing users",
+    steps: [
+      "No database changes — just update the app.",
+      "Optional: set <b>PUBLIC_SITE_URL</b> so Google can index your landing page.",
+    ],
+  },
+};
+
+const wnIcon16 = {
+  box: `<svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/></svg>`,
+  search: `<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>`,
+  spark: `<svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg>`,
+  heart: `<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>`,
+};
+
+/** 1200×1500 portrait "what's new in v1.6" card; `lang` is "id" | "en". */
+export function whatsNewV16Html({ logo, font, lang }) {
+  const s = WHATS_NEW_V16[lang];
+  const mono = "font:500 17px/1.6 'JetBrains Mono'";
+
+  const m1 = `<div style="background:${C.ink};border-radius:14px;padding:16px 18px;color:${C.cream};${mono}">
+      <div style="display:flex;gap:7px;margin-bottom:12px"><i style="width:11px;height:11px;border-radius:50%;background:${C.expense}"></i><i style="width:11px;height:11px;border-radius:50%;background:${C.warning}"></i><i style="width:11px;height:11px;border-radius:50%;background:${C.income}"></i></div>
+      <div><span style="color:${C.gold}">$</span> docker compose up -d</div>
+      <div style="opacity:.7">✔ Container dompetku  Started</div>
     </div>
-    <div class="eyebrow" style="margin-top:30px;font-size:17px">${s.eyebrow}</div>
-    <h1 class="display" style="font-weight:800;font-size:76px;line-height:1;letter-spacing:-2.5px;margin-top:14px">${s.title}</h1>
-    <p style="font:400 25px/1.4 Figtree;color:${C.muted};margin-top:16px;width:900px">${s.subtitle}</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:30px">
-      ${feature(wnIcon.plug, s.f1, `<div style="background:${C.soft};border-radius:16px;padding:6px 18px 14px">${m1}</div>`)}
-      ${feature(wnIcon.user, s.f2, `<div style="background:${C.soft};border-radius:16px;padding:18px">${m2}</div>`)}
-      ${feature(wnIcon.users, s.f3, `<div style="background:${C.soft};border-radius:16px;padding:6px 18px">${m3}</div>`)}
-      ${feature(wnIcon.wallet, s.f4, `<div style="background:${C.soft};border-radius:16px;padding:18px">${m4}</div>`)}
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <span class="tag" style="background:${C.primarySoft};color:${C.primary};font-size:17px">● ${s.f1.ok}</span>
+      <span class="tag" style="background:${C.card};border:1.5px solid ${C.border};color:${C.muted};font-size:17px">amd64 · arm64</span>
+    </div>`;
+
+  const m2 = `<div style="display:flex;align-items:center;gap:10px;height:44px;border-radius:99px;background:${C.card};border:1.5px solid ${C.border};padding:0 16px;font:500 18px/1 Figtree;color:${C.muted}">
+      <span style="width:18px;height:18px;display:inline-block">${wnIcon16.search.replace("<svg", `<svg style="width:18px;height:18px;stroke:${C.muted};fill:none;stroke-width:2.2"`)}</span>dompetku finance tracker</div>
+    <div style="background:${C.card};border-radius:14px;padding:14px 16px;margin-top:12px">
+      <div style="display:flex;align-items:center;gap:10px"><img src="${logo}" width="26" height="26" style="border-radius:7px"><span style="font:500 16px/1.2 Figtree;color:${C.muted}">dompetku.ilramdhan.dev</span>
+        <span style="margin-left:auto;display:flex;gap:6px"><span class="tag" style="background:${C.primary};color:${C.cream};font-size:14px">ID</span><span class="tag" style="background:${C.primarySoft};color:${C.primary};font-size:14px">EN</span></span></div>
+      <div style="font:600 20px/1.25 Figtree;color:${C.blue};margin-top:8px">Dompetku — Personal Finance Tracker</div>
+      <div style="font:400 17px/1.35 Figtree;color:${C.muted};margin-top:4px">${s.f2.desc}</div>
+    </div>`;
+
+  const m3 = `${s.f3.rows.map(([l, r], i) => wnRow(l, r, i === s.f3.rows.length - 1)).join("")}
+    <div style="display:flex;gap:4px;margin:6px 0 4px">${[1, 1, 1, 1, 1, 0.5, 0.25]
+      .map(
+        (o) =>
+          `<i style="flex:1;height:8px;border-radius:99px;background:${C.gold};opacity:${o}"></i>`,
+      )
+      .join("")}</div>`;
+
+  const m4 = `<div style="display:flex;gap:10px">
+      <div style="flex:1;height:48px;border-radius:12px;background:${C.card};border:1.5px solid ${C.border};display:flex;align-items:center;justify-content:center;gap:10px;font:700 19px/1 Figtree">★ ${s.f4.star}</div>
+      <div style="flex:1;height:48px;border-radius:12px;background:${C.card};border:1.5px solid ${C.border};display:flex;align-items:center;justify-content:center;gap:8px;font:700 19px/1 Figtree;color:${C.expense}">♥ ${s.f4.sponsor}</div>
     </div>
-    <div style="position:absolute;left:0;right:0;bottom:0;background:${C.ink};color:${C.cream};padding:28px 64px;display:flex;align-items:center;gap:32px">
-      <div style="flex:1">
-        <div style="font:700 17px/1 Figtree;letter-spacing:3px;text-transform:uppercase;color:${C.gold}">${s.footTitle}</div>
-        ${s.steps
-          .map(
-            (t, i) =>
-              `<div style="display:flex;gap:12px;align-items:baseline;margin-top:${i ? 8 : 14}px;font:400 23px/1.35 Figtree"><span style="font:700 20px/1 'JetBrains Mono';color:${C.gold}">${i + 1}</span><span>${t}</span></div>`,
-          )
-          .join("")}
-      </div>
-      <span class="pill" style="background:${C.cream};color:${C.ink};flex:none">dompetku.ilramdhan.dev</span>
-    </div>
-  </div>`;
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      ${["GitHub Sponsors", "Ko-fi", "Saweria"].map((n) => `<span class="tag" style="background:${C.goldSoft};color:${C.goldInk};font-size:17px">${n}</span>`).join("")}
+    </div>`;
+
+  return whatsNewShell({
+    logo,
+    font,
+    version: "v1.6",
+    s,
+    features: [
+      [
+        wnIcon16.box,
+        s.f1,
+        `<div style="background:${C.soft};border-radius:16px;padding:16px">${m1}</div>`,
+      ],
+      [
+        wnIcon16.search,
+        s.f2,
+        `<div style="background:${C.soft};border-radius:16px;padding:16px">${m2}</div>`,
+      ],
+      [
+        wnIcon16.spark,
+        s.f3,
+        `<div style="background:${C.soft};border-radius:16px;padding:6px 18px 12px">${m3}</div>`,
+      ],
+      [
+        wnIcon16.heart,
+        s.f4,
+        `<div style="background:${C.soft};border-radius:16px;padding:18px">${m4}</div>`,
+      ],
+    ],
+  });
 }

@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { bannerHtml, ogHtml, whatsNewV15Html } from "./brand-cards.mjs";
+import { bannerHtml, ogHtml, whatsNewV15Html, whatsNewV16Html } from "./brand-cards.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -65,13 +65,13 @@ const banner = {
   html: bannerHtml({ logo: svgData, font }),
 };
 
-/** "What's new in v1.5" portrait cards (ID + EN) for chats, README and release notes. */
-const whatsNew = (lang) => ({
+/** "What's new" portrait cards (ID + EN) for chats, README and release notes. */
+const whatsNew = (lang, card = whatsNewV15Html) => ({
   w: 1200,
   h: 1500,
   opaque: true,
   optimize: true,
-  html: whatsNewV15Html({ logo: svgData, font, lang }),
+  html: card({ logo: svgData, font, lang }),
 });
 
 const targets = {
@@ -89,6 +89,8 @@ const targets = {
   "docs/assets/banner.png": banner,
   "docs/assets/whats-new-v1.5-id.png": whatsNew("id"),
   "docs/assets/whats-new-v1.5-en.png": whatsNew("en"),
+  "docs/assets/whats-new-v1.6-id.png": whatsNew("id", whatsNewV16Html),
+  "docs/assets/whats-new-v1.6-en.png": whatsNew("en", whatsNewV16Html),
 };
 
 const playwright = load("playwright");

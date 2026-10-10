@@ -43,7 +43,7 @@ time), and amounts support **IDR and USD**.
 
 ## Table of contents
 
-- [What's new in v1.5](#whats-new-in-v15)
+- [What's new in v1.6](#whats-new-in-v16)
 - [Live demo](#live-demo)
 - [Screenshots](#screenshots)
 - [Features](#features)
@@ -59,19 +59,33 @@ time), and amounts support **IDR and USD**.
 - [Star history](#star-history)
 - [Acknowledgements](#acknowledgements)
 
-## What's new in v1.5
+## What's new in v1.6
 
-A plain-language summary of the v1.5 release, ready to share: bot settings in the app, a profile
-page, family accounts with per-wallet access, and pockets inside wallets. Already using Dompetku?
-Run `supabase/schema.sql` once more; everything else is optional.
+A plain-language summary of the v1.6 release, ready to share: an official Docker image to run
+Dompetku on your own server, a landing page that search engines can find (with an English version),
+support for AI routers that stream their answers, and new ways to support the project. No database
+changes this time; just update the app.
+
+<p>
+  <a href="docs/assets/whats-new-v1.6-id.png"><img src="docs/assets/whats-new-v1.6-id.png" alt="Apa yang baru di Dompetku v1.6 (Bahasa Indonesia)" width="49%"></a>
+  <a href="docs/assets/whats-new-v1.6-en.png"><img src="docs/assets/whats-new-v1.6-en.png" alt="What's new in Dompetku v1.6 (English)" width="49%"></a>
+</p>
+
+Full size: [Bahasa Indonesia](docs/assets/whats-new-v1.6-id.png) · [English](docs/assets/whats-new-v1.6-en.png) ·
+[Changelog](CHANGELOG.md)
+
+<details>
+<summary>Previously in v1.5: bot settings in the app, profile page, family accounts and pockets</summary>
+
+Already on v1.4 or older? Run `supabase/schema.sql` once more for the v1.5 features; everything
+else is optional.
 
 <p>
   <a href="docs/assets/whats-new-v1.5-id.png"><img src="docs/assets/whats-new-v1.5-id.png" alt="Apa yang baru di Dompetku v1.5 (Bahasa Indonesia)" width="49%"></a>
   <a href="docs/assets/whats-new-v1.5-en.png"><img src="docs/assets/whats-new-v1.5-en.png" alt="What's new in Dompetku v1.5 (English)" width="49%"></a>
 </p>
 
-Full size: [Bahasa Indonesia](docs/assets/whats-new-v1.5-id.png) · [English](docs/assets/whats-new-v1.5-en.png) ·
-[Changelog](CHANGELOG.md)
+</details>
 
 ## Live demo
 
