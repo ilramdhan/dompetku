@@ -166,12 +166,13 @@ export function Hero({
               priority
             />
           </BrowserFrame>
+          {/* Decorative overlay, hidden on phones: not the LCP image, so it loads lazily and
+              doesn't compete with the hero screenshot (which keeps fetchpriority="high"). */}
           <PhoneFrame className="absolute -bottom-8 -left-6 hidden w-[24%] sm:block lg:-left-10">
             <Screenshot
               name="dashboard-mobile"
               variant="mobile"
               alt={t("Tampilan dashboard di ponsel")}
-              priority
             />
           </PhoneFrame>
         </div>
