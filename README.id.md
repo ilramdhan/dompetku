@@ -126,6 +126,11 @@ request, pastikan `npm run lint`, `npm run typecheck`, `npm test` dan `npm run b
 Masalah keamanan dilaporkan secara privat lewat [SECURITY.md](SECURITY.md), bukan lewat issue
 publik.
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ilramdhan/dompetku)
+
+Ingin langsung mulai tanpa setup? Buka repo di GitHub Codespaces: dev container sudah memasang
+dependensi dan Docker, jadi `npm run db:up`, `npm run dev` dan `npm test` langsung bisa dipakai.
+
 ## Dukungan
 
 Kalau Dompetku bermanfaat buatmu:

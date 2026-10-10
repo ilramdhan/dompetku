@@ -280,7 +280,12 @@ public/          PWA manifest, icons and self-hosted fonts
 
 ## Local development
 
-You need [Node.js](https://nodejs.org) 22 or newer (or [Bun](https://bun.sh), which CI uses) and
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ilramdhan/dompetku)
+
+Prefer zero setup? Open the repo in GitHub Codespaces: the dev container installs dependencies
+and includes Docker, so `npm run db:up`, `npm run dev` and `npm test` work right away.
+
+Locally, you need [Node.js](https://nodejs.org) 22 or newer (or [Bun](https://bun.sh), which CI uses) and
 a Supabase project with the schema applied.
 
 ```bash

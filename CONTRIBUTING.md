@@ -70,6 +70,8 @@ git checkout -b fix/budget-rollover-rounding
 
 Follow **[Running locally in docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#7-running-locally-for-developers)** — it explains how to install the tools, create a free Supabase project and fill in `.env`.
 
+No local setup? [Open the repo in GitHub Codespaces](https://codespaces.new/ilramdhan/dompetku) — the dev container in `.devcontainer/` installs dependencies and includes Docker for `npm run db:up`.
+
 The project uses [Bun](https://bun.sh) in CI, but npm works too:
 
 | Task                   | Bun                 | npm                 |

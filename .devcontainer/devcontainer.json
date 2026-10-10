@@ -1,0 +1,37 @@
+// Dev container for GitHub Codespaces / VS Code Dev Containers.
+// Reference: https://containers.dev/implementors/json_reference/
+{
+  "name": "Dompetku",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+  "features": {
+    // Lets `npm run db:up` start local Supabase (it runs Docker containers).
+    // moby is unavailable on the Debian trixie base image, so install Docker CE.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": { "moby": false },
+    // CI installs with Bun; bun.lock is the only lockfile in the repo.
+    "ghcr.io/shyim/devcontainers-features/bun:0": {}
+  },
+  // Same install as CI: fails if bun.lock is out of date.
+  "postCreateCommand": "bun install --frozen-lockfile",
+  // 8080 is the Vite dev server port; 54321/54323 come from scripts/dev-db/supabase/config.toml.
+  "forwardPorts": [8080, 54321, 54323],
+  "portsAttributes": {
+    "8080": { "label": "App (vite dev)", "onAutoForward": "notify" },
+    "54321": { "label": "Supabase API", "onAutoForward": "notify" },
+    "54323": { "label": "Supabase Studio", "onAutoForward": "notify" }
+  },
+  // Local Supabase runs several containers; smaller machines run out of memory.
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "vitest.explorer"
+      ]
+    }
+  }
+}
