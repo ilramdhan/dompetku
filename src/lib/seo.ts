@@ -73,6 +73,8 @@ export function robotsContent(index: boolean): string {
 export type SeoEnv = {
   PUBLIC_SITE_URL?: string | undefined;
   DEMO_MODE?: string | undefined;
+  GOOGLE_SITE_VERIFICATION?: string | undefined;
+  BING_SITE_VERIFICATION?: string | undefined;
 };
 
 export type SeoConfig = {
@@ -80,13 +82,41 @@ export type SeoConfig = {
   siteUrl: string | null;
   /** Public pages may be indexed (false on a demo instance). */
   indexable: boolean;
+  /** Google Search Console token (env GOOGLE_SITE_VERIFICATION); null when unset or in demo. */
+  googleVerification?: string | null;
+  /** Bing Webmaster Tools token (env BING_SITE_VERIFICATION); null when unset or in demo. */
+  bingVerification?: string | null;
 };
 
+/**
+ * Search-console verification token: the bare `content` value (a full `<meta …>` tag pasted by
+ * mistake is unwrapped). Only URL-safe token characters are accepted; anything else → null.
+ */
+export function verificationToken(s: string | null | undefined): string | null {
+  let v = (s ?? "").trim();
+  const m = /content\s*=\s*["']([^"']*)["']/i.exec(v);
+  if (m) v = (m[1] ?? "").trim();
+  return /^[A-Za-z0-9_\-.:=+/]{8,200}$/.test(v) ? v : null;
+}
+
 export function seoConfigFrom(env: SeoEnv): SeoConfig {
+  const indexable = env.DEMO_MODE !== "true";
   return {
     siteUrl: normalizeSiteUrl(env.PUBLIC_SITE_URL),
-    indexable: env.DEMO_MODE !== "true",
+    indexable,
+    googleVerification: indexable ? verificationToken(env.GOOGLE_SITE_VERIFICATION) : null,
+    bingVerification: indexable ? verificationToken(env.BING_SITE_VERIFICATION) : null,
   };
+}
+
+/** `google-site-verification` / `msvalidate.01` meta tags for the landing (never in demo). */
+export function verificationMeta(cfg: SeoConfig): Meta[] {
+  if (!cfg.indexable) return [];
+  const meta: Meta[] = [];
+  if (cfg.googleVerification)
+    meta.push({ name: "google-site-verification", content: cfg.googleVerification });
+  if (cfg.bingVerification) meta.push({ name: "msvalidate.01", content: cfg.bingVerification });
+  return meta;
 }
 
 type Meta = Record<string, unknown>;

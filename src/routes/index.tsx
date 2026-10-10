@@ -7,7 +7,7 @@ import { LANDING_FAQ, landingRedirect } from "@/lib/landing";
 import { loadSeoConfig } from "@/components/landing/seo-config";
 import { translate } from "@/lib/i18n";
 import { DEFAULT_LANG, parseLang, validateLangSearch } from "@/lib/lang";
-import { faqJsonLd, seoHead, softwareAppJsonLd } from "@/lib/seo";
+import { faqJsonLd, seoHead, softwareAppJsonLd, verificationMeta } from "@/lib/seo";
 import { appVersion } from "@/lib/version";
 
 // Keyword-rich (Indonesian + English) for search results; the visible H1 is unchanged. Both are
@@ -51,6 +51,7 @@ export const Route = createFileRoute("/")({
       ...head,
       meta: [
         ...head.meta,
+        ...verificationMeta(seo),
         {
           "script:ld+json": softwareAppJsonLd({
             description,

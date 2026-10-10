@@ -12,6 +12,8 @@ import {
   seoHead,
   sitemapXml,
   softwareAppJsonLd,
+  verificationMeta,
+  verificationToken,
 } from "@/lib/seo";
 
 const metaOf = (meta: Record<string, unknown>[], key: string) =>
@@ -44,10 +46,23 @@ describe("site URL helpers", () => {
     expect(robotsContent(false)).toBe("noindex, nofollow");
   });
   it("reads env: demo instances are never indexable", () => {
-    expect(seoConfigFrom({})).toEqual({ siteUrl: null, indexable: true });
-    expect(seoConfigFrom({ DEMO_MODE: "true", PUBLIC_SITE_URL: "https://d.test/" })).toEqual({
+    expect(seoConfigFrom({})).toEqual({
+      siteUrl: null,
+      indexable: true,
+      googleVerification: null,
+      bingVerification: null,
+    });
+    expect(
+      seoConfigFrom({
+        DEMO_MODE: "true",
+        PUBLIC_SITE_URL: "https://d.test/",
+        GOOGLE_SITE_VERIFICATION: "abcdefgh12345",
+      }),
+    ).toEqual({
       siteUrl: "https://d.test",
       indexable: false,
+      googleVerification: null,
+      bingVerification: null,
     });
   });
 });
@@ -204,5 +219,30 @@ describe("robots.txt", () => {
     expect(robotsTxt({ siteUrl: "https://x.test", indexable: true })).toContain(
       "\nSitemap: https://x.test/sitemap.xml\n",
     );
+  });
+});
+
+describe("search engine verification", () => {
+  it("accepts a bare token or unwraps a pasted meta tag", () => {
+    expect(verificationToken(" abcDEF123_-xyz ")).toBe("abcDEF123_-xyz");
+    expect(verificationToken('<meta name="msvalidate.01" content="0123456789ABCDEF" />')).toBe(
+      "0123456789ABCDEF",
+    );
+    expect(verificationToken("")).toBeNull();
+    expect(verificationToken(undefined)).toBeNull();
+    expect(verificationToken('bad"><script>')).toBeNull();
+    expect(verificationToken("short")).toBeNull();
+  });
+  it("emits google and bing meta tags only on an indexable instance", () => {
+    const cfg = seoConfigFrom({
+      GOOGLE_SITE_VERIFICATION: "googletoken123",
+      BING_SITE_VERIFICATION: "BINGTOKEN456",
+    });
+    expect(verificationMeta(cfg)).toEqual([
+      { name: "google-site-verification", content: "googletoken123" },
+      { name: "msvalidate.01", content: "BINGTOKEN456" },
+    ]);
+    expect(verificationMeta({ ...cfg, indexable: false })).toEqual([]);
+    expect(verificationMeta(seoConfigFrom({}))).toEqual([]);
   });
 });
