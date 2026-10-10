@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Paperclip, X } from "lucide-react";
 import { CURRENCY_OPTIONS, EntityDialog, type FieldDef } from "./entity-dialog";
 import { Button } from "@/components/ui/button";

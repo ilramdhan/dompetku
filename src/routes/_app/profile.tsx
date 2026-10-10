@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Check, Eye, EyeOff, ImageUp, KeyRound, Trash2, UserRound, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { PageHeader } from "@/components/app-shell";
 import { RouteError } from "@/components/route-error";
 import { DemoDisabled } from "@/components/demo";

@@ -13,7 +13,8 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { Toaster } from "@/components/ui/sonner";
+import { LazyToaster } from "@/components/lazy-toaster";
+import { FONT_BODY, FONT_DISPLAY, fontPreloads } from "@/lib/fonts";
 import { Button } from "@/components/ui/button";
 import { LanguageProvider, useI18n } from "@/lib/i18n";
 import { DEFAULT_LANG, urlLangFor, type Lang } from "@/lib/lang";
@@ -96,18 +97,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:image", content: "/icons/og-image.png" },
     ],
     links: [
-      // Self-hosted fonts (@font-face in styles.css); preload the latin subsets used on every page.
-      ...[
-        "figtree-latin-wght-normal",
-        "bricolage-grotesque-latin-opsz-normal",
-        "jetbrains-mono-latin-wght-normal",
-      ].map((f) => ({
-        rel: "preload",
-        href: `/fonts/${f}.woff2`,
-        as: "font",
-        type: "font/woff2",
-        crossOrigin: "anonymous" as const,
-      })),
+      // Body + display fonts only; routes that show amounts add the mono preload (lib/fonts.ts).
+      ...fontPreloads(FONT_BODY, FONT_DISPLAY),
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/svg+xml", href: "/logo.svg" },
       { rel: "icon", type: "image/png", sizes: "32x32", href: "/icons/favicon-32.png" },
@@ -173,7 +164,7 @@ function RootComponent() {
       <PrivacySync />
       <BrandingSync />
       <Outlet />
-      <Toaster richColors position="top-center" />
+      <LazyToaster />
     </LanguageProvider>
   );
 }

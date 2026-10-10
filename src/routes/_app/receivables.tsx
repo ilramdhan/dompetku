@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-quer
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { CheckCircle2, HandCoins, Plus, RotateCcw, Undo2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { PageHeader } from "@/components/app-shell";
 import { Pagination } from "@/components/pagination";
 import { RouteError } from "@/components/route-error";

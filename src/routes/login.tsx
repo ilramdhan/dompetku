@@ -1,7 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { login } from "@/lib/auth.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
