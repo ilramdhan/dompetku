@@ -205,7 +205,7 @@ export function BackupRestore() {
             </div>
           ) : null}
 
-          {busy ? <Progress value={progress ?? 0} /> : null}
+          {busy ? <Progress value={progress ?? 0} aria-label={t("Memulihkan…")} /> : null}
 
           <div className="flex flex-wrap gap-2">
             <Button

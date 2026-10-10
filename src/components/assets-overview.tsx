@@ -102,7 +102,11 @@ export function AssetsOverview() {
             <p className="num text-xs text-muted-foreground">
               {t("dari")} {money(a.goalsTarget)}
             </p>
-            <Progress className="mt-2" value={Math.min(100, goalPct)} />
+            <Progress
+              className="mt-2"
+              value={Math.min(100, goalPct)}
+              aria-label={`${t("Target tabungan")} ${Math.round(goalPct)}%`}
+            />
           </Link>
         </div>
         {g.ready && (g.world || g.antam) ? (

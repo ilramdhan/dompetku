@@ -339,7 +339,10 @@ function Dashboard() {
                           {Math.round(b.percent)}%
                         </span>
                       </div>
-                      <Progress value={Math.min(100, b.percent)} />
+                      <Progress
+                        value={Math.min(100, b.percent)}
+                        aria-label={`${b.category} ${Math.round(b.percent)}%`}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -427,7 +430,10 @@ function Dashboard() {
                         <span className="min-w-0 truncate">{g.name}</span>
                         <span className="num shrink-0 text-muted-foreground">{Math.round(p)}%</span>
                       </div>
-                      <Progress value={Math.min(100, p)} />
+                      <Progress
+                        value={Math.min(100, p)}
+                        aria-label={`${g.name} ${Math.round(p)}%`}
+                      />
                       {(() => {
                         const need = projectGoal({
                           target: g.target_amount,

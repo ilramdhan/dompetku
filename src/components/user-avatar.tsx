@@ -53,7 +53,7 @@ export function ProfileLink({
   return (
     <Link
       to="/profile"
-      aria-label={t("Profil")}
+      aria-label={label}
       title={label}
       className={cn("flex min-w-0 items-center gap-3", className)}
       activeProps={{ className: "font-semibold text-sidebar-primary" }}

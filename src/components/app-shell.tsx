@@ -123,7 +123,7 @@ export function LanguageToggle({ className }: { className?: string }) {
       type="button"
       variant="ghost"
       onClick={() => setLang(lang === "id" ? "en" : "id")}
-      aria-label={t("Ganti bahasa")}
+      aria-label={`${className === undefined ? (lang === "id" ? "EN" : "ID") : lang.toUpperCase()} - ${t("Ganti bahasa")}`}
       className={
         className ??
         "flex w-full justify-start gap-3 px-3 py-2 text-sm text-sidebar-muted hover:bg-sidebar-accent"

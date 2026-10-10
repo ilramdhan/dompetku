@@ -10,7 +10,7 @@ import { CHART_PALETTE as FALLBACK } from "@/components/charts/shared";
 import { PENDING_MS, ReportsSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Segmented } from "@/components/segmented";
 import { trendQuery, yearlySummaryQuery } from "@/lib/queries";
 import { currentMonth, monthLabel, shortMonth } from "@/lib/dates";
 import { compact, money } from "@/lib/format";
@@ -77,12 +77,15 @@ function CategoryTrend() {
     <Card className="min-w-0 p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{t("Tren pengeluaran per kategori")}</h2>
-        <Tabs value={String(months)} onValueChange={(v) => setMonths(Number(v))}>
-          <TabsList>
-            <TabsTrigger value="6">6 {t("bulan")}</TabsTrigger>
-            <TabsTrigger value="12">12 {t("bulan")}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <Segmented
+          label={t("Rentang waktu")}
+          value={String(months)}
+          onValueChange={(v) => setMonths(Number(v))}
+          options={[
+            { value: "6", label: `6 ${t("bulan")}` },
+            { value: "12", label: `12 ${t("bulan")}` },
+          ]}
+        />
       </div>
       {cats.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">

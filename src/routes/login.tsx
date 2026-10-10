@@ -94,7 +94,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-sidebar px-4 py-8">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-sidebar px-4 py-8">
       <Card className="w-full max-w-sm p-6 sm:p-8">
         <p className="flex items-center gap-3 font-display text-3xl font-bold">
           <AppLogo className="size-10" />
@@ -202,6 +202,6 @@ function LoginPage() {
       >
         ← {t("Kembali ke beranda")}
       </Link>
-    </div>
+    </main>
   );
 }
