@@ -43,7 +43,7 @@ time), and amounts support **IDR and USD**.
 
 ## Table of contents
 
-- [What's new in v1.6](#whats-new-in-v16)
+- [What's new in v1.7](#whats-new-in-v17)
 - [Live demo](#live-demo)
 - [Screenshots](#screenshots)
 - [Features](#features)
@@ -59,20 +59,30 @@ time), and amounts support **IDR and USD**.
 - [Star history](#star-history)
 - [Acknowledgements](#acknowledgements)
 
-## What's new in v1.6
+## What's new in v1.7
 
-A plain-language summary of the v1.6 release, ready to share: an official Docker image to run
-Dompetku on your own server, a landing page that search engines can find (with an English version),
-support for AI routers that stream their answers, and new ways to support the project. No database
-changes this time; just update the app.
+A plain-language summary of the v1.7 release, ready to share: Reports and the Yearly recap can now
+be filtered by wallet, dark mode is easier to read (and works better with screen readers), and pages
+load faster on phones and show their data right away. No database changes this time; just update
+the app.
+
+<p>
+  <a href="docs/assets/whats-new-v1.7-id.png"><img src="docs/assets/whats-new-v1.7-id.png" alt="Apa yang baru di Dompetku v1.7 (Bahasa Indonesia)" width="49%"></a>
+  <a href="docs/assets/whats-new-v1.7-en.png"><img src="docs/assets/whats-new-v1.7-en.png" alt="What's new in Dompetku v1.7 (English)" width="49%"></a>
+</p>
+
+Full size: [Bahasa Indonesia](docs/assets/whats-new-v1.7-id.png) · [English](docs/assets/whats-new-v1.7-en.png) ·
+[Changelog](CHANGELOG.md)
+
+<details>
+<summary>Previously in v1.6: Docker image, search-friendly landing page, streamed AI answers and sponsors</summary>
 
 <p>
   <a href="docs/assets/whats-new-v1.6-id.png"><img src="docs/assets/whats-new-v1.6-id.png" alt="Apa yang baru di Dompetku v1.6 (Bahasa Indonesia)" width="49%"></a>
   <a href="docs/assets/whats-new-v1.6-en.png"><img src="docs/assets/whats-new-v1.6-en.png" alt="What's new in Dompetku v1.6 (English)" width="49%"></a>
 </p>
 
-Full size: [Bahasa Indonesia](docs/assets/whats-new-v1.6-id.png) · [English](docs/assets/whats-new-v1.6-en.png) ·
-[Changelog](CHANGELOG.md)
+</details>
 
 <details>
 <summary>Previously in v1.5: bot settings in the app, profile page, family accounts and pockets</summary>
@@ -191,7 +201,8 @@ or dark). Regenerate them with `npm run screenshots` (see [Regenerating screensh
 ### Reports
 
 - Dashboard with cash flow, category breakdowns and net worth charts.
-- Monthly reports, a printable **yearly summary** with CSV export.
+- Monthly reports, a printable **yearly summary** with CSV export, for all wallets or **one wallet**
+  (transfers in and out included).
 - **Per-account report** with a balance chart and **bank statement reconciliation**.
 - Activity log of every change.
 

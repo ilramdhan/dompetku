@@ -13,7 +13,13 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { bannerHtml, ogHtml, whatsNewV15Html, whatsNewV16Html } from "./brand-cards.mjs";
+import {
+  bannerHtml,
+  ogHtml,
+  whatsNewV15Html,
+  whatsNewV16Html,
+  whatsNewV17Html,
+} from "./brand-cards.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -91,6 +97,8 @@ const targets = {
   "docs/assets/whats-new-v1.5-en.png": whatsNew("en"),
   "docs/assets/whats-new-v1.6-id.png": whatsNew("id", whatsNewV16Html),
   "docs/assets/whats-new-v1.6-en.png": whatsNew("en", whatsNewV16Html),
+  "docs/assets/whats-new-v1.7-id.png": whatsNew("id", whatsNewV17Html),
+  "docs/assets/whats-new-v1.7-en.png": whatsNew("en", whatsNewV17Html),
 };
 
 const playwright = load("playwright");

@@ -587,3 +587,183 @@ export function whatsNewV16Html({ logo, font, lang }) {
     ],
   });
 }
+
+/** Copy for the "what's new in v1.7" card; same layout as v1.5/v1.6. Plain words only. */
+const WHATS_NEW_V17 = {
+  id: {
+    eyebrow: "Pembaruan v1.7",
+    title: "Apa yang baru?",
+    subtitle: "Laporan per dompet, lebih nyaman dibaca, dan terasa lebih cepat di HP.",
+    f1: {
+      title: "Laporan per dompet",
+      body: "Lihat Laporan dan Rekap tahunan untuk satu dompet saja. Transfer masuk dan keluar ikut dihitung.",
+      wallet: "Dompet",
+      choice: "BCA",
+      rows: [
+        ["Makan & Minum", "Rp1,2 jt", 62],
+        ["Transfer keluar", "Rp800rb", 41],
+        ["Transport", "Rp350rb", 18],
+      ],
+    },
+    f2: {
+      title: "Lebih nyaman dibaca",
+      body: "Teks di mode gelap kini lebih kontras, dan tombol serta grafik bisa dibacakan pembaca layar.",
+      before: "Sebelum",
+      after: "Sekarang",
+      a11y: "Aksesibilitas 100",
+    },
+    f3: {
+      title: "Lebih cepat di HP",
+      body: "Gambar dan file yang dimuat lebih kecil, dan disimpan di browser agar kunjungan berikutnya lebih cepat.",
+      rows: [
+        ["Gambar halaman depan", "−53%"],
+        ["Kode awal halaman", "−69 KB"],
+        ["Halaman login", "2,9 dtk"],
+      ],
+    },
+    f4: {
+      title: "Langsung tampil",
+      body: "Data yang sudah dimuat server langsung muncul tanpa berkedip atau memuat ulang.",
+      skeleton: "Dulu: kerangka lalu memuat ulang",
+      ready: "Sekarang: langsung siap",
+    },
+    footTitle: "Untuk yang sudah pakai",
+    steps: [
+      "Tidak ada perubahan database — cukup perbarui aplikasinya.",
+      "Filter dompet ada di halaman Laporan dan Rekap tahunan.",
+    ],
+  },
+  en: {
+    eyebrow: "Update v1.7",
+    title: "What's new?",
+    subtitle: "Reports per wallet, easier to read, and noticeably faster on phones.",
+    f1: {
+      title: "Reports per wallet",
+      body: "View Reports and the Yearly recap for a single wallet. Transfers in and out are counted too.",
+      wallet: "Wallet",
+      choice: "BCA",
+      rows: [
+        ["Food & Drinks", "Rp1.2M", 62],
+        ["Transfers out", "Rp800k", 41],
+        ["Transport", "Rp350k", 18],
+      ],
+    },
+    f2: {
+      title: "Easier to read",
+      body: "Dark mode text now has stronger contrast, and buttons and charts can be read aloud by screen readers.",
+      before: "Before",
+      after: "Now",
+      a11y: "Accessibility 100",
+    },
+    f3: {
+      title: "Faster on phones",
+      body: "Smaller images and files to load, cached by your browser so the next visit is quicker.",
+      rows: [
+        ["Landing page images", "−53%"],
+        ["Initial page code", "−69 KB"],
+        ["Login page", "2.9 s"],
+      ],
+    },
+    f4: {
+      title: "Ready right away",
+      body: "Data the server already loaded shows up instantly, without flicker or reloading.",
+      skeleton: "Before: skeleton, then reload",
+      ready: "Now: ready at once",
+    },
+    footTitle: "For existing users",
+    steps: [
+      "No database changes — just update the app.",
+      "The wallet filter is on the Reports and Yearly recap pages.",
+    ],
+  },
+};
+
+const wnIcon17 = {
+  filter: `<svg viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>`,
+  eye: `<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  bolt: `<svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>`,
+  check: `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m8 12 3 3 5-6"/></svg>`,
+};
+
+/** 1200×1500 portrait "what's new in v1.7" card; `lang` is "id" | "en". */
+export function whatsNewV17Html({ logo, font, lang }) {
+  const s = WHATS_NEW_V17[lang];
+
+  const m1 = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <span style="font:600 18px/1 Figtree;color:${C.muted}">${s.f1.wallet}</span>
+      <div style="flex:1;height:42px;border-radius:10px;background:${C.card};border:1.5px solid ${C.primary};padding:0 14px;display:flex;align-items:center;justify-content:space-between;font:700 19px/1 Figtree">${s.f1.choice}<span style="color:${C.primary}">▾</span></div>
+    </div>
+    ${s.f1.rows
+      .map(
+        ([n, v, p], i) => `<div style="margin-top:${i ? 12 : 0}px">
+        <div style="display:flex;justify-content:space-between;font:600 18px/1 Figtree;margin-bottom:7px"><span>${n}</span><span class="mono" style="font:700 17px/1 'JetBrains Mono'">${v}</span></div>
+        <div class="bar" style="height:9px;background:${C.card}"><span style="width:${p}%;background:${i === 1 ? C.blue : C.expense}"></span></div></div>`,
+      )
+      .join("")}`;
+
+  const swatch = (
+    label,
+    fg,
+  ) => `<div style="flex:1;background:#1a2f27;border-radius:12px;padding:14px 16px">
+      <div style="font:700 13px/1 Figtree;letter-spacing:2px;text-transform:uppercase;color:${C.gold}">${label}</div>
+      <div style="font:600 19px/1.3 Figtree;color:${fg};margin-top:8px">Rp1.250.000</div>
+    </div>`;
+  const m2 = `<div style="display:flex;gap:10px">${swatch(s.f2.before, "#5f7a6e")}${swatch(s.f2.after, "#d9e3dc")}</div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <span class="tag" style="background:${C.primarySoft};color:${C.primary};font-size:17px">♿ ${s.f2.a11y}</span>
+      <span class="tag" style="background:${C.card};border:1.5px solid ${C.border};color:${C.muted};font-size:17px">≥ 4.5 : 1</span>
+    </div>`;
+
+  const m3 = `${s.f3.rows.map(([l, r], i) => wnRow(l, r, i === s.f3.rows.length - 1)).join("")}`;
+
+  const line = (w, o = 1) =>
+    `<i style="display:block;height:10px;width:${w}%;border-radius:99px;background:${C.border};opacity:${o}"></i>`;
+  const m4 = `<div style="display:flex;gap:10px">
+      <div style="flex:1;background:${C.card};border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px">${line(70)}${line(90, 0.7)}${line(50, 0.5)}</div>
+      <div style="flex:1;background:${C.card};border-radius:12px;padding:12px 14px">
+        <div class="lbl" style="font-size:14px">Total</div>
+        <div class="mono" style="font:700 20px/1.2 'JetBrains Mono';margin-top:4px">Rp12,4 jt</div>
+        <div style="display:flex;gap:4px;align-items:flex-end;height:22px;margin-top:6px">${[
+          10, 16, 12, 22, 18,
+        ]
+          .map(
+            (h) =>
+              `<i style="flex:1;height:${h}px;border-radius:3px 3px 0 0;background:${C.income}"></i>`,
+          )
+          .join("")}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <span style="flex:1;font:500 15px/1.25 Figtree;color:${C.muted}">${s.f4.skeleton}</span>
+      <span style="flex:1;font:700 15px/1.25 Figtree;color:${C.primary}">✓ ${s.f4.ready}</span>
+    </div>`;
+
+  return whatsNewShell({
+    logo,
+    font,
+    version: "v1.7",
+    s,
+    features: [
+      [
+        wnIcon17.filter,
+        s.f1,
+        `<div style="background:${C.soft};border-radius:16px;padding:16px 18px 18px">${m1}</div>`,
+      ],
+      [
+        wnIcon17.eye,
+        s.f2,
+        `<div style="background:${C.soft};border-radius:16px;padding:16px">${m2}</div>`,
+      ],
+      [
+        wnIcon17.bolt,
+        s.f3,
+        `<div style="background:${C.soft};border-radius:16px;padding:6px 18px">${m3}</div>`,
+      ],
+      [
+        wnIcon17.check,
+        s.f4,
+        `<div style="background:${C.soft};border-radius:16px;padding:16px">${m4}</div>`,
+      ],
+    ],
+  });
+}
