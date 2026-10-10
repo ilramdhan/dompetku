@@ -71,7 +71,7 @@ export function VersionBadge(props: { variant: VersionBadgeVariant; className?: 
     >
       {versionLink}
       {showCommit ? (
-        <span className="num text-muted-foreground/70" title={t("Commit")}>
+        <span className="num text-muted-foreground" title={t("Commit")}>
           · {commit}
         </span>
       ) : null}

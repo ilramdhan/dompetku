@@ -94,13 +94,13 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-sidebar px-4 py-8">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-sidebar px-4 py-8">
       <Card className="w-full max-w-sm p-6 sm:p-8">
         <p className="flex items-center gap-3 font-display text-3xl font-bold">
           <AppLogo className="size-10" />
           <AppName className="min-w-0 truncate" />
         </p>
-        <p className="mt-1 text-sm text-ink-muted">{tagline}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{tagline}</p>
         {demo.demo && !challenge ? (
           <div className="mt-5 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
             <p className="flex items-start gap-2 font-medium">
@@ -202,6 +202,6 @@ function LoginPage() {
       >
         ← {t("Kembali ke beranda")}
       </Link>
-    </div>
+    </main>
   );
 }
