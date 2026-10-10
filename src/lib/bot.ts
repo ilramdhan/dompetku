@@ -136,6 +136,7 @@ export function botHelp(): string {
     "• kopi 25rb #makan (masuk kantong Makan di dompetnya)",
     "• kirim foto struk untuk OCR",
     "Semua transaksi tampil sebagai pratinjau dulu, tekan ✅ untuk menyimpan.",
+    "Di pratinjau bisa ganti 🏷 kategori, 🏦 akun, 🔁 masuk/keluar, atau ✏️ keterangan.",
     "",
     "Perintah:",
     ...BOT_COMMANDS.map((c) => `/${c.command} — ${c.description}`),
@@ -615,7 +616,13 @@ export type DraftPayload = {
   via: "quick" | "ai" | "ocr";
   /** v19: "#makan" tag; matched against the wallet's Kantong when saving (unknown = ignored). */
   pocket?: string | null;
+  /** Set while the bot waits for a new "Ket" typed by the user (✏️ Keterangan); never saved. */
+  awaiting?: DraftAwait | null;
+  /** update_id of the chat message that answered an edit prompt, so a webhook retry is a no-op. */
+  awaiting_done?: number | null;
 };
+
+export type DraftAwait = { field: "description"; at: string };
 
 export type InlineKeyboard = { inline_keyboard: { text: string; callback_data: string }[][] };
 
@@ -665,10 +672,105 @@ export function previewKeyboard(id: string): InlineKeyboard {
       [
         { text: "🏷 Kategori", callback_data: `d:c:${id}` },
         { text: "🏦 Akun", callback_data: `d:a:${id}` },
+      ],
+      [
         { text: "🔁 Masuk/Keluar", callback_data: `d:k:${id}` },
+        { text: "✏️ Keterangan", callback_data: `d:e:${id}` },
       ],
     ],
   };
+}
+
+/* ---------------- Edit description (✏️ Keterangan) ---------------- */
+/** Longest description accepted from a chat edit (same cap as AI/quick descriptions). */
+export const DESCRIPTION_MAX = 200;
+/** How long an edit prompt waits for the user's next message before normal chat resumes. */
+export const EDIT_AWAIT_MINUTES = 10;
+
+// Control, zero-width and bidi-override characters (built from code points to keep the source plain).
+const INVISIBLE = new RegExp(
+  "[" +
+    [
+      [0x00, 0x1f],
+      [0x7f, 0x9f],
+      [0x200b, 0x200f],
+      [0x2028, 0x202e],
+      [0x2060, 0x2064],
+      [0xfeff, 0xfeff],
+    ]
+      .map(
+        ([a, b]) => `\\u${a!.toString(16).padStart(4, "0")}-\\u${b!.toString(16).padStart(4, "0")}`,
+      )
+      .join("") +
+    "]",
+  "g",
+);
+
+/** Trim, drop control characters, collapse whitespace and cap at 200 chars; empty → null. */
+export function sanitizeDescription(raw: string | null | undefined): string | null {
+  const s = Array.from(
+    String(raw ?? "")
+      .replace(INVISIBLE, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  )
+    .slice(0, DESCRIPTION_MAX)
+    .join("")
+    .trim();
+  return s || null;
+}
+
+/** True when the draft has been waiting for a typed description for less than 10 minutes. */
+export function isAwaitingFresh(
+  payload: Pick<DraftPayload, "awaiting"> | null | undefined,
+  now: number,
+  minutes = EDIT_AWAIT_MINUTES,
+): boolean {
+  const a = payload?.awaiting;
+  if (!a || a.field !== "description") return false;
+  const at = Date.parse(a.at);
+  return Number.isFinite(at) && at <= now + 60_000 && now - at < minutes * 60_000;
+}
+
+/** Payload without the edit-prompt flag (it must never reach a preview or a saved transaction). */
+export function withoutAwait<T extends DraftPayload>(p: T): T {
+  const { awaiting: _drop, ...rest } = p;
+  return rest as T;
+}
+
+/** "/batal", "/cancel", "/batal@MyBot" or a bare "batal" cancel a pending description edit. */
+export function isEditCancel(text: string): boolean {
+  return /^\/?(batal|cancel)(@\w+)?$/i.test(text.trim());
+}
+
+/**
+ * Which draft a plain chat message answers: the pending one with the newest fresh edit prompt,
+ * else (webhook retry of the same update) the one this update_id already edited.
+ */
+export function pickEditTarget<R extends { status: string; payload: DraftPayload }>(
+  rows: R[],
+  updateId: number,
+  now: number,
+): { row: R; retry: boolean } | null {
+  const fresh = rows
+    .filter((r) => r.status === "pending" && isAwaitingFresh(r.payload, now))
+    .sort((a, b) => Date.parse(b.payload.awaiting!.at) - Date.parse(a.payload.awaiting!.at))[0];
+  if (fresh) return { row: fresh, retry: false };
+  const done = rows.find((r) => r.payload?.awaiting_done === updateId);
+  return done ? { row: done, retry: true } : null;
+}
+
+export function descriptionPrompt(current: string | null | undefined): string {
+  return [
+    `✏️ Kirim keterangan baru untuk transaksi ini (maks. ${DESCRIPTION_MAX} karakter).`,
+    ...(current ? ["", `Sekarang: ${current}`] : []),
+    "",
+    "Ketik /batal atau tekan Kembali untuk membatalkan.",
+  ].join("\n");
+}
+
+export function descriptionKeyboard(id: string): InlineKeyboard {
+  return { inline_keyboard: [[{ text: "⬅️ Kembali", callback_data: `d:b:${id}` }]] };
 }
 
 /** Option picker; callback carries the index into the (sorted) option list to stay under Telegram's 64-byte limit. */
@@ -696,7 +798,7 @@ export function undoKeyboard(txId: string): InlineKeyboard {
 export type Callback =
   | {
       kind: "draft";
-      op: "s" | "x" | "c" | "a" | "k" | "b" | "C" | "A";
+      op: "s" | "x" | "c" | "a" | "k" | "e" | "b" | "C" | "A";
       id: string;
       idx: number | null;
     }
@@ -705,7 +807,7 @@ export type Callback =
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 export function parseCallback(data: string): Callback {
-  const d = data.match(new RegExp(`^d:([sxcakbCA]):(${UUID})(?::(\\d{1,3}))?$`));
+  const d = data.match(new RegExp(`^d:([sxcakebCA]):(${UUID})(?::(\\d{1,3}))?$`));
   if (d)
     return { kind: "draft", op: d[1] as "s", id: d[2]!, idx: d[3] != null ? Number(d[3]) : null };
   const u = data.match(new RegExp(`^u:(${UUID})$`));

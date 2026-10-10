@@ -3,6 +3,13 @@ import { db } from "./db.server";
 import {
   aiTextGate,
   clampMessage,
+  descriptionKeyboard,
+  descriptionPrompt,
+  EDIT_AWAIT_MINUTES,
+  isEditCancel,
+  pickEditTarget,
+  sanitizeDescription,
+  withoutAwait,
   guessCategory,
   matchCategory,
   money,
@@ -89,6 +96,9 @@ export async function handleBotUpdate(u: BotUpdate): Promise<BotReply> {
     return reply(
       'Kirim teks transaksi (mis. "kopi 25rb") atau foto struk. Ketik /help untuk bantuan.',
     );
+  // ✏️ Keterangan: the next chat after the edit prompt is the new description, not a transaction.
+  const edited = await applyDescriptionEdit(u, text);
+  if (edited) return edited;
   const { classifyBotCommand } = await import("./bot");
   if (text.startsWith("/") || classifyBotCommand(text).type !== "unknown") {
     const r = await (await fin()).botCommand(text);
@@ -176,8 +186,11 @@ async function storeDraft(
   return res.data as unknown as DraftRow;
 }
 
+const previewTextOf = async (row: DraftRow) =>
+  previewText(withoutAwait(row.payload), await defaultAccountName());
+
 async function previewReply(row: DraftRow, asEdit = false): Promise<BotReply> {
-  const text = previewText(row.payload, await defaultAccountName());
+  const text = await previewTextOf(row);
   return asEdit ? edit(text, previewKeyboard(row.id)) : reply(text, previewKeyboard(row.id));
 }
 
@@ -302,6 +315,64 @@ async function draftFromImage(u: BotUpdate): Promise<BotReply> {
   return previewReply(await storeDraft(externalId, u.chat_id, payload, "ocr", receiptPath));
 }
 
+/* ---------------- ✏️ Keterangan (edit description) ---------------- */
+const EDIT_CANCELLED = "↩️ Edit keterangan dibatalkan.";
+
+/**
+ * If this chat has a draft waiting for a typed description (flag in payload.awaiting, < 10 min),
+ * apply the text to it and answer with the refreshed preview. Returns null for the normal flow:
+ * no fresh flag, an expired flag/draft, a missing bot_drafts table, or another slash command
+ * (which clears the flag first). The answered update_id is kept in payload.awaiting_done so a
+ * webhook retry re-sends the preview instead of creating a draft (or running /batal = undo).
+ */
+async function applyDescriptionEdit(u: BotUpdate, text: string): Promise<BotReply | null> {
+  const now = Date.now();
+  const res = await db()
+    .from("bot_drafts")
+    .select("*")
+    .eq("chat_id", u.chat_id)
+    // created_at is indexed and drafts older than the 48 h TTL can't be edited anyway
+    .gte("created_at", new Date(now - DRAFT_TTL_HOURS * 3600_000).toISOString())
+    .gte("updated_at", new Date(now - (EDIT_AWAIT_MINUTES + 1) * 60_000).toISOString())
+    .order("updated_at", { ascending: false })
+    .limit(20);
+  if (res.error) {
+    if ((await fin()).isMissingTable(res.error)) return null;
+    throw new Error(res.error.message);
+  }
+  const rows = ((res.data ?? []) as unknown as DraftRow[]).filter(
+    (r) => String(r.chat_id) === String(u.chat_id),
+  );
+  const hit = pickEditTarget(rows, u.update_id, now);
+  if (!hit) return null;
+  const { row } = hit;
+  const cancel = isEditCancel(text);
+  if (hit.retry) {
+    // Same update_id delivered again: answer like the first time, never run /batal (= undo).
+    if (cancel) return reply(EDIT_CANCELLED);
+    if (text.startsWith("/")) return null;
+    return row.status === "pending" ? previewReply(row) : reply("ℹ️ Pratinjau ini sudah diproses.");
+  }
+  if (Date.parse(row.created_at) < now - DRAFT_TTL_HOURS * 3600_000) return null;
+  const save = async (payload: DraftPayload) => {
+    await db()
+      .from("bot_drafts")
+      .update({ payload, updated_at: new Date().toISOString() })
+      .eq("id", row.id)
+      .eq("status", "pending");
+    return { ...row, payload };
+  };
+  const base = withoutAwait(row.payload);
+  if (text.startsWith("/") || cancel) {
+    const next = await save({ ...base, awaiting_done: u.update_id });
+    if (!cancel) return null; // any other command runs normally once the flag is cleared
+    return reply(`${EDIT_CANCELLED}\n\n${await previewTextOf(next)}`, previewKeyboard(row.id));
+  }
+  const description = sanitizeDescription(text);
+  if (!description) return reply(descriptionPrompt(base.description), descriptionKeyboard(row.id));
+  return previewReply(await save({ ...base, description, awaiting_done: u.update_id }));
+}
+
 /* ---------------- Callback buttons ---------------- */
 async function handleCallback(data: string, chatId: string): Promise<BotReply> {
   const cb = parseCallback(data);
@@ -348,18 +419,22 @@ async function handleCallback(data: string, chatId: string): Promise<BotReply> {
   }
   const f = await fin();
   const ctx = await f.parseContext();
-  const p = row.payload;
+  // Any other button ends a pending ✏️ Keterangan prompt, so a later chat is a transaction again.
+  const p = withoutAwait(row.payload);
   const catList = p.kind === "income" ? ctx.income : ctx.expense;
   const accList = ctx.accounts ?? [];
-  const update = async (patch: Partial<DraftPayload>) => {
-    const payload = { ...p, ...patch };
-    await db()
+  const store = (payload: DraftPayload) =>
+    db()
       .from("bot_drafts")
       .update({ payload, updated_at: new Date().toISOString() })
       .eq("id", row.id)
       .eq("status", "pending");
+  const update = async (patch: Partial<DraftPayload>) => {
+    const payload = { ...p, ...patch };
+    await store(payload);
     return previewReply({ ...row, payload }, true);
   };
+  if (row.payload.awaiting && cb.op !== "e" && cb.op !== "s" && cb.op !== "x") await store(p);
   switch (cb.op) {
     case "s":
       return saveDraft(row);
@@ -377,7 +452,14 @@ async function handleCallback(data: string, chatId: string): Promise<BotReply> {
       return edit("❌ Dibatalkan, tidak ada yang disimpan.", null, "Dibatalkan");
     }
     case "b":
-      return previewReply(row, true);
+      return previewReply({ ...row, payload: p }, true);
+    case "e":
+      await store({ ...p, awaiting: { field: "description", at: new Date().toISOString() } });
+      return edit(
+        descriptionPrompt(p.description),
+        descriptionKeyboard(row.id),
+        "Kirim keterangan",
+      );
     case "k": {
       const kind = p.kind === "income" ? "expense" : "income";
       const list = kind === "income" ? ctx.income : ctx.expense;
@@ -405,7 +487,7 @@ async function handleCallback(data: string, chatId: string): Promise<BotReply> {
 }
 
 async function saveDraft(row: DraftRow): Promise<BotReply> {
-  const p = row.payload;
+  const p = withoutAwait(row.payload);
   const f = await fin();
   const r = await f.createFromExternal({
     kind: p.kind,
