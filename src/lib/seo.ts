@@ -16,6 +16,8 @@ export const OG_IMAGE = "/icons/og-image.png";
 export const SITE_NAME = "Dompetku";
 export const OG_LOCALE = "id_ID";
 export const OG_LOCALE_ALT = "en_US";
+/** Maintainer, for the JSON-LD `author` (the upstream project; self-hosted copies keep it). */
+export const AUTHOR = { name: "ilramdhan", url: "https://github.com/ilramdhan" } as const;
 
 /** Public, indexable pages listed in the sitemap. */
 export const PUBLIC_PATHS = ["/", "/privacy", "/terms"] as const;
@@ -211,6 +213,8 @@ export function softwareAppJsonLd(opts: {
     isAccessibleForFree: true,
     license: "https://opensource.org/licenses/MIT",
     codeRepository: DEFAULT_REPO_URL,
+    sameAs: [DEFAULT_REPO_URL],
+    author: { "@type": "Person", name: AUTHOR.name, url: AUTHOR.url },
     offers: { "@type": "Offer", price: "0", priceCurrency: "IDR" },
   };
   if (opts.version && opts.version !== "0.0.0") ld["softwareVersion"] = opts.version;

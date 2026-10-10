@@ -148,6 +148,8 @@ describe("JSON-LD", () => {
       image: "https://x.test/icons/og-image.png",
       softwareVersion: "1.5.1",
       inLanguage: "id",
+      sameAs: ["https://github.com/ilramdhan/dompetku"],
+      author: { "@type": "Person", name: "ilramdhan", url: "https://github.com/ilramdhan" },
       offers: { "@type": "Offer", price: "0" },
     });
   });
