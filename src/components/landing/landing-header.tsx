@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { FlaskConical, Github, Languages, Menu, Moon, Sun } from "lucide-react";
 import { AppLogo, AppName, useBranding } from "@/components/app-logo";
@@ -12,6 +12,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useI18n } from "@/lib/i18n";
+import { isLangPath, langHref, langSearch, otherLang } from "@/lib/lang";
 import { useScrolledPast } from "@/hooks/use-scrolled-past";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ export function SectionLink({
   onClick?: () => void;
   children: ReactNode;
 }) {
+  const { lang } = useI18n();
   if (onLanding) {
     return (
       <a href={`#${hash}`} className={className} onClick={onClick}>
@@ -46,7 +48,7 @@ export function SectionLink({
     );
   }
   return (
-    <Link to="/" hash={hash} className={className} onClick={onClick}>
+    <Link to="/" search={langSearch(lang)} hash={hash} className={className} onClick={onClick}>
       {children}
     </Link>
   );
@@ -81,13 +83,26 @@ function ThemeButton() {
   );
 }
 
+/**
+ * Language switch for the public pages: persists the choice (`dk-lang`) and moves to that
+ * language's own crawlable URL (`?lang=en`, no param for Indonesian), keeping the section hash.
+ */
 function LangButton() {
   const { lang, setLang, t } = useI18n();
+  const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  function toggle() {
+    const next = otherLang(lang);
+    setLang(next);
+    if (!isLangPath(pathname)) return;
+    const hash = typeof window === "undefined" ? "" : window.location.hash;
+    void router.navigate({ href: langHref(pathname, next, hash), resetScroll: false });
+  }
   return (
     <Button
       type="button"
       variant="ghost"
-      onClick={() => setLang(lang === "id" ? "en" : "id")}
+      onClick={toggle}
       aria-label={t("Ganti bahasa")}
       className="h-9 gap-1.5 px-2.5 hover:bg-muted hover:text-foreground"
     >
@@ -156,7 +171,7 @@ export function LandingHeader({
   repo: string;
   onLanding?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const scrolled = useScrolledPast(() => 8);
   const link =
@@ -173,6 +188,7 @@ export function LandingHeader({
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:px-6 lg:px-8">
         <Link
           to="/"
+          search={langSearch(lang)}
           className="flex min-w-0 items-center gap-2.5 rounded-md font-display text-xl font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <AppLogo className="size-8" />

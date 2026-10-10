@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { LandingShell } from "@/components/landing/landing-shell";
 import { useI18n } from "@/lib/i18n";
+import { langSearch } from "@/lib/lang";
 import { cn } from "@/lib/utils";
 import { formatLegalDate, LEGAL_UPDATED, type LegalSection } from "./legal-content";
 
@@ -27,6 +28,7 @@ export function LegalPage({
         >
           <Link
             to="/"
+            search={langSearch(lang)}
             className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
