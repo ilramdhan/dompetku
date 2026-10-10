@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -18,7 +18,8 @@ import { Button } from "@/components/ui/button";
 import { LanguageProvider, useI18n } from "@/lib/i18n";
 import { DEFAULT_LANG, urlLangFor, type Lang } from "@/lib/lang";
 import { PrivacySync } from "@/lib/privacy-sync";
-import { BrandingSync } from "@/components/app-logo";
+import { BrandingSync, brandingQuery } from "@/components/app-logo";
+import { demoQuery } from "@/components/demo";
 
 function NotFoundComponent() {
   const { t } = useI18n();
@@ -116,6 +117,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "apple-touch-icon", sizes: "180x180", href: "/icons/apple-touch-icon.png" },
     ],
   }),
+  // SSR only: public branding + demo flag are read on every page (header, logo, DemoGate), so
+  // fetch them before render; the SSR query integration (router.tsx) ships them to the client and
+  // the first client render matches the server HTML without a refetch. prefetchQuery never throws.
+  // In the browser useQuery keeps them fresh, so client navigations never block on this loader.
+  loader: async ({ context }) => {
+    if (typeof window !== "undefined") return;
+    await Promise.all([
+      context.queryClient.prefetchQuery(brandingQuery()),
+      context.queryClient.prefetchQuery(demoQuery()),
+    ]);
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -153,17 +165,15 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
   const urlLang = useUrlLang();
 
+  // QueryClientProvider comes from setupRouterSsrQueryIntegration (router.tsx, router Wrap).
   return (
-    <QueryClientProvider client={queryClient}>
-      <LanguageProvider urlLang={urlLang}>
-        <PrivacySync />
-        <BrandingSync />
-        <Outlet />
-        <Toaster richColors position="top-center" />
-      </LanguageProvider>
-    </QueryClientProvider>
+    <LanguageProvider urlLang={urlLang}>
+      <PrivacySync />
+      <BrandingSync />
+      <Outlet />
+      <Toaster richColors position="top-center" />
+    </LanguageProvider>
   );
 }
