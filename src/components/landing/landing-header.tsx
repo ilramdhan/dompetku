@@ -103,7 +103,7 @@ function LangButton() {
       type="button"
       variant="ghost"
       onClick={toggle}
-      aria-label={t("Ganti bahasa")}
+      aria-label={`${lang.toUpperCase()} - ${t("Ganti bahasa")}`}
       className="h-9 gap-1.5 px-2.5 hover:bg-muted hover:text-foreground"
     >
       <Languages />

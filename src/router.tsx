@@ -1,5 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { routeTree } from "./routeTree.gen";
 import { clearSessionCache, isPasswordChangeError, isUnauthorizedError } from "./lib/session-cache";
 
@@ -25,6 +26,8 @@ export const getRouter = () => {
     });
   };
 
+  // Created inside getRouter, which TanStack Start calls once per SSR request, so the
+  // server cache (per-user finance data) never leaks between requests.
   const queryClient = new QueryClient({
     queryCache: new QueryCache({ onError: onAuthError }),
     mutationCache: new MutationCache({ onError: onAuthError }),
@@ -43,6 +46,12 @@ export const getRouter = () => {
     defaultPreloadStaleTime: 30_000,
     defaultPreload: "intent",
   });
+
+  // Dehydrates the server QueryClient (loader ensureQueryData/prefetch results) into the
+  // SSR stream and hydrates it on the client, so the first client render matches the
+  // server HTML (no React #418, no refetch of data the loader already fetched). It also
+  // wraps the app in QueryClientProvider and clears the server cache after the request.
+  setupRouterSsrQueryIntegration({ router, queryClient });
 
   return router;
 };
