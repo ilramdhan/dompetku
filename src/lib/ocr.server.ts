@@ -1,6 +1,7 @@
 import { draftSchema, type Draft } from "./schemas";
 import { isValidDate, matchCategory } from "./bot";
 import { usageFromResponse } from "./ai-usage";
+import { parseChatCompletion } from "./ai-response";
 import type { AiMeta } from "./ai-usage.server";
 
 /** What the model may pick from. Names only — never the "(expense)" suffix, which models echo back. */
@@ -71,6 +72,8 @@ async function aiJson(messages: unknown[], vision: boolean, meta: AiMeta = WEB):
         model,
         messages,
         temperature: 0,
+        // Explicit for proxies that stream by default; SSE bodies are still accepted below.
+        stream: false,
         response_format: { type: "json_object" },
       }),
       signal: AbortSignal.timeout(45_000),
@@ -90,10 +93,16 @@ async function aiJson(messages: unknown[], vision: boolean, meta: AiMeta = WEB):
   }
   let j: any;
   try {
-    j = await res.json();
-  } catch (e) {
+    j = parseChatCompletion(await res.text(), res.headers.get("content-type"));
+  } catch {
+    j = null;
+  }
+  if (!j || typeof j !== "object") {
     await record(meta, vision, model, false);
-    throw e;
+    console.error(`AI response unreadable model=${model}`);
+    throw new Error(
+      "Respons AI tidak bisa dibaca. Periksa AI_API_URL (harus endpoint chat/completions).",
+    );
   }
   await record(meta, vision, model, true, j);
   const content: string = j?.choices?.[0]?.message?.content ?? "{}";

@@ -55,6 +55,8 @@ time), and amounts support **IDR and USD**.
 - [Contributing](#contributing)
 - [Security](#security)
 - [License](#license)
+- [Contributors](#contributors)
+- [Star history](#star-history)
 - [Acknowledgements](#acknowledgements)
 
 ## What's new in v1.5
@@ -221,22 +223,27 @@ You need free accounts on [GitHub](https://github.com), [Supabase](https://supab
 > project (step 2) before logging in. Never share your `SUPABASE_SERVICE_ROLE_KEY`: it gives full
 > access to your database.
 
+**Prefer your own server?** An official multi-arch Docker image (`ghcr.io/ilramdhan/dompetku`) and a
+[`docker-compose.yml`](docker-compose.yml) are published for every release: `docker compose up -d` with
+your `.env`, behind an HTTPS reverse proxy. Supabase stays external. See
+[SELF-HOSTING.md → Docker](docs/SELF-HOSTING.md#10-docker-your-own-server).
+
 The complete, beginner-friendly walkthrough (exact clicks, optional features, updating and
 troubleshooting) is in **[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)**.
 Every environment variable is explained in [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
 
 ## Tech stack
 
-| Layer      | Technology                                                                            |
-| ---------- | ------------------------------------------------------------------------------------- |
-| App        | [TanStack Start](https://tanstack.com/start) (React 19, SSR, server functions)        |
-| Data & UI  | TanStack Router & Query, Tailwind CSS v4, shadcn/ui (Radix), Recharts, zod            |
-| Database   | [Supabase](https://supabase.com) PostgreSQL + private Storage (server-only)           |
-| Hosting    | [Vercel](https://vercel.com) serverless (also runs on [Lovable](https://lovable.dev)) |
-| Automation | [n8n](https://n8n.io) + Telegram Bot API                                              |
-| AI         | Any OpenAI-compatible API (receipt OCR and chat parsing)                              |
-| Extras     | Resend (email, optional), Sentry (errors, optional)                                   |
-| Quality    | Vitest, Testing Library, ESLint, Prettier, GitHub Actions                             |
+| Layer      | Technology                                                                               |
+| ---------- | ---------------------------------------------------------------------------------------- |
+| App        | [TanStack Start](https://tanstack.com/start) (React 19, SSR, server functions)           |
+| Data & UI  | TanStack Router & Query, Tailwind CSS v4, shadcn/ui (Radix), Recharts, zod               |
+| Database   | [Supabase](https://supabase.com) PostgreSQL + private Storage (server-only)              |
+| Hosting    | [Vercel](https://vercel.com) serverless, [Lovable](https://lovable.dev) or Docker (Node) |
+| Automation | [n8n](https://n8n.io) + Telegram Bot API                                                 |
+| AI         | Any OpenAI-compatible API (receipt OCR and chat parsing)                                 |
+| Extras     | Resend (email, optional), Sentry (errors, optional)                                      |
+| Quality    | Vitest, Testing Library, ESLint, Prettier, GitHub Actions                                |
 
 How it all fits together, with diagrams: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
@@ -273,7 +280,12 @@ public/          PWA manifest, icons and self-hosted fonts
 
 ## Local development
 
-You need [Node.js](https://nodejs.org) 22 or newer (or [Bun](https://bun.sh), which CI uses) and
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ilramdhan/dompetku)
+
+Prefer zero setup? Open the repo in GitHub Codespaces: the dev container installs dependencies
+and includes Docker, so `npm run db:up`, `npm run dev` and `npm test` work right away.
+
+Locally, you need [Node.js](https://nodejs.org) 22 or newer (or [Bun](https://bun.sh), which CI uses) and
 a Supabase project with the schema applied.
 
 ```bash
@@ -319,6 +331,23 @@ Every instance also serves short, public [privacy policy](src/components/legal/l
 (`/privacy`) and terms (`/terms`) pages written for a self-hosted deployment; they are linked from
 the landing page footer. Edit `src/components/legal/legal-content.ts` (and the matching English
 strings in `src/lib/i18n.tsx`) if your instance needs different wording.
+
+## Contributors
+
+Thanks to everyone who has helped build Dompetku. Want to join them? Pick a [good first issue](https://github.com/ilramdhan/dompetku/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+
+<a href="https://github.com/ilramdhan/dompetku/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ilramdhan/dompetku" alt="Dompetku contributors">
+</a>
+
+## Star history
+
+<a href="https://star-history.com/#ilramdhan/dompetku&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ilramdhan/dompetku&type=Date&theme=dark">
+    <img src="https://api.star-history.com/svg?repos=ilramdhan/dompetku&type=Date" alt="Dompetku GitHub star history chart" width="600">
+  </picture>
+</a>
 
 ## Acknowledgements
 

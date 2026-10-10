@@ -1,0 +1,27 @@
+# Keep the build context small and secret-free.
+node_modules
+.output
+.nitro
+.tanstack
+.vinxi
+.vercel
+.wrangler
+dist
+dist-ssr
+coverage
+.git
+.github
+.claude
+.lovable
+.idea
+.vscode
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+*.local
+Dockerfile
+docker-compose.yml
+docs
+scripts/dev-db/supabase

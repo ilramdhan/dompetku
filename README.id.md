@@ -126,6 +126,11 @@ request, pastikan `npm run lint`, `npm run typecheck`, `npm test` dan `npm run b
 Masalah keamanan dilaporkan secara privat lewat [SECURITY.md](SECURITY.md), bukan lewat issue
 publik.
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ilramdhan/dompetku)
+
+Ingin langsung mulai tanpa setup? Buka repo di GitHub Codespaces: dev container sudah memasang
+dependensi dan Docker, jadi `npm run db:up`, `npm run dev` dan `npm test` langsung bisa dipakai.
+
 ## Dukungan
 
 Kalau Dompetku bermanfaat buatmu:
@@ -134,6 +139,23 @@ Kalau Dompetku bermanfaat buatmu:
 - 💚 Dukung pengembangannya lewat [GitHub Sponsors](https://github.com/sponsors/ilramdhan),
   [Saweria](https://saweria.co/ilramadhan) atau [Ko-fi](https://ko-fi.com/ilramdhan_).
 - 💬 Kirim masukan, ide atau laporan bug di [GitHub Issues](https://github.com/ilramdhan/dompetku/issues).
+
+## Kontributor
+
+Terima kasih untuk semua yang sudah ikut membangun Dompetku. Ingin ikut? Pilih [good first issue](https://github.com/ilramdhan/dompetku/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+
+<a href="https://github.com/ilramdhan/dompetku/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ilramdhan/dompetku" alt="Kontributor Dompetku">
+</a>
+
+## Riwayat star
+
+<a href="https://star-history.com/#ilramdhan/dompetku&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ilramdhan/dompetku&type=Date&theme=dark">
+    <img src="https://api.star-history.com/svg?repos=ilramdhan/dompetku&type=Date" alt="Grafik riwayat star GitHub Dompetku" width="600">
+  </picture>
+</a>
 
 ## Lisensi
 

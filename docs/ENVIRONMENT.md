@@ -79,6 +79,8 @@ After running the **v17** section of `supabase/schema.sql`, **Profile** (avatar 
 
 Provider examples (Gemini, OpenAI, OpenRouter, Ollama): [SELF-HOSTING §6.2](SELF-HOSTING.md#62-receipt-ocr-and-ai-chat-parsing).
 
+Proxies and routers (e.g. 9router, LiteLLM) work too: the app sends `"stream": false`, and if the proxy still answers with a streamed (`text/event-stream`) response, the chunks are joined automatically. If the bot replies "Respons AI tidak bisa dibaca", check that `AI_API_URL` is the full `/chat/completions` URL.
+
 ## Telegram bot (optional)
 
 | Name                   | Required?                   | Example                       | What it does                                                                                                                                                                                     |
