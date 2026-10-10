@@ -9,6 +9,26 @@ Starting with v1.0.0, versioned entries (`## [x.y.z]`) are generated automatical
 > [!NOTE]
 > When an entry mentions a **schema section** (`v2`…`v13`), self-hosters must run that section of [`supabase/schema.sql`](supabase/schema.sql) on their Supabase project. Every section is safe to run more than once, and the app keeps working (with the feature disabled) until you do.
 
+## [1.7.0](https://github.com/ilramdhan/dompetku/compare/v1.6.1...v1.7.0) (2026-10-10)
+
+
+### Features
+
+* **reports:** filter laporan and rekap tahunan by wallet ([#64](https://github.com/ilramdhan/dompetku/issues/64)) ([bff7cd9](https://github.com/ilramdhan/dompetku/commit/bff7cd95a9edc2999eaae62cc6e0209190cb4d7c))
+
+
+### Bug Fixes
+
+* **a11y:** dark-mode contrast and accessible names ([#61](https://github.com/ilramdhan/dompetku/issues/61)) ([1deec0f](https://github.com/ilramdhan/dompetku/commit/1deec0f6d20a7f6cb4f4d94ec7931e7e44a769b8))
+* **ssr:** hydrate react query cache on the client ([#63](https://github.com/ilramdhan/dompetku/issues/63)) ([6c64295](https://github.com/ilramdhan/dompetku/commit/6c642957bb0bc1ebcbfc11a01c636e00cb331628))
+
+
+### Performance
+
+* **deploy:** long-lived cache headers for static assets ([#60](https://github.com/ilramdhan/dompetku/issues/60)) ([1262140](https://github.com/ilramdhan/dompetku/commit/12621405cd3d620a083e58011e0a3e113efe873b))
+* **landing:** serve responsive webp screenshots ([#59](https://github.com/ilramdhan/dompetku/issues/59)) ([d9c2df2](https://github.com/ilramdhan/dompetku/commit/d9c2df2d48b95c082044fb19cc9b4d265fcb7c71))
+* slim the mobile critical path (fonts, entry chunk) ([#66](https://github.com/ilramdhan/dompetku/issues/66)) ([0d787df](https://github.com/ilramdhan/dompetku/commit/0d787dfb677847c1615939a6bd1c85740caec0d1))
+
 ## [1.6.1](https://github.com/ilramdhan/dompetku/compare/v1.6.0...v1.6.1) (2026-10-10)
 
 
