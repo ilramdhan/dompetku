@@ -18,6 +18,7 @@
 - External automation (n8n bots/reminders) uses `/api/public/n8n/*` routes guarded by `N8N_API_KEY`; keep business logic in `finance.server.ts` so web and bot share it.
 - Schema lives in `supabase/schema.sql` (user runs it on their own Supabase); update it whenever tables change.
 - Vercel builds switch nitro preset via the VERCEL env in vite.config.ts, so the same code runs on Lovable and Vercel.
+- Docker: the Dockerfile builds with `NITRO_PRESET=node-server` (honoured by the Lovable wrapper outside its sandbox; default build stays cloudflare-module, Vercel stays vercel) and ships only `.output/` as non-root on port 3000; `docker.yml` publishes multi-arch `ghcr.io/ilramdhan/dompetku`, called by release-please on release. Don't hardcode the preset in vite.config.ts.
 - AI (OCR/text parsing) uses an OpenAI-compatible endpoint configured by AI_API_URL/AI_API_KEY/AI_MODEL for portability.
 - Receipt photos live in a private Supabase Storage bucket `receipts`, lazy-created by `src/lib/receipt.server.ts`; transactions store only `receipt_path`, and viewing goes through short-lived signed URLs.
 - Dark mode is a `.dark` class on `<html>` set by an inline script in `__root.tsx` (localStorage `dk-theme`); all colors must stay semantic tokens so both themes work.
