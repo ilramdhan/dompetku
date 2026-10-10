@@ -100,7 +100,7 @@ function LoginPage() {
           <AppLogo className="size-10" />
           <AppName className="min-w-0 truncate" />
         </p>
-        <p className="mt-1 text-sm text-ink-muted">{tagline}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{tagline}</p>
         {demo.demo && !challenge ? (
           <div className="mt-5 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
             <p className="flex items-start gap-2 font-medium">
