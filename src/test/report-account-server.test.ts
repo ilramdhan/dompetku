@@ -165,6 +165,7 @@ vi.mock("../lib/app-settings.server", () => ({
 
 import { categoryTrend, computeYearly, yearlySummary } from "../lib/finance.server";
 import { resetAggregateState } from "../lib/aggregate";
+import { reportScope } from "../lib/report-filter";
 
 beforeEach(() => {
   state.sql = true;
@@ -415,5 +416,55 @@ describe("reports without a wallet filter (unchanged for old users)", () => {
     expect(state.rpcCalls).toEqual([]);
     expect(out.income).toBe(10_000_000);
     expect(out.expense).toBe(225_000.5);
+  });
+});
+
+describe("reports filtered to one wallet (#62)", () => {
+  it("yearlySummary counts the wallet's income/expense plus transfers in/out (JS path)", async () => {
+    const out = await yearlySummary(2025, null, A);
+    expect(state.rpcCalls).toEqual([]);
+    // income 10M + transfer in 200k; expense 150k + 25k + transfer out 1M (2024 row excluded)
+    expect(out.income).toBe(10_200_000);
+    expect(out.expense).toBe(1_175_000);
+    expect(out.months.slice(0, 3).map((m) => [m.income, m.expense])).toEqual([
+      [10_000_000, 150_000],
+      [0, 1_000_000],
+      [200_000, 25_000],
+    ]);
+  });
+  it("categoryTrend groups transfers out as one pseudo category", async () => {
+    const out = await categoryTrend(3, "2025-03", null, B);
+    expect(out.categories).toEqual([
+      { id: "c-food", name: "Makan", color: "#f00", total: 50_000.5 },
+    ]);
+    const a = await categoryTrend(3, "2025-03", null, A);
+    expect(a.categories.map((c) => [c.name, c.total])).toEqual([
+      ["Transfer keluar", 1_000_000],
+      ["Makan", 150_000],
+      ["Tanpa kategori", 25_000],
+    ]);
+  });
+  it("computeYearly by category and totals for one wallet", async () => {
+    const out = await computeYearly("2025", C);
+    expect(out.income).toBe(0);
+    expect(out.expense).toBe(500_000);
+    expect(out.byCategory).toEqual([
+      { name: "Hiburan", color: "#0f0", value: 300_000 },
+      { name: "Transfer keluar", color: null, value: 200_000 },
+    ]);
+  });
+  it("an id outside the member scope yields an empty report (no leak)", async () => {
+    const r = reportScope([A, B], C);
+    const out = await yearlySummary(2025, r.scope, r.account);
+    expect(out.income).toBe(0);
+    expect(out.expense).toBe(0);
+    const trend = await categoryTrend(3, "2025-03", r.scope, r.account);
+    expect(trend.categories).toEqual([]);
+  });
+  it("a permitted wallet for a member equals the owner's view of it", async () => {
+    const r = reportScope([A, B], A);
+    expect(await yearlySummary(2025, r.scope, r.account)).toEqual(
+      await yearlySummary(2025, null, A),
+    );
   });
 });

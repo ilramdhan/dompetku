@@ -10,6 +10,7 @@ import { receiptColumns } from "./receipts";
 import { budgetPercent } from "./budget";
 import type { Json, Tables, TablesInsert } from "./database.types";
 import { scopeIds, txScopeFilter, walletNetByMonth } from "./permissions";
+import { walletAggRows, type WalletTx } from "./report-filter";
 import {
   categoriesByName,
   categorySlices,
@@ -631,6 +632,54 @@ async function fetchAggTx(
   );
 }
 type AggSource = () => Promise<AggTx[]>;
+
+/**
+ * Wallet-filtered reports (issue #62): every transaction touching `account` in [start, end),
+ * transfers included, turned into income/expense rows from that wallet's point of view
+ * (`walletAggRows`, same rules as the per-account report). Always aggregated in JS.
+ */
+async function fetchWalletAggTx(
+  start: string,
+  end: string,
+  account: string,
+  opts: { kind?: "income" | "expense"; hardCap?: number } = {},
+): Promise<AggTx[]> {
+  const id = scopeIds([account])[0]!;
+  const rows = must<WalletTx[]>(
+    await fetchAll(
+      (from, to) =>
+        db()
+          .from("transactions")
+          .select(
+            "kind, amount_idr, occurred_at, category_id, account_id, to_account_id, category:categories(name,color)",
+          )
+          .gte("occurred_at", start)
+          .lt("occurred_at", end)
+          .or(`account_id.eq.${id},to_account_id.eq.${id}`)
+          .order("id")
+          .range(from, to),
+      opts.hardCap ? { hardCap: opts.hardCap } : {},
+    ),
+  );
+  const out = walletAggRows(rows, id) as unknown as AggTx[];
+  return opts.kind ? out.filter((t) => t.kind === opts.kind) : out;
+}
+
+/** Report source: one wallet (JS) when `account` is set, else the usual scoped/unscoped fetch. */
+function reportSource(
+  start: string,
+  end: string,
+  account: string | null | undefined,
+  opts: { kind?: "income" | "expense"; hardCap?: number; scope?: Scope },
+): { fb: AggSource; js: Scope } {
+  if (account)
+    return {
+      fb: once(() => fetchWalletAggTx(start, end, account, opts)),
+      // Any non-null scope forces the JS path in the aggregate helpers below.
+      js: [account],
+    };
+  return { fb: once(() => fetchAggTx(start, end, opts)), js: opts.scope };
+}
 
 /**
  * v9 SQL aggregates are global; a scoped (member) request always uses the JS path, whose source
@@ -1296,13 +1345,13 @@ export async function parseContext(): Promise<import("./ocr.server").ParseContex
 }
 
 /* ---------------- Yearly recap ---------------- */
-export async function computeYearly(year: string) {
+export async function computeYearly(year: string, account?: string | null) {
   const start = `${year}-01-01`;
   const end = `${Number(year) + 1}-01-01`;
-  const fb = once(() => fetchAggTx(start, end));
+  const { fb, js } = reportSource(start, end, account, {});
   const [totals, cats] = await Promise.all([
-    monthTotals(start, end, fb),
-    categoryTotals(start, end, "expense", fb),
+    monthTotals(start, end, fb, js),
+    categoryTotals(start, end, "expense", fb, js),
   ]);
   const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   const income = kindTotal(totals, "income");
@@ -1524,29 +1573,30 @@ export async function importCsv(text: string) {
 }
 
 /* ---------------- Reports ---------------- */
-export async function categoryTrend(months: number, endMonth: string, scope?: Scope) {
+export async function categoryTrend(
+  months: number,
+  endMonth: string,
+  scope?: Scope,
+  account?: string | null,
+) {
   const first = shiftMonth(endMonth, -(months - 1));
   const { start } = monthRange(first);
   const { end } = monthRange(endMonth);
-  const rows = await monthCategoryTotals(
-    start,
-    end,
-    () => fetchAggTx(start, end, { kind: "expense", hardCap: 50000, scope }),
+  const { fb, js } = reportSource(start, end, account, {
+    kind: "expense",
+    hardCap: 50000,
     scope,
-  );
+  });
+  const rows = await monthCategoryTotals(start, end, fb, js);
   const list = Array.from({ length: months }, (_, i) => shiftMonth(first, i));
   return { months: list, ...categoryTrendSeries(list, rows) };
 }
 
-export async function yearlySummary(year: number, scope?: Scope) {
+export async function yearlySummary(year: number, scope?: Scope, account?: string | null) {
   const start = `${year}-01-01`;
   const end = `${year + 1}-01-01`;
-  const totals = await monthTotals(
-    start,
-    end,
-    () => fetchAggTx(start, end, { hardCap: 100000, scope }),
-    scope,
-  );
+  const { fb, js } = reportSource(start, end, account, { hardCap: 100000, scope });
+  const totals = await monthTotals(start, end, fb, js);
   const months = monthSeries(
     Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`),
     totals,
