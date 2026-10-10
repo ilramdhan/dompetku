@@ -363,7 +363,7 @@ sequenceDiagram
   A->>A: chat_id in BOT_ALLOWED_CHAT_IDS? (empty list → refuse all)
   A->>A: quickParse → keyword/history category → AI only if ambiguous
   A->>DB: insert bot_drafts row
-  A-->>N: {method:"send", text, reply_markup: ✅ ❌ 🏷 🏦 🔁}
+  A-->>N: {method:"send", text, reply_markup: ✅ ❌ 🏷 🏦 🔁 ✏️}
   N-->>U: preview with buttons
   U->>N: tap ✅
   N->>A: callback_data

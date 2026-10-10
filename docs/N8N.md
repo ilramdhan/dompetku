@@ -44,7 +44,7 @@ sequenceDiagram
     N->>A: POST /api/public/n8n/bot (header x-api-key)
     A-->>N: { method, text, reply_markup, toast }
     N->>T: sendMessage / editMessageText / answerCallbackQuery
-    T-->>U: preview with ✅ ❌ 🏷 🏦 🔁 buttons
+    T-->>U: preview with ✅ ❌ 🏷 🏦 🔁 ✏️ buttons
 ```
 
 ### Where to run n8n
@@ -184,15 +184,16 @@ A **credential** is a secret stored encrypted inside n8n. Create them under **Ov
 6. **Register the `/` menu**: import workflow 04, click **Test workflow** (Execute workflow) once. The last node shows `getWebhookInfo`; a `url` starting with your n8n HTTPS address means the trigger is installed.
 7. **Test** — send these to the bot:
 
-| Send                                     | Expected                                                          |
-| ---------------------------------------- | ----------------------------------------------------------------- |
-| `/help`                                  | List of commands                                                  |
-| `kopi 25rb`                              | ⚡ Preview with category & default account, buttons ✅ ❌ 🏷 🏦 🔁 |
-| A receipt photo                          | 🧾 Preview with items (needs AI configured in the app)            |
-| Tap ✅                                   | Message changes to a saved confirmation with ↩️ Undo              |
-| Tap ✅ twice                             | "Already saved" — no duplicate                                    |
-| `/saldo`, `/minggu`, `/bulan`, `/budget` | Reports (no AI tokens used)                                       |
-| A message from another Telegram account  | Ignored                                                           |
+| Send                                           | Expected                                                                   |
+| ---------------------------------------------- | -------------------------------------------------------------------------- |
+| `/help`                                        | List of commands                                                           |
+| `kopi 25rb`                                    | ⚡ Preview with category & default account, buttons ✅ ❌ 🏷 🏦 🔁 ✏️       |
+| A receipt photo                                | 🧾 Preview with items (needs AI configured in the app)                     |
+| Tap ✏️ Keterangan, then send `dini bayar baju` | A new preview with `Ket: dini bayar baju` (`/batal` or ⬅️ Kembali cancels) |
+| Tap ✅                                         | Message changes to a saved confirmation with ↩️ Undo                       |
+| Tap ✅ twice                                   | "Already saved" — no duplicate                                             |
+| `/saldo`, `/minggu`, `/bulan`, `/budget`       | Reports (no AI tokens used)                                                |
+| A message from another Telegram account        | Ignored                                                                    |
 
 > [!TIP]
 > Bot replies are in Indonesian; amounts like `25rb` (25 thousand) and `1,5jt` (1.5 million) are understood.
