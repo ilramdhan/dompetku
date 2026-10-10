@@ -31,8 +31,10 @@ export function WalletFilter({
         className={`no-print h-9 w-full min-w-0 sm:w-48 ${className ?? ""}`}
         aria-label={t("Filter dompet")}
       >
-        <Wallet className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        <SelectValue placeholder={t("Semua dompet")} />
+        <div className="flex min-w-0 items-center gap-2 [&>span]:truncate">
+          <Wallet className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <SelectValue placeholder={t("Semua dompet")} />
+        </div>
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="all">{t("Semua dompet")}</SelectItem>
