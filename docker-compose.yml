@@ -11,3 +11,12 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+    # Hardening: the server never writes to disk, so run it read-only with no extra privileges.
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
