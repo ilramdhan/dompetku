@@ -9,6 +9,26 @@ Starting with v1.0.0, versioned entries (`## [x.y.z]`) are generated automatical
 > [!NOTE]
 > When an entry mentions a **schema section** (`v2`…`v13`), self-hosters must run that section of [`supabase/schema.sql`](supabase/schema.sql) on their Supabase project. Every section is safe to run more than once, and the app keeps working (with the feature disabled) until you do.
 
+## [1.6.0](https://github.com/ilramdhan/dompetku/compare/v1.5.1...v1.6.0) (2026-10-10)
+
+
+### Features
+
+* **docker:** add official docker image and compose for self-hosting ([#46](https://github.com/ilramdhan/dompetku/issues/46)) ([4e005f8](https://github.com/ilramdhan/dompetku/commit/4e005f872376d71c6206c8f4254cc10a8ba29159))
+* **seo:** english landing via ?lang with hreflang, llms.txt and search console verification ([#50](https://github.com/ilramdhan/dompetku/issues/50)) ([7fa7f7e](https://github.com/ilramdhan/dompetku/commit/7fa7f7e1789d086429b0522e2ecc4464720c67f7))
+* **seo:** make landing page indexable with sitemap and structured data ([#47](https://github.com/ilramdhan/dompetku/issues/47)) ([aecd8c9](https://github.com/ilramdhan/dompetku/commit/aecd8c9fe0069f8b3da78b925338b5a375a42aad))
+
+
+### Bug Fixes
+
+* **ai:** accept streamed (SSE) responses from OpenAI-compatible proxies like 9router ([#37](https://github.com/ilramdhan/dompetku/issues/37)) ([08f1426](https://github.com/ilramdhan/dompetku/commit/08f14269734df2d3e5866cab825d55a03107420c))
+
+
+### Documentation
+
+* improve readme discoverability and add github sponsors ([#41](https://github.com/ilramdhan/dompetku/issues/41)) ([a157e26](https://github.com/ilramdhan/dompetku/commit/a157e26acc63693fd284180a8bb38a92cc488884))
+* **readme:** add contributors and star history sections ([#48](https://github.com/ilramdhan/dompetku/issues/48)) ([b0d1eed](https://github.com/ilramdhan/dompetku/commit/b0d1eed484bbf64e22e68107d688cf8c390bb29c))
+
 ## [1.5.1](https://github.com/ilramdhan/dompetku/compare/v1.5.0...v1.5.1) (2026-10-09)
 
 
