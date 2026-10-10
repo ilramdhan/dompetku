@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
@@ -11,7 +11,13 @@ import { PENDING_MS, ReportsSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/segmented";
-import { trendQuery, yearlySummaryQuery } from "@/lib/queries";
+import { rowsQuery, trendQuery, yearlySummaryQuery } from "@/lib/queries";
+import { WalletFilter } from "@/components/wallet-filter";
+import {
+  isTransferCategory,
+  resolveReportAccount,
+  validateReportSearch,
+} from "@/lib/report-filter";
 import { currentMonth, monthLabel, shortMonth } from "@/lib/dates";
 import { compact, money } from "@/lib/format";
 import { usePrivacy } from "@/lib/privacy";
@@ -20,19 +26,39 @@ import { pageHead } from "@/lib/head";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => pageHead("Laporan", "Tren pengeluaran per kategori dan rekap tahunan."),
-  loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(trendQuery(6, currentMonth())),
-      context.queryClient.ensureQueryData(yearlySummaryQuery(Number(currentMonth().slice(0, 4)))),
-    ]),
+  validateSearch: validateReportSearch,
+  loaderDeps: ({ search }) => ({ account: search.account }),
+  loader: async ({ context, deps }) => {
+    const qc = context.queryClient;
+    // Unknown / not-visible wallet ids fall back to all wallets (the list is server-scoped).
+    const account = deps.account
+      ? resolveReportAccount(deps.account, await qc.ensureQueryData(rowsQuery("accounts")))
+      : undefined;
+    return Promise.all([
+      qc.ensureQueryData(trendQuery(6, currentMonth(), account)),
+      qc.ensureQueryData(yearlySummaryQuery(Number(currentMonth().slice(0, 4)), account)),
+    ]);
+  },
   errorComponent: RouteError,
   pendingComponent: ReportsSkeleton,
   pendingMs: PENDING_MS,
   component: ReportsPage,
 });
 
+/** Wallet filter state from `?account=` (validated, and dropped when not a visible wallet). */
+function useReportAccount() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const accounts = (useQuery(rowsQuery("accounts")).data ?? []) as { id: string; name: string }[];
+  const account = resolveReportAccount(search.account, accounts);
+  const setAccount = (a: string | undefined) =>
+    void navigate({ search: a ? { account: a } : {}, replace: true });
+  return { account, accounts, setAccount };
+}
+
 function ReportsPage() {
   const { t } = useI18n();
+  const { account, accounts, setAccount } = useReportAccount();
   return (
     <>
       <PageHeader
@@ -44,20 +70,43 @@ function ReportsPage() {
           </Button>
         }
       />
-      <CategoryTrend />
-      <YearlyRecap />
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <WalletFilter value={account} accounts={accounts} onChange={setAccount} />
+        {account ? (
+          <p className="text-xs text-muted-foreground">
+            {t("Transfer dihitung sebagai uang masuk/keluar dompet ini.")}
+          </p>
+        ) : null}
+      </div>
+      <CategoryTrend account={account} />
+      <YearlyRecap account={account} />
     </>
   );
 }
 
-function CategoryTrend() {
+function CategoryTrend({ account }: { account: string | undefined }) {
   usePrivacy();
   const { t, lang } = useI18n();
   const locale = lang === "en" ? "en-US" : "id-ID";
   const [months, setMonths] = useState(6);
-  const { data } = useQuery({ ...trendQuery(months, currentMonth()), placeholderData: (p) => p });
+  const { data } = useQuery({
+    ...trendQuery(months, currentMonth(), account),
+    placeholderData: (p) => p,
+  });
   const [selected, setSelected] = useState<string[] | null>(null);
-  const cats = useMemo(() => data?.categories ?? [], [data]);
+  // Wallet filter: pick the default top 5 again for the new wallet's categories.
+  const [prevAccount, setPrevAccount] = useState(account);
+  if (prevAccount !== account) {
+    setPrevAccount(account);
+    setSelected(null);
+  }
+  const cats = useMemo(
+    () =>
+      (data?.categories ?? []).map((c) =>
+        isTransferCategory(c.name) ? { ...c, name: t(c.name) } : c,
+      ),
+    [data, t],
+  );
   useEffect(() => {
     if (selected === null && cats.length) setSelected(cats.slice(0, 5).map((c) => c.id));
   }, [cats, selected]);
@@ -131,7 +180,7 @@ function CategoryTrend() {
   );
 }
 
-function YearlyRecap() {
+function YearlyRecap({ account }: { account: string | undefined }) {
   usePrivacy();
   const { t, lang } = useI18n();
   const locale = lang === "en" ? "en-US" : "id-ID";
@@ -139,7 +188,7 @@ function YearlyRecap() {
   const [sort, setSort] = useState<"month" | "income" | "expense" | "net">("month");
   const [direction, setDirection] = useState<SortDirection>("asc");
   const { data: y, isFetching } = useQuery({
-    ...yearlySummaryQuery(year),
+    ...yearlySummaryQuery(year, account),
     placeholderData: (p) => p,
   });
   const sortedMonths = useMemo(

@@ -688,6 +688,12 @@ const DICT: Record<string, string> = {
   "Tidak ada di mutasi bank": "Not in the bank statement",
   "Transaksi akun": "Account transactions",
   "Transfer keluar": "Transfers out",
+  // Laporan / Rekap tahunan wallet filter (#62)
+  "Semua dompet": "All wallets",
+  "Filter dompet": "Filter by wallet",
+  "Transfer masuk": "Transfers in",
+  "Transfer dihitung sebagai uang masuk/keluar dompet ini.":
+    "Transfers count as money in or out of this wallet.",
   "Uang keluar": "Money out",
   "Uang keluar per kategori": "Money out by category",
   "Uang masuk": "Money in",
