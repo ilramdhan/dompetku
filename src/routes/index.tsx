@@ -9,6 +9,7 @@ import { translate } from "@/lib/i18n";
 import { DEFAULT_LANG, parseLang, validateLangSearch } from "@/lib/lang";
 import { faqJsonLd, seoHead, softwareAppJsonLd, verificationMeta } from "@/lib/seo";
 import { appVersion } from "@/lib/version";
+import { FONT_MONO, fontPreloads } from "@/lib/fonts";
 
 // Keyword-rich (Indonesian + English) for search results; the visible H1 is unchanged. Both are
 // DICT keys, so `/?lang=en` gets the English title/description.
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/")({
     // Re-parse: unvalidated params from the root route also reach `match.search`.
     const lang = parseLang(match.search.lang) ?? DEFAULT_LANG;
     const description = translate(DESCRIPTION, lang);
-    const head = seoHead({
+    const seoTags = seoHead({
       title: translate(TITLE, lang),
       description,
       path: "/",
@@ -45,6 +46,9 @@ export const Route = createFileRoute("/")({
       largeImage: true,
       lang,
     });
+    // The landing renders `.num` text (feature tiles, footer version), so the browser fetches
+    // JetBrains Mono anyway; preloading it avoids a late, high-priority request that delays FCP.
+    const head = { ...seoTags, links: [...fontPreloads(FONT_MONO), ...seoTags.links] };
     if (!seo.indexable) return head;
     const faq = LANDING_FAQ.map((f) => ({ q: translate(f.q, lang), a: translate(f.a, lang) }));
     return {

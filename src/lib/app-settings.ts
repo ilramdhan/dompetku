@@ -7,8 +7,7 @@
  * load it through the unauthenticated `/api/public/app-icon` route without signed URLs.
  * SVG is rejected because it can carry scripts when served from our origin.
  */
-import { z } from "zod";
-import { CURRENCIES } from "./schemas";
+import { CURRENCIES } from "./currencies";
 
 export const DEFAULT_APP_NAME = "Dompetku";
 /** Default tagline is an i18n key (shown through `t()` while unchanged). */
@@ -203,34 +202,9 @@ export function brandingOf(s: ResolvedSettings): Branding {
   };
 }
 
+export type { AppSettingsInput } from "./app-settings-schema";
+
 export const DEFAULT_BRANDING: Branding = brandingOf(resolveSettings(null, {}));
-
-const optText = (max: number) =>
-  z.preprocess(
-    (v) => (typeof v === "string" && v.trim() === "" ? null : v),
-    z.string().trim().max(max).nullable(),
-  );
-
-/** Input accepted by the settings form (null/empty = back to default). */
-export const appSettingsInputSchema = z.object({
-  app_name: optText(40),
-  tagline: optText(80),
-  logo_data: z
-    .string()
-    .nullable()
-    .refine((v) => v === null || isLogoDataUrl(v), "Logo harus PNG/JPEG/WebP maksimal 200 KB"),
-  timezone: optText(64).refine((v) => v === null || isValidTimezone(v), "Zona waktu tidak valid"),
-  base_currency: z.enum(CURRENCIES),
-  landing_enabled: z.boolean(),
-  landing_tagline: optText(160),
-  github_url: optText(200).refine((v) => v === null || isHttpsUrl(v), "URL harus https://"),
-  bot_default_account_id: z.preprocess((v) => (v === "" ? null : v), z.string().uuid().nullable()),
-  reminder_days: z.preprocess(
-    (v) => (v === "" || v === undefined ? null : v),
-    z.coerce.number().int().min(1).max(365).nullable(),
-  ),
-});
-export type AppSettingsInput = z.output<typeof appSettingsInputSchema>;
 
 /** Picks the reminder window: explicit request value, then the setting, then the caller default. */
 export function reminderDays(

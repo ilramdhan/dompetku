@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-quer
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Plus } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { PageHeader } from "@/components/app-shell";
 import { RouteError } from "@/components/route-error";
 import { PageSkeleton, PENDING_MS } from "@/components/skeletons";

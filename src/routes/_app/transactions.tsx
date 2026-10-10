@@ -15,7 +15,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { PageHeader } from "@/components/app-shell";
 import { Pagination } from "@/components/pagination";
 import { SortButton, type SortDirection } from "@/components/sort-button";

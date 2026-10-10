@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireAdmin } from "./auth-middleware";
-import { appSettingsInputSchema } from "./app-settings";
+import { appSettingsInputSchema } from "./app-settings-schema";
 
 /** Public (no login): only non-sensitive branding fields for landing, login and <head>. */
 export const getPublicBranding = createServerFn({ method: "GET" }).handler(async () => {

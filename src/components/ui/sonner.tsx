@@ -1,8 +1,12 @@
+import { useEffect } from "react";
 import { Toaster as Sonner } from "sonner";
+import { markToasterReady } from "@/lib/toast";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  // Child effects run first, so sonner has subscribed by now: replay toasts queued in lib/toast.
+  useEffect(() => markToasterReady(), []);
   return (
     <Sonner
       className="toaster group"

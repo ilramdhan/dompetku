@@ -3,7 +3,6 @@ import {
   DEFAULT_BRANDING,
   DEFAULT_ICON,
   MAX_LOGO_BYTES,
-  appSettingsInputSchema,
   brandingOf,
   isHttpsUrl,
   isLogoDataUrl,
@@ -12,6 +11,7 @@ import {
   reminderDays,
   resolveSettings,
 } from "@/lib/app-settings";
+import { appSettingsInputSchema } from "@/lib/app-settings-schema";
 import { classifyBotCommand } from "@/lib/bot";
 
 const png = (bytes: number) => `data:image/png;base64,${Buffer.alloc(bytes, 1).toString("base64")}`;
