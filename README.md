@@ -223,22 +223,27 @@ You need free accounts on [GitHub](https://github.com), [Supabase](https://supab
 > project (step 2) before logging in. Never share your `SUPABASE_SERVICE_ROLE_KEY`: it gives full
 > access to your database.
 
+**Prefer your own server?** An official multi-arch Docker image (`ghcr.io/ilramdhan/dompetku`) and a
+[`docker-compose.yml`](docker-compose.yml) are published for every release: `docker compose up -d` with
+your `.env`, behind an HTTPS reverse proxy. Supabase stays external. See
+[SELF-HOSTING.md → Docker](docs/SELF-HOSTING.md#10-docker-your-own-server).
+
 The complete, beginner-friendly walkthrough (exact clicks, optional features, updating and
 troubleshooting) is in **[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)**.
 Every environment variable is explained in [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
 
 ## Tech stack
 
-| Layer      | Technology                                                                            |
-| ---------- | ------------------------------------------------------------------------------------- |
-| App        | [TanStack Start](https://tanstack.com/start) (React 19, SSR, server functions)        |
-| Data & UI  | TanStack Router & Query, Tailwind CSS v4, shadcn/ui (Radix), Recharts, zod            |
-| Database   | [Supabase](https://supabase.com) PostgreSQL + private Storage (server-only)           |
-| Hosting    | [Vercel](https://vercel.com) serverless (also runs on [Lovable](https://lovable.dev)) |
-| Automation | [n8n](https://n8n.io) + Telegram Bot API                                              |
-| AI         | Any OpenAI-compatible API (receipt OCR and chat parsing)                              |
-| Extras     | Resend (email, optional), Sentry (errors, optional)                                   |
-| Quality    | Vitest, Testing Library, ESLint, Prettier, GitHub Actions                             |
+| Layer      | Technology                                                                               |
+| ---------- | ---------------------------------------------------------------------------------------- |
+| App        | [TanStack Start](https://tanstack.com/start) (React 19, SSR, server functions)           |
+| Data & UI  | TanStack Router & Query, Tailwind CSS v4, shadcn/ui (Radix), Recharts, zod               |
+| Database   | [Supabase](https://supabase.com) PostgreSQL + private Storage (server-only)              |
+| Hosting    | [Vercel](https://vercel.com) serverless, [Lovable](https://lovable.dev) or Docker (Node) |
+| Automation | [n8n](https://n8n.io) + Telegram Bot API                                                 |
+| AI         | Any OpenAI-compatible API (receipt OCR and chat parsing)                                 |
+| Extras     | Resend (email, optional), Sentry (errors, optional)                                      |
+| Quality    | Vitest, Testing Library, ESLint, Prettier, GitHub Actions                                |
 
 How it all fits together, with diagrams: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
