@@ -359,7 +359,8 @@ sequenceDiagram
   participant A as POST /api/public/n8n/bot
   participant DB as Supabase
   U->>N: "coffee 25k" or receipt photo
-  N->>A: {update_id, chat_id, text | image_base64, callback_data?}
+  N->>A: {update_id, chat_id, text | image_base64, callback_data?, chat_type?, reply_to_bot?, bot_username?}
+  A->>A: group chat? only @mention / reply to bot / /cmd, else method "none"
   A->>A: chat_id in BOT_ALLOWED_CHAT_IDS? (empty list → refuse all)
   A->>A: quickParse → keyword/history category → AI only if ambiguous
   A->>DB: insert bot_drafts row

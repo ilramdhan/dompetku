@@ -83,13 +83,13 @@ Proxies and routers (e.g. 9router, LiteLLM) work too: the app sends `"stream": f
 
 ## Telegram bot (optional)
 
-| Name                   | Required?                   | Example                       | What it does                                                                                                                                                                                     |
-| ---------------------- | --------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `BOT_ALLOWED_CHAT_IDS` | **Yes, if you use the bot** | `123456789,987654321`         | Comma-separated Telegram chat IDs allowed to use the bot. **Fails closed:** empty = every chat is refused before any database access, and the bot replies with the chat ID to add.               |
-| `BOT_DEFAULT_ACCOUNT`  | No                          | `BCA`                         | Account name used when a message doesn't mention one. Must match an existing account name. Can be overridden in Settings → App (v14).                                                            |
-| `BOT_TEXT_AI`          | No (default `auto`)         | `auto` \| `always` \| `never` | When chat messages may use AI: only when ambiguous, always, or never (zero AI tokens for chat; receipts still use AI).                                                                           |
-| `BOT_AI_DAILY_LIMIT`   | No (default `50`)           | `50` \| `0`                   | Max bot AI calls (chat parsing + photo OCR) per chat per app-local day; the bot then asks for the quick format. `0` = unlimited. Counted in `ai_usage` (v15); without it, today's AI/OCR drafts. |
-| `TELEGRAM_BOT_TOKEN`   | Only for direct mode        | `123456789:AA…`               | Enables [Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n): Telegram calls `POST /api/public/telegram/webhook` on the app itself, no n8n relay. Not needed with n8n. **Secret.**    |
+| Name                   | Required?                   | Example                       | What it does                                                                                                                                                                                                                                                                                              |
+| ---------------------- | --------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BOT_ALLOWED_CHAT_IDS` | **Yes, if you use the bot** | `123456789,987654321`         | Comma-separated Telegram chat IDs allowed to use the bot (group chats have negative IDs, supergroups start with `-100`; see [N8N.md](N8N.md#using-the-bot-in-a-telegram-group)). **Fails closed:** empty = every chat is refused before any database access, and the bot replies with the chat ID to add. |
+| `BOT_DEFAULT_ACCOUNT`  | No                          | `BCA`                         | Account name used when a message doesn't mention one. Must match an existing account name. Can be overridden in Settings → App (v14).                                                                                                                                                                     |
+| `BOT_TEXT_AI`          | No (default `auto`)         | `auto` \| `always` \| `never` | When chat messages may use AI: only when ambiguous, always, or never (zero AI tokens for chat; receipts still use AI).                                                                                                                                                                                    |
+| `BOT_AI_DAILY_LIMIT`   | No (default `50`)           | `50` \| `0`                   | Max bot AI calls (chat parsing + photo OCR) per chat per app-local day; the bot then asks for the quick format. `0` = unlimited. Counted in `ai_usage` (v15); without it, today's AI/OCR drafts.                                                                                                          |
+| `TELEGRAM_BOT_TOKEN`   | Only for direct mode        | `123456789:AA…`               | Enables [Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n): Telegram calls `POST /api/public/telegram/webhook` on the app itself, no n8n relay. Not needed with n8n. **Secret.**                                                                                                             |
 
 ## Regional (optional)
 
@@ -155,13 +155,14 @@ Only the public pages (`/`, `/privacy`, `/terms`) are indexable; the app, the lo
 
 These live in the **n8n** environment (not Vercel) and are read by the workflow templates in [`n8n/`](../n8n) via `$env.…`. n8n must allow it: `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`. Full setup: [N8N.md](N8N.md).
 
-| Name                        | Used by            | Example                       | What it does                                                                                               |
-| --------------------------- | ------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `FINTRACK_URL`              | 01, 02, 05         | `https://your-app.vercel.app` | Base URL of your Dompetku deployment (no trailing slash).                                                  |
-| `TELEGRAM_BOT_TOKEN`        | 01, 02, 03, 04     | `<token from @BotFather>`     | Telegram Bot API token. **Secret.** (The app reads its own `TELEGRAM_BOT_TOKEN` only for direct mode.)     |
-| `TELEGRAM_ALLOWED_CHAT_IDS` | 01                 | `123456789`                   | Comma-separated chat IDs n8n forwards to the app (first filter; the app re-checks `BOT_ALLOWED_CHAT_IDS`). |
-| `TELEGRAM_ADMIN_CHAT_ID`    | 02, 03             | `123456789`                   | Chat that receives scheduled reminders/reports and workflow error alerts.                                  |
-| `BACKUP_EMAIL_FROM`         | 05 (email variant) | `noreply@mail.example.com`    | Sender for emailed backups.                                                                                |
-| `BACKUP_EMAIL_TO`           | 05 (email variant) | `you@example.com`             | Recipient for emailed backups.                                                                             |
+| Name                        | Used by            | Example                       | What it does                                                                                                         |
+| --------------------------- | ------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `FINTRACK_URL`              | 01, 02, 05         | `https://your-app.vercel.app` | Base URL of your Dompetku deployment (no trailing slash).                                                            |
+| `TELEGRAM_BOT_TOKEN`        | 01, 02, 03, 04     | `<token from @BotFather>`     | Telegram Bot API token. **Secret.** (The app reads its own `TELEGRAM_BOT_TOKEN` only for direct mode.)               |
+| `TELEGRAM_ALLOWED_CHAT_IDS` | 01                 | `123456789`                   | Comma-separated chat IDs n8n forwards to the app (first filter; the app re-checks `BOT_ALLOWED_CHAT_IDS`).           |
+| `TELEGRAM_BOT_USERNAME`     | 01                 | `chatbotfinance`              | Optional. Bot username without `@`; makes group mention/reply matching exact. Without it any `@…bot` mention counts. |
+| `TELEGRAM_ADMIN_CHAT_ID`    | 02, 03             | `123456789`                   | Chat that receives scheduled reminders/reports and workflow error alerts.                                            |
+| `BACKUP_EMAIL_FROM`         | 05 (email variant) | `noreply@mail.example.com`    | Sender for emailed backups.                                                                                          |
+| `BACKUP_EMAIL_TO`           | 05 (email variant) | `you@example.com`             | Recipient for emailed backups.                                                                                       |
 
 The `N8N_API_KEY` value is **not** an n8n environment variable — it goes into an n8n **Header Auth credential** (Name `x-api-key`).

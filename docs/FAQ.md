@@ -168,6 +168,13 @@ Your Vercel account is the recovery path: delete (or replace) `APP_TOTP_SECRET` 
 </details>
 
 <details>
+<summary><strong>Can I use the bot in a Telegram group?</strong></summary>
+
+Yes. Add the bot to the group, disable its privacy mode in @BotFather (`/setprivacy` → Disable, then remove and re-add the bot), and put the group's chat ID (negative, supergroups start with `-100`) in `BOT_ALLOWED_CHAT_IDS`. In the group the bot only reacts to `@yourbot` mentions, replies to its own messages and `/commands`; everything else is ignored without using AI quota. Anyone in an allow-listed group can press the preview buttons. n8n users must re-import template 01. Details: [N8N.md](N8N.md#using-the-bot-in-a-telegram-group).
+
+</details>
+
+<details>
 <summary><strong>Can strangers use my Telegram bot?</strong></summary>
 
 No. The bot **fails closed**: only chat IDs in `BOT_ALLOWED_CHAT_IDS` are served, and an empty list refuses everyone before touching the database. n8n adds a first filter with `TELEGRAM_ALLOWED_CHAT_IDS`. All automation endpoints also require your `N8N_API_KEY`.

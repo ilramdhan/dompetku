@@ -201,6 +201,33 @@ A **credential** is a secret stored encrypted inside n8n. Create them under **Ov
 > [!TIP]
 > `N8N_API_KEY`, `BOT_ALLOWED_CHAT_IDS`, `BOT_TEXT_AI`, `BOT_AI_DAILY_LIMIT` and the AI/email values can also be set in the app under **Settings → Integrasi** (schema v16) — no Vercel redeploy needed. See [ENVIRONMENT.md](ENVIRONMENT.md#setting-integrations-from-the-web-ui-v16).
 
+### Using the bot in a Telegram group
+
+You can add the bot to a Telegram group so a team (family, flatmates, a small business) records transactions together. In a group the app only reacts to messages **addressed to the bot**:
+
+- a message that mentions it, e.g. `pemasukan 500rb di akun A @chatbotfinance` (the mention is stripped, so it is recorded as `pemasukan 500rb di akun A`, then shows the usual preview → ✅);
+- a **reply** to one of the bot's messages (including the ✏️ Keterangan prompt — in a group, reply to that prompt with the new description);
+- a `/command` (`/saldo`, `/bulan`, …). Commands addressed to another bot (`/cmd@otherbot`) are ignored.
+
+Everything else said in the group is ignored silently: no reply and no AI quota used. Stickers and service messages (someone joined, pinned message, …) are ignored too. Private chats behave exactly as before. Anyone in an allow-listed group can press the preview buttons, so only add groups you trust.
+
+**Setup**
+
+1. In **@BotFather** send `/setprivacy` → choose your bot → **Disable**. Otherwise Telegram only delivers `/commands` and replies to the bot; plain `@bot` mentions are **not** delivered. Then **remove the bot from the group and add it again** — Telegram applies a privacy change only when the bot re-joins.
+2. Add the group's `chat_id` to `BOT_ALLOWED_CHAT_IDS` (app) and, when you use n8n, to `TELEGRAM_ALLOWED_CHAT_IDS`. Group IDs are **negative**; supergroups start with `-100…`. Tip: mention the bot once in the group — the `⛔ Bot belum dikonfigurasi…` reply shows the `chat_id` to add.
+3. n8n users: **re-import the updated template 01**. The old template still works in private chats, but in groups it lacks the filter that drops unaddressed messages.
+4. Optional: set `TELEGRAM_BOT_USERNAME` (your bot's username without `@`) in n8n so mention matching is exact. Without it, any mention of a username ending in `bot` counts.
+
+| In the group                                        | Result                                     |
+| --------------------------------------------------- | ------------------------------------------ |
+| `kopi 25rb @chatbotfinance`                         | Preview for `kopi 25rb`; anyone can tap ✅ |
+| Reply to the ✏️ Keterangan prompt with `dini bayar` | Preview updated with the new description   |
+| `/saldo`                                            | Balance report                             |
+| `kopi 25rb` (no mention)                            | Ignored                                    |
+
+> [!NOTE]
+> **Direct mode** (webhook, no n8n) needs no extra variable: the app detects the bot's username automatically via Telegram's `getMe`. The `/setprivacy` and chat-ID steps still apply.
+
 ### Telegram direct mode (without n8n)
 
 If you only want the chat bot (no scheduled reminders, error alerts or Drive backups), the app can talk to Telegram itself:
@@ -244,12 +271,12 @@ All schedules use the workflow time zone **Asia/Jakarta** — change it under **
 
 All requests send the header `x-api-key: <N8N_API_KEY>` (`Authorization: Bearer …` also works).
 
-| Workflow | Request                                                                                                                                                                                                         | Response fields used                                                                                        |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 01       | `POST /api/public/n8n/bot` body `{ update_id, chat_id, text?, image_base64?, mime_type?, callback_data? }` (`mime_type` required with an image: `image/jpeg`, `image/png`, `image/webp`; body max 4.5 MB → 413) | `method` (`send`/`edit`), `text`, `reply_markup`, `toast`                                                   |
-| 02       | `GET /api/public/n8n/reminders?days=3`                                                                                                                                                                          | `count`, `message`                                                                                          |
-| 02       | `GET /api/public/n8n/report?period=today\|lastweek\|lastmonth`                                                                                                                                                  | `message`                                                                                                   |
-| 05       | `GET /api/public/n8n/backup`                                                                                                                                                                                    | Whole body saved as a file; `Content-Disposition: attachment; filename="dompetku-cadangan-YYYY-MM-DD.json"` |
+| Workflow | Request                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Response fields used                                                                                        |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 01       | `POST /api/public/n8n/bot` body `{ update_id, chat_id, text?, image_base64?, mime_type?, callback_data?, chat_type?, reply_to_bot?, bot_username? }` (`chat_type` is `private`/`group`/`supergroup`/`channel`, `reply_to_bot` a boolean and `bot_username` a string — all optional, used for [group mode](#using-the-bot-in-a-telegram-group); `method: "none"` means send nothing; `mime_type` required with an image: `image/jpeg`, `image/png`, `image/webp`; body max 4.5 MB → 413) | `method` (`send`/`edit`/`none`), `text`, `reply_markup`, `toast`                                            |
+| 02       | `GET /api/public/n8n/reminders?days=3`                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `count`, `message`                                                                                          |
+| 02       | `GET /api/public/n8n/report?period=today\|lastweek\|lastmonth`                                                                                                                                                                                                                                                                                                                                                                                                                          | `message`                                                                                                   |
+| 05       | `GET /api/public/n8n/backup`                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Whole body saved as a file; `Content-Disposition: attachment; filename="dompetku-cadangan-YYYY-MM-DD.json"` |
 
 Other routes under `src/routes/api/public/n8n/` (`reminders-email`, `reminders-send-email`, `summary`, `transactions`, …) are available for your own workflows.
 
