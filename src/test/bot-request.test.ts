@@ -35,6 +35,41 @@ describe("botUpdateSchema — gambar", () => {
   });
 });
 
+describe("botUpdateSchema — grup (#71)", () => {
+  const t = { ...base, text: "kopi @dompetkubot" };
+  it("chat_type/reply_to_bot/bot_username opsional (template lama tetap valid)", () => {
+    const v = botUpdateSchema.parse(t);
+    expect(v.chat_type).toBeUndefined();
+    expect(v.reply_to_bot).toBeUndefined();
+    expect(v.bot_username).toBeUndefined();
+    expect(
+      botUpdateSchema.safeParse({ ...t, chat_type: null, reply_to_bot: null, bot_username: null })
+        .success,
+    ).toBe(true);
+  });
+  it("menerima field grup dan membuang @ di depan username", () => {
+    for (const c of ["private", "group", "supergroup", "channel"])
+      expect(botUpdateSchema.parse({ ...t, chat_type: c }).chat_type).toBe(c);
+    const v = botUpdateSchema.parse({
+      ...t,
+      chat_type: "supergroup",
+      reply_to_bot: true,
+      bot_username: " @DompetkuBot ",
+    });
+    expect(v).toMatchObject({ reply_to_bot: true, bot_username: "DompetkuBot" });
+  });
+  it("menolak nilai tidak valid", () => {
+    for (const bad of [
+      { chat_type: "forum" },
+      { reply_to_bot: "yes" },
+      { bot_username: "ab" },
+      { bot_username: "bad name" },
+      { bot_username: "x".repeat(65) },
+    ])
+      expect(botUpdateSchema.safeParse({ ...t, ...bad }).success).toBe(false);
+  });
+});
+
 const post = (body: BodyInit, headers: Record<string, string> = {}) =>
   new Request("http://x/api/public/n8n/bot", { method: "POST", body, headers });
 

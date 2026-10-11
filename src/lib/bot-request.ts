@@ -16,7 +16,14 @@ const mimeType = z.preprocess(
   z.enum(BOT_IMAGE_MIME),
 );
 
-// Body: { update_id, chat_id, text?, image_base64?, mime_type?, callback_data? }
+// Optional bot username for group mentions (#71); "@name" is accepted and stripped.
+const botUsername = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim().replace(/^@/, "") : v),
+  z.string().regex(/^[A-Za-z0-9_]{3,64}$/),
+);
+
+// Body: { update_id, chat_id, text?, image_base64?, mime_type?, callback_data?,
+//         chat_type?, reply_to_bot?, bot_username? } — no chat_type = private (old templates).
 export const botUpdateSchema = z
   .object({
     update_id: z.coerce.number().int().nonnegative(),
@@ -25,6 +32,9 @@ export const botUpdateSchema = z
     image_base64: z.string().min(100).max(4_400_000).nullable().optional(),
     mime_type: mimeType.nullable().optional(),
     callback_data: z.string().max(64).nullable().optional(),
+    chat_type: z.enum(["private", "group", "supergroup", "channel"]).nullable().optional(),
+    reply_to_bot: z.boolean().nullable().optional(),
+    bot_username: botUsername.nullable().optional(),
   })
   .refine((v) => v.text || v.image_base64 || v.callback_data, {
     message: "text, image_base64, atau callback_data wajib diisi",

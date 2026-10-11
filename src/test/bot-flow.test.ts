@@ -602,3 +602,69 @@ describe("✏️ Keterangan: ganti keterangan pratinjau (#68)", () => {
     expect((await say(161, "/help")).text).toContain("/paylater");
   });
 });
+
+describe("mode grup (#71)", () => {
+  const G = "-100555";
+  const grp = (update_id: number, text: string | null, extra: Record<string, unknown> = {}) =>
+    handleBotUpdate({
+      update_id,
+      chat_id: G,
+      text,
+      chat_type: "supergroup",
+      bot_username: "chatbotfinance",
+      ...extra,
+    });
+  beforeEach(() => {
+    process.env["BOT_ALLOWED_CHAT_IDS"] = `111,${G}`;
+  });
+
+  it("obrolan grup diabaikan tanpa DB; mention → pratinjau dengan teks bersih", async () => {
+    const quiet = await grp(200, "nanti makan siang di mana?");
+    expect(quiet).toEqual({ method: "none", text: "", reply_markup: null });
+    expect((await grp(201, "/saldo@OtherBot")).method).toBe("none");
+    expect(dbCalls).toEqual([]);
+    const r = await grp(202, "pemasukan 500rb di akun BCA @chatbotfinance");
+    expect(r.method).toBe("send");
+    expect(r.text).toContain("BCA");
+    expect(tables["bot_drafts"]![0]!.chat_id).toBe(G);
+    expect(JSON.stringify(tables["bot_drafts"]![0]!.payload)).not.toContain("@chatbotfinance");
+    expect((await grp(203, "@chatbotfinance")).text).toContain("Kirim teks transaksi");
+    expect((await grp(204, "/help")).text).toContain("/paylater");
+  });
+
+  it("grup belum diizinkan: tolak hanya bila disapa", async () => {
+    process.env["BOT_ALLOWED_CHAT_IDS"] = "111";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect((await grp(210, "kopi 25rb")).method).toBe("none");
+    expect(warn).not.toHaveBeenCalled();
+    const r = await grp(211, "kopi 25rb @chatbotfinance");
+    expect(r.text).toContain(`chat_id ${G}`);
+    warn.mockRestore();
+  });
+
+  it("✏️ keterangan di grup: balasan ke bot dipakai, chat lain diabaikan", async () => {
+    await grp(220, "kopi 25rb @chatbotfinance");
+    const id = tables["bot_drafts"]![0]!.id;
+    await handleBotUpdate({ update_id: 221, chat_id: G, callback_data: `d:e:${id}` });
+    expect(tables["bot_drafts"]![0]!.payload.awaiting.field).toBe("description");
+    expect((await grp(222, "eh siapa yang bayar?")).method).toBe("none");
+    const r = await grp(223, "kopi susu kantor", { reply_to_bot: true });
+    expect(r.text).toContain("Ket: kopi susu kantor");
+    expect(tables["bot_drafts"]).toHaveLength(1);
+  });
+
+  it("chat pribadi & template lama tanpa chat_type tidak berubah", async () => {
+    const r = await handleBotUpdate({ update_id: 230, chat_id: "111", text: "kopi 25rb @budi" });
+    expect(r.method).toBe("send");
+    expect(
+      (
+        await handleBotUpdate({
+          update_id: 231,
+          chat_id: "111",
+          text: "kopi 25rb",
+          chat_type: "private",
+        })
+      ).method,
+    ).toBe("send");
+  });
+});

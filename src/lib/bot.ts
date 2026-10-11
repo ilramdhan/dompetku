@@ -137,6 +137,7 @@ export function botHelp(): string {
     "• kirim foto struk untuk OCR",
     "Semua transaksi tampil sebagai pratinjau dulu, tekan ✅ untuk menyimpan.",
     "Di pratinjau bisa ganti 🏷 kategori, 🏦 akun, 🔁 masuk/keluar, atau ✏️ keterangan.",
+    'Di grup: sebut @namabot atau balas pesan bot, mis. "kopi 25rb @namabot".',
     "",
     "Perintah:",
     ...BOT_COMMANDS.map((c) => `/${c.command} — ${c.description}`),
@@ -766,6 +767,7 @@ export function descriptionPrompt(current: string | null | undefined): string {
     ...(current ? ["", `Sekarang: ${current}`] : []),
     "",
     "Ketik /batal atau tekan Kembali untuk membatalkan.",
+    "Di grup: balas (reply) pesan ini.",
   ].join("\n");
 }
 

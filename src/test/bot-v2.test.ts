@@ -283,5 +283,7 @@ describe("✏️ Keterangan (pure)", () => {
       expect(isEditCancel(c)).toBe(true);
     for (const c of ["/batalin", "batal beli kopi", "/undo"]) expect(isEditCancel(c)).toBe(false);
     expect(botHelp()).toContain("✏️ keterangan");
+    expect(t).toContain("Di grup: balas (reply) pesan ini.");
+    expect(botHelp()).toContain("Di grup: sebut @namabot atau balas pesan bot");
   });
 });

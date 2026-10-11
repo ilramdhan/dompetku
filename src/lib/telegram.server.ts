@@ -7,6 +7,7 @@
  */
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { settingsKey } from "./secret-box.server";
+import { groupAddress, isGroupChat } from "./bot-group";
 import { logError } from "./monitoring.server";
 import {
   parseTelegramUpdate,
@@ -65,6 +66,25 @@ export async function tgApi(
   }
 }
 
+const USERNAME_TTL_MS = 6 * 3600_000;
+const usernames = new Map<string, { at: number; name: string | null }>();
+
+/** The bot's own @username via getMe, memory-cached ~6 h per token (hashed). Null on failure. */
+export async function botUsername(token: string): Promise<string | null> {
+  try {
+    const key = createHash("sha256").update(token).digest("hex");
+    const hit = usernames.get(key);
+    if (hit && Date.now() - hit.at < USERNAME_TTL_MS) return hit.name;
+    const r = await tgApi(token, "getMe");
+    const name = (r.result as { username?: string } | undefined)?.username ?? null;
+    if (!r.ok || !name) return hit?.name ?? null; // don't cache failures
+    usernames.set(key, { at: Date.now(), name });
+    return name;
+  } catch {
+    return null;
+  }
+}
+
 async function downloadImage(token: string, fileId: string): Promise<Buffer | null> {
   const f = await tgApi(token, "getFile", { file_id: fileId });
   const path = (f.result as { file_path?: string } | undefined)?.file_path;
@@ -100,6 +120,32 @@ export async function handleTelegramUpdate(token: string, raw: unknown): Promise
     callback_id: inc.callback_id,
   };
   if (inc.type === "reply") return send(token, replyCalls(ctx, { method: "send", text: inc.text }));
+  // Groups (#71): only messages addressed to the bot get past here — before the allow-list
+  // refusal, chat actions or image downloads — so chatter in the group stays silent.
+  const group =
+    inc.type !== "callback" && isGroupChat(inc.chat_type)
+      ? await (async () => {
+          const name = await botUsername(token);
+          const rt = inc.reply_to;
+          const replyToBot =
+            !!rt?.is_bot && (!name || rt.username?.toLowerCase() === name.toLowerCase());
+          const g = groupAddress({
+            text: inc.type === "text" ? inc.text : inc.type === "image" ? inc.caption : null,
+            chatType: inc.chat_type,
+            botUsername: name,
+            replyToBot,
+          });
+          return { ...g, name, replyToBot };
+        })()
+      : null;
+  if (group && !group.addressed) return;
+  const extra = group
+    ? {
+        chat_type: inc.chat_type as "group" | "supergroup",
+        reply_to_bot: group.replyToBot,
+        bot_username: group.name,
+      }
+    : {};
   const bot = await import("./bot.server");
   try {
     // Allow-list first: unknown chats never trigger an image download or any finance DB access.
@@ -124,6 +170,7 @@ export async function handleTelegramUpdate(token: string, raw: unknown): Promise
         update_id: inc.update_id,
         chat_id: inc.chat_id,
         text: inc.text,
+        ...extra,
       });
     } else {
       void tgApi(token, "sendChatAction", { chat_id: inc.chat_id, action: "upload_photo" });
@@ -145,6 +192,7 @@ export async function handleTelegramUpdate(token: string, raw: unknown): Promise
         text: inc.caption,
         image_base64: buf.toString("base64"),
         mime_type: inc.mime_type,
+        ...extra,
       });
     }
     await send(token, replyCalls(ctx, r));

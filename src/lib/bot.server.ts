@@ -28,6 +28,7 @@ import { addDays } from "./dates";
 import type { Tables } from "./database.types";
 import { withTax } from "./fees";
 import { isChatAllowed } from "./integrations";
+import { groupAddress, isGroupChat } from "./bot-group";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const fin = () => import("./finance.server");
@@ -42,6 +43,10 @@ export type BotUpdate = {
   image_base64?: string | null | undefined;
   mime_type?: string | null | undefined;
   callback_data?: string | null | undefined;
+  /** #71 group mode; absent = private chat (old n8n templates). */
+  chat_type?: "private" | "group" | "supergroup" | "channel" | null | undefined;
+  reply_to_bot?: boolean | null | undefined;
+  bot_username?: string | null | undefined;
 };
 export type BotReply = {
   method: "send" | "edit" | "none";
@@ -82,6 +87,18 @@ export async function chatAllowed(chatId: string): Promise<boolean> {
 
 /* ---------------- Entry point ---------------- */
 export async function handleBotUpdate(u: BotUpdate): Promise<BotReply> {
+  // Groups (#71): pure gate before the allow-list or any DB — only messages addressed to the bot
+  // (mention, reply, /cmd[@this bot]) are handled, with the mention stripped; the rest is silent.
+  if (!u.callback_data && isGroupChat(u.chat_type)) {
+    const g = groupAddress({
+      text: u.text,
+      chatType: u.chat_type,
+      botUsername: u.bot_username,
+      replyToBot: u.reply_to_bot,
+    });
+    if (!g.addressed) return { method: "none", text: "", reply_markup: null };
+    u = { ...u, text: g.text };
+  }
   if (!(await chatAllowed(u.chat_id))) {
     // Refuse before any DB access; echo the chat_id so the owner can add it to the env.
     console.warn(`bot: chat_id ${u.chat_id} ditolak (tidak ada di BOT_ALLOWED_CHAT_IDS)`);

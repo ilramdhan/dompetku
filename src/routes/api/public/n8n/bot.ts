@@ -3,7 +3,8 @@ import { reportServerError, withErrorLogging } from "@/lib/monitoring";
 import { botUpdateSchema, readJsonBody } from "@/lib/bot-request";
 
 // POST /api/public/n8n/bot — satu pintu untuk semua update Telegram dari n8n.
-// Body: { update_id, chat_id, text?, image_base64?, mime_type?, callback_data? }
+// Body: { update_id, chat_id, text?, image_base64?, mime_type?, callback_data?, chat_type?, reply_to_bot?, bot_username? }
+// Grup (#71): tanpa chat_type = private; di grup hanya pesan yang menyebut @bot / membalas bot / /perintah yang dijawab (lainnya method "none").
 // mime_type wajib bila image_base64 ada: image/jpeg | image/png | image/webp (image/jpg → image/jpeg).
 // Body > 4,5 MB (batas Vercel) ditolak 413.
 // Balasan: { ok, method: "send"|"edit"|"none", text, reply_markup, toast? } → n8n tinggal meneruskan ke Telegram Bot API.

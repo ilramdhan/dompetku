@@ -19,6 +19,8 @@ describe("parseTelegramUpdate", () => {
       chat_id: "111",
       message_id: 5,
       callback_id: null,
+      chat_type: null,
+      reply_to: null,
       text: "kopi 25rb",
     });
     const cb = parseTelegramUpdate({
@@ -79,6 +81,76 @@ describe("parseTelegramUpdate", () => {
       message: { message_id: 1, chat, document: { file_id: "d", mime_type: "application/pdf" } },
     });
     expect(pdf.type).toBe("reply");
+  });
+});
+
+describe("parseTelegramUpdate — grup (#71)", () => {
+  const gchat = { id: -100123, type: "supergroup" };
+  it("adds chat_type and reply_to author", () => {
+    const r = parseTelegramUpdate({
+      update_id: 10,
+      message: {
+        message_id: 3,
+        chat: gchat,
+        text: "Kopi susu",
+        reply_to_message: { message_id: 2, from: { id: 9, is_bot: true, username: "DompetBot" } },
+      },
+    });
+    expect(r).toMatchObject({
+      type: "text",
+      chat_id: "-100123",
+      chat_type: "supergroup",
+      reply_to: { is_bot: true, username: "DompetBot" },
+    });
+    expect(
+      parseTelegramUpdate({
+        update_id: 11,
+        message: { message_id: 1, chat: { id: 111, type: "private" }, text: "x" },
+      }),
+    ).toMatchObject({ chat_type: "private", reply_to: null });
+    expect(
+      parseTelegramUpdate({
+        update_id: 12,
+        message: {
+          message_id: 1,
+          chat: { id: 111, type: "weird" },
+          text: "x",
+          reply_to_message: { from: { id: 2 } },
+        },
+      }),
+    ).toMatchObject({ chat_type: null, reply_to: { is_bot: false, username: null } });
+  });
+  it("ignores unsupported content and service messages in groups only", () => {
+    for (const m of [
+      { sticker: {} },
+      { new_chat_members: [{ id: 1 }] },
+      { document: { file_id: "d", mime_type: "application/pdf" } },
+      { text: "" },
+    ]) {
+      expect(
+        parseTelegramUpdate({ update_id: 13, message: { message_id: 1, chat: gchat, ...m } }),
+      ).toEqual({ type: "ignore" });
+      expect(
+        parseTelegramUpdate({
+          update_id: 13,
+          message: { message_id: 1, chat: { id: -1, type: "group" }, ...m },
+        }),
+      ).toEqual({ type: "ignore" });
+    }
+    expect(
+      parseTelegramUpdate({
+        update_id: 14,
+        message: { message_id: 1, chat: { id: 111, type: "private" }, sticker: {} },
+      }).type,
+    ).toBe("reply");
+  });
+  it("still parses group photos (gate runs later with the caption)", () => {
+    expect(
+      parseTelegramUpdate({
+        update_id: 15,
+        message: { message_id: 1, chat: gchat, photo: [{ file_id: "p", file_size: 1 }] },
+      }),
+    ).toMatchObject({ type: "image", caption: null, chat_type: "supergroup" });
   });
 });
 

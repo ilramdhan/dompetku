@@ -18,6 +18,10 @@ export type TgContext = {
   chat_id: string;
   message_id: number | null;
   callback_id: string | null;
+  /** #71: Telegram chat.type ("private" | "group" | "supergroup" | "channel"), null if absent. */
+  chat_type?: string | null;
+  /** #71: author of the message this one replies to (null when not a reply). */
+  reply_to?: { is_bot: boolean; username: string | null } | null;
 };
 
 export type TgIncoming =
@@ -34,6 +38,7 @@ export type TgIncoming =
   | (TgContext & { type: "reply"; text: string });
 
 const IMAGE_DOC = /^image\/(jpeg|png|webp)$/;
+const CHAT_TYPES = ["private", "group", "supergroup", "channel"];
 
 /** Classifies a Telegram update (message / callback_query). Anything else is ignored. */
 export function parseTelegramUpdate(u: any): TgIncoming {
@@ -47,6 +52,16 @@ export function parseTelegramUpdate(u: any): TgIncoming {
     chat_id: chatId,
     message_id: typeof msg?.message_id === "number" ? msg.message_id : null,
     callback_id: cb?.id ? String(cb.id) : null,
+    chat_type: CHAT_TYPES.includes(msg?.chat?.type) ? msg.chat.type : null,
+    reply_to: msg?.reply_to_message?.from
+      ? {
+          is_bot: !!msg.reply_to_message.from.is_bot,
+          username:
+            typeof msg.reply_to_message.from.username === "string"
+              ? msg.reply_to_message.from.username
+              : null,
+        }
+      : null,
   };
   if (cb) return { ...base, type: "callback", callback_data: String(cb.data ?? "").slice(0, 64) };
   if (!msg) return { type: "ignore" };
@@ -75,6 +90,8 @@ export function parseTelegramUpdate(u: any): TgIncoming {
     };
   if (typeof msg.text === "string" && msg.text)
     return { ...base, type: "text", text: msg.text.slice(0, 2000) };
+  // Groups see stickers, joins and other service messages: stay silent instead of nagging.
+  if (base.chat_type === "group" || base.chat_type === "supergroup") return { type: "ignore" };
   return {
     ...base,
     type: "reply",
