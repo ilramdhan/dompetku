@@ -613,6 +613,6 @@ notify pgrst, 'reload schema';
 -- ============ v20: interval fleksibel untuk langganan (aman dijalankan ulang) ============
 -- Opsional: tanpa bagian ini langganan tetap berjalan dengan siklus bulanan/tahunan biasa (interval = 1).
 -- interval: setiap N bulan atau N tahun (mis. 3 bulan, 6 bulan, 3 tahun, 5 tahun).
--- Sama seperti pola transaksi berulang (recurring_transactions.interval).
-alter table public.subscriptions add column if not exists interval int not null default 1 check (interval > 0);
+-- Sama seperti pola transaksi berulang (recurring_transactions."interval").
+alter table public.subscriptions add column if not exists "interval" int not null default 1 check ("interval" >= 1);
 notify pgrst, 'reload schema';

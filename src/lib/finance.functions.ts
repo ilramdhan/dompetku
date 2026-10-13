@@ -78,7 +78,7 @@ export const saveRow = createServerFn({ method: "POST" })
       data.table === "accounts"
         ? ["transfer_fees", "topup_fees", "monthly_fee", "monthly_fee_day"]
         : data.table === "subscriptions"
-          ? ["tax_percent"]
+          ? ["tax_percent", "interval"]
           : data.table === "goals"
             ? ["account_id"]
             : data.table === "budgets"

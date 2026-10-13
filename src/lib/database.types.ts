@@ -345,6 +345,8 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           tax_percent?: number | null;
+          /** v20 */
+          interval?: number;
         };
         Update: {
           id?: string;
@@ -359,6 +361,8 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           tax_percent?: number | null;
+          /** v20 */
+          interval?: number;
         };
         Relationships: [
           {
