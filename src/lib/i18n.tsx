@@ -416,7 +416,6 @@ const DICT: Record<string, string> = {
   kategori: "category",
   akun: "account",
   "akun baru dibuat": "new account(s) created",
-  bulan: "months",
   hari: "days",
   dilewati: "skipped",
   "sama dengan data yang sudah ada": "identical to existing data",
@@ -603,9 +602,6 @@ const DICT: Record<string, string> = {
   "Pengeluaran rutin / bulan": "Recurring expenses / month",
   "Belum ada transaksi berulang. Tambahkan gaji, sewa, atau transfer tabungan…":
     "No recurring transactions yet. Add your salary, rent or savings transfer…",
-  Tiap: "Every",
-  minggu: "weeks",
-  tahun: "years",
   Mingguan: "Weekly",
   Otomatis: "Automatic",
   Manual: "Manual",

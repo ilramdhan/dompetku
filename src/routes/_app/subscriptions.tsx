@@ -23,6 +23,7 @@ import { usePrivacy } from "@/lib/privacy";
 import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/head";
 import { resolveReportAccount, validateReportSearch } from "@/lib/report-filter";
+import { subMonthly } from "@/lib/subscriptions";
 import type { Account, Category, Subscription } from "@/lib/schemas";
 
 export const Route = createFileRoute("/_app/subscriptions")({
@@ -71,11 +72,7 @@ function SubsPage() {
   const active = filtered.filter((s) => s.active);
   const cycleUnit = { monthly: "bulan", yearly: "tahun" } as const;
   const cycleLabel = { monthly: "Bulanan", yearly: "Tahunan" } as const;
-  const monthly = active.reduce((a, s) => {
-    const interval = Math.max(1, s.interval || 1);
-    const months = s.cycle === "yearly" ? 12 * interval : interval;
-    return a + toIdr(s) / months;
-  }, 0);
+  const monthly = active.reduce((a, s) => a + subMonthly(toIdr(s), s.cycle, s.interval ?? 1), 0);
   const today = todayStr();
   const accName = (id: string | null | undefined) => accounts.find((a) => a.id === id)?.name;
 
@@ -253,7 +250,7 @@ function SubsPage() {
         },
         {
           name: "interval",
-          label: v.cycle === "yearly" ? t("Setiap (tahun)") : t("Setiap (bulan)"),
+          label: v["cycle"] === "yearly" ? t("Setiap (tahun)") : t("Setiap (bulan)"),
           type: "number",
           half: true,
           placeholder: "1",

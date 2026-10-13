@@ -27,6 +27,7 @@ import {
 import { addDays } from "./dates";
 import type { Tables } from "./database.types";
 import { withTax } from "./fees";
+import { subMonthly, subNextDue } from "./subscriptions";
 import { isChatAllowed } from "./integrations";
 import { groupAddress, isGroupChat } from "./bot-group";
 
@@ -854,9 +855,8 @@ export async function subscriptionsText(): Promise<string> {
   const lines = ["🔁 Langganan aktif", ""];
   for (const s of subs) {
     const amt = withTax(Number(s.amount), s.tax_percent);
-    const interval = Math.max(1, s.interval || 1);
-    const months = s.cycle === "yearly" ? 12 * interval : interval;
-    monthlyIdr += (amt / months) * (s.currency === "USD" ? rate : 1);
+    const interval = s.interval ?? 1;
+    monthlyIdr += subMonthly(amt, s.cycle, interval) * (s.currency === "USD" ? rate : 1);
     const late = s.next_due < today ? " ⚠️ lewat" : s.next_due === today ? " • HARI INI" : "";
     const cycleText =
       interval > 1
