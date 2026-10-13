@@ -3,6 +3,8 @@
  * Pure functions for next-due calculation and monthly cost conversion.
  */
 
+import { addMonthsKeepDay } from "./dates";
+
 /** Convert subscription amount to monthly equivalent. */
 export function subMonthly(amount: number, cycle: "monthly" | "yearly", interval: number): number {
   if (cycle === "monthly") return amount / interval;
@@ -22,8 +24,5 @@ export function subMonths(cycle: "monthly" | "yearly", interval: number): number
  * @returns ISO date string
  */
 export function subNextDue(cycle: "monthly" | "yearly", interval: number, lastDue: string): string {
-  const d = new Date(lastDue + "T00:00:00Z");
-  const months = subMonths(cycle, interval);
-  d.setUTCMonth(d.getUTCMonth() + months);
-  return d.toISOString().slice(0, 10);
+  return addMonthsKeepDay(lastDue, subMonths(cycle, interval));
 }
