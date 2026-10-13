@@ -214,7 +214,7 @@ function SubsPage() {
         visible={page.visible.length}
         onChange={page.setOffset}
       />
-      {crud.dialog(t("langganan"), [
+      {crud.dialog(t("langganan"), (v) => [
         {
           name: "name",
           label: t("Nama layanan"),
@@ -253,7 +253,7 @@ function SubsPage() {
         },
         {
           name: "interval",
-          label: t("Setiap N"),
+          label: v.cycle === "yearly" ? t("Setiap (tahun)") : t("Setiap (bulan)"),
           type: "number",
           half: true,
           placeholder: "1",
