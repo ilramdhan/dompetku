@@ -329,6 +329,8 @@ export type Database = {
           created_at: string;
           /** v4 */
           tax_percent?: number | null;
+          /** v20 */
+          interval?: number;
         };
         Insert: {
           id?: string;

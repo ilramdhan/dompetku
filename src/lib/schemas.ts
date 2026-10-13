@@ -126,6 +126,7 @@ export const subscriptionSchema = z.object({
   amount: money,
   currency: z.enum(CURRENCIES),
   cycle: z.enum(["monthly", "yearly"]),
+  interval: z.coerce.number().int().min(1).default(1),
   next_due: dateStr,
   account_id: optId,
   category_id: optId,

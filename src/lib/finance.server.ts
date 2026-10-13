@@ -954,7 +954,8 @@ export async function paySubscription(id: string, accountId: string | null, date
     notes: null,
     receipt_path: null,
   });
-  const next = addMonthsKeepDay(s.next_due, s.cycle === "yearly" ? 12 : 1);
+  const interval = Math.max(1, s.interval || 1);
+  const next = addMonthsKeepDay(s.next_due, (s.cycle === "yearly" ? 12 : 1) * interval);
   must(await db().from("subscriptions").update({ next_due: next }).eq("id", id));
   await logActivity("subscription.pay", "subscriptions", {
     name: s.name,
@@ -1020,10 +1021,19 @@ export async function computeReminders(days = 30, pre: ReminderInputs = {}): Pro
   const subs = must(subsRes);
   for (const s of subs) {
     const amt = withTax(Number(s.amount), s.tax_percent);
+    const interval = Math.max(1, s.interval || 1);
+    const cycleText =
+      interval > 1
+        ? s.cycle === "yearly"
+          ? `tiap ${interval} tahun`
+          : `tiap ${interval} bulan`
+        : s.cycle === "yearly"
+          ? "tahunan"
+          : "bulanan";
     out.push({
       type: "subscription",
       id: s.id,
-      title: `Langganan ${s.name} (${s.cycle === "yearly" ? "tahunan" : "bulanan"})`,
+      title: `Langganan ${s.name} (${cycleText})`,
       amount: amt,
       currency: s.currency,
       amount_idr: await toIdr(amt, s.currency, rate),
