@@ -146,7 +146,7 @@ A **fork** is your own copy of the project on GitHub. Vercel will build the webs
 **What success looks like:** the result panel says **Success. No rows returned** (you may also see a small table from the last statement). In **Table Editor** you now see tables such as `accounts`, `categories`, `transactions`, `debts`, `subscriptions`, `budgets`, `goals` … and the `categories` table already has default categories.
 
 <details>
-<summary><strong>What are the sections v1 … v19?</strong></summary>
+<summary><strong>What are the sections v1 … v20?</strong></summary>
 
 The file grew with the app. Every section uses `if not exists` / `on conflict do nothing` / `create or replace`, so **the whole file is idempotent: running it again is always safe** and never deletes data. Run the whole file each time you update.
 
@@ -171,6 +171,7 @@ The file grew with the app. Every section uses `if not exists` / `on conflict do
 | v17       | Profile (name, address, photo) and changing the login password in the app (`app_users`)                                                  |
 | v18       | Multi-user for families: members with per-wallet view/manage access (`account_permissions`), needs v17                                   |
 | v19       | Kantong (pockets) inside a wallet with low/empty alerts (`pockets`, `transactions.pocket_id`, `pocket_alerts`)                           |
+| v20       | Subscription flexible interval: every N months/years (`subscriptions."interval"`)                                                        |
 
 If a later section has not been run, the related page shows a hint instead of crashing, and the rest of the app keeps working.
 

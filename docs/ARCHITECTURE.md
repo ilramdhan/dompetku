@@ -13,7 +13,7 @@ so you can follow along even if you are new to web development.
 - [Tech stack](#tech-stack)
 - [System diagram](#system-diagram)
 - [Directory structure](#directory-structure)
-- [Database schema sections (v1–v19)](#database-schema-sections-v1v19)
+- [Database schema sections (v1–v20)](#database-schema-sections-v1v20)
 - [Key flows](#key-flows)
 - [Conventions and contributor rules](#conventions-and-contributor-rules)
 - [Testing and CI](#testing-and-ci)
@@ -128,7 +128,7 @@ collapsed. Lovable planning drafts in `.lovable/` are omitted.
 │   ├── icons/                     # PWA icons (collapsed)
 │   ├── manifest.webmanifest       # PWA manifest (no service worker)
 │   └── (robots.txt and sitemap.xml are server routes in src/routes)
-├── supabase/schema.sql            # Full database schema, sections v1–v19, safe to re-run
+├── supabase/schema.sql            # Full database schema, sections v1–v20, safe to re-run
 ├── src/
 │   ├── server.ts                  # Server entry wrapper: catches SSR errors → logError + error page
 │   ├── start.ts                   # Global request middleware: security headers, error page, CSRF
@@ -208,7 +208,7 @@ File-name suffixes tell you where code may run:
 | `i18n.tsx`                                                                    | `LanguageProvider` / `useI18n`, ID→EN dictionary.                                                                      |
 | `dates.ts`, `head.ts`, `utils.ts`                                             | Date helpers, page `<head>` helper, `cn()` class merge.                                                                |
 
-## Database schema sections (v1–v19)
+## Database schema sections (v1–v20)
 
 `supabase/schema.sql` is one file, organised in sections that are **safe to re-run** (`if not
 exists` everywhere). A fresh install runs the whole file once. Existing installs run any newer
@@ -236,6 +236,7 @@ the section is run.
 | v17     | `app_users` (username, display_name, address, avatar data URL, password_hash, role, is_active, session_version): profile + in-app password change; backups carry profile fields only.                                           |
 | v18     | Multi-user: `app_users.must_change_password`, `account_permissions` (user_id, account_id, level `view`/`manage`, PK both, cascade), optional `activity_log.actor`.                                                              |
 | v19     | Kantong: `pockets` (account_id cascade, name unique per wallet, allocated, min_balance, period `monthly`/`none`), optional `transactions.pocket_id` (on delete set null), `pocket_alerts` (pocket, month, level `low`/`empty`). |
+| v20     | Subscription flexible interval: `subscriptions."interval"` (default 1, check ≥ 1) enables custom intervals like every 3 months, 6 months, 3 years.                                                                              |
 
 ## Key flows
 
