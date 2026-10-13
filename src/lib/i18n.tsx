@@ -278,6 +278,7 @@ const DICT: Record<string, string> = {
   "Setiap (tahun)": "Every (years)",
   Tiap: "Every",
   bulan: "months",
+  minggu: "weeks",
   tahun: "years",
   "Tagihan berikutnya": "Next bill",
   "Dibayar dari": "Paid from",

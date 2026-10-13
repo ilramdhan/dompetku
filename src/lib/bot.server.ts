@@ -27,7 +27,7 @@ import {
 import { addDays } from "./dates";
 import type { Tables } from "./database.types";
 import { withTax } from "./fees";
-import { subMonthly, subNextDue } from "./subscriptions";
+import { subMonthly } from "./subscriptions";
 import { isChatAllowed } from "./integrations";
 import { groupAddress, isGroupChat } from "./bot-group";
 
