@@ -54,7 +54,7 @@ Versions are taken from `package.json` (`^` means "this version or a compatible 
 | File storage       | Supabase Storage                                                           | —                                             | Private `receipts` bucket for receipt photos, viewed through short-lived signed URLs.                                                                    |
 | Hosting            | [Vercel](https://vercel.com) (region `sin1`, see `vercel.json`) or Lovable | —                                             | Serverless functions; the bot endpoint gets a 60 s limit for OCR (see `vite.config.ts`).                                                                 |
 | Tests              | [Vitest](https://vitest.dev) + Testing Library + jsdom                     | Vitest ^4.1                                   | Unit tests for all pure logic plus a few component tests.                                                                                                |
-| Lint & format      | ESLint 9 + typescript-eslint, Prettier 3                                   | —                                             | Consistent code style; `npm run lint` must pass in CI.                                                                                                   |
+| Lint & format      | ESLint 9 + typescript-eslint, Prettier 3                                   | —                                             | Consistent code style; `bun run lint` must pass in CI.                                                                                                   |
 | CI                 | GitHub Actions (`.github/workflows/ci.yml`)                                | —                                             | Runs lint, typecheck, test and build on every pull request and push to `main`.                                                                           |
 | Automation         | [n8n](https://n8n.io)                                                      | any recent                                    | Receives Telegram updates and runs schedules (reminders, reports, weekly backup) by calling `/api/public/n8n/*`.                                         |
 | Chat bot           | Telegram Bot API                                                           | —                                             | Record transactions by chat or receipt photo, with inline buttons.                                                                                       |
@@ -177,7 +177,7 @@ File-name suffixes tell you where code may run:
 | File                                                                          | Purpose                                                                                                                |
 | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `db.server.ts`                                                                | The single Supabase client (service-role key), typed with `database.types.ts`.                                         |
-| `database.types.ts`                                                           | Generated DB types (`npm run gen:types`); optional columns/tables added by hand.                                       |
+| `database.types.ts`                                                           | Generated DB types (`bun run gen:types`); optional columns/tables added by hand.                                       |
 | `session.server.ts`, `auth.functions.ts`, `auth-middleware.ts`                | Credential check, HMAC-signed cookie, login/logout/2FA server functions, `requireAuth`.                                |
 | `totp.ts` / `totp.server.ts`                                                  | Pure TOTP (RFC 6238) helpers / verification against `APP_TOTP_SECRET`.                                                 |
 | `password.ts` / `password.server.ts`, `session.ts`                            | Pure scrypt hash format + password policy / hashing; pure cookie payload + session-version check.                      |
@@ -527,7 +527,7 @@ worker** on purpose: it keeps Lovable previews and deployments free of stale cac
 - [ ] Add a new section `-- ===== vN: … =====` to `supabase/schema.sql` (idempotent, RLS enabled,
       grants to `service_role` only).
 - [ ] Add the table/columns to `src/lib/database.types.ts` (mark optional if the section may not
-      have been run), or regenerate with `npm run gen:types`.
+      have been run), or regenerate with `bun run gen:types`.
 - [ ] Read through `isMissingTable()` / `isMissingFunction()` so old databases keep working.
 - [ ] Add the table to `RESTORE_TABLES` in `backup.ts` in foreign-key order (and conflict keys).
 - [ ] Add the table to the `AFFECTS` map in `queries.ts`.
@@ -539,11 +539,11 @@ worker** on purpose: it keeps Lovable previews and deployments free of stale cac
 ## Testing and CI
 
 ```bash
-npm run lint        # ESLint
-npm run typecheck   # tsc --noEmit
-npm test            # Vitest, once
-npm run test:watch  # Vitest in watch mode
-npm run build       # production build
+bun run lint        # ESLint
+bun run typecheck   # tsc --noEmit
+bun run test            # Vitest, once
+bun run test:watch  # Vitest in watch mode
+bun run build       # production build
 ```
 
 - Tests live in `src/test` and mostly cover pure modules (bot parsing, fees, budgets, recurring,

@@ -7,21 +7,21 @@ screenshots, without touching a real database.
 ## Requirements
 
 - Docker (running)
-- Node.js 22+ and `npm install` done in the repo
+- Node.js 22+ and `bun install` done in the repo
 - No Supabase CLI install needed: the scripts use `npx supabase@2` (downloads on first run)
 
 ## Quick start
 
 ```bash
-npm run db:up          # start local Supabase (Postgres + PostgREST + Storage + Studio) and apply supabase/schema.sql
+bun run db:up          # start local Supabase (Postgres + PostgREST + Storage + Studio) and apply supabase/schema.sql
 # create .env.local (see below)
-npm run seed:demo -- --reset          # wipe app data and insert demo data
+bun run seed:demo -- --reset          # wipe app data and insert demo data
 set -a; . ./.env.local; set +a; npx vite dev --port 8080
 ```
 
 Open <http://localhost:8080> and sign in with **demo** / **demo-password-123**.
 
-Stop everything with `npm run db:down` (data is discarded).
+Stop everything with `bun run db:down` (data is discarded).
 
 ### `.env.local`
 
@@ -43,7 +43,7 @@ APP_TIMEZONE=Asia/Jakarta
 If your CLI version prints a different key, use the `SECRET_KEY` (or legacy `SERVICE_ROLE_KEY`)
 from `npx supabase@2 status --workdir scripts/dev-db`.
 
-`npm run seed:demo` reads `.env.local` automatically (`node --env-file-if-exists`). `vite dev` does
+`bun run seed:demo` reads `.env.local` automatically (`node --env-file-if-exists`). `vite dev` does
 not load non-`VITE_` variables into `process.env`, which is why the quick start exports them in the
 shell first.
 
@@ -51,10 +51,10 @@ shell first.
 
 | Command                          | What it does                                                                                                                                                                      |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run db:up`                  | `supabase start` with the minimal config in `scripts/dev-db/supabase/config.toml` (ports 54321 API, 54322 Postgres, 54323 Studio), then `scripts/dev-db/apply-schema.sh`.         |
+| `bun run db:up`                  | `supabase start` with the minimal config in `scripts/dev-db/supabase/config.toml` (ports 54321 API, 54322 Postgres, 54323 Studio), then `scripts/dev-db/apply-schema.sh`.         |
 | `scripts/dev-db/apply-schema.sh` | Pipes the whole `supabase/schema.sql` (every section, including ones added later) into `psql` inside the DB container and reloads PostgREST. Safe to re-run after schema changes. |
-| `npm run seed:demo -- --reset`   | Deletes all rows from the app tables, then inserts the demo data. Without `--reset` it refuses to run when accounts already exist.                                                |
-| `npm run db:down`                | Stops the stack and deletes its volumes.                                                                                                                                          |
+| `bun run seed:demo -- --reset`   | Deletes all rows from the app tables, then inserts the demo data. Without `--reset` it refuses to run when accounts already exist.                                                |
+| `bun run db:down`                | Stops the stack and deletes its volumes.                                                                                                                                          |
 
 The seed script refuses to write to any host other than `localhost`/`127.0.0.1` unless you pass
 `--allow-remote` **and** set `DEMO_RESET_CONFIRM=yes`. `--reset` deletes **all** data — every app
@@ -116,7 +116,7 @@ The images in `public/screenshots/` (used by the README and the landing page) co
 stack. Start the dev server as in the quick start, then:
 
 ```bash
-npm run db:up && npm run seed:demo -- --reset && npm run screenshots
+bun run db:up && bun run seed:demo -- --reset && bun run screenshots
 ```
 
 `scripts/screenshots.mjs` (run through `npx` with Playwright and sharp, nothing is added to

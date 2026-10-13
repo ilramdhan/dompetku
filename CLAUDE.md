@@ -27,12 +27,14 @@ server-side only), Vitest. Deployed on Lovable and Vercel from the same code.
 ## Commands
 
 ```sh
-npm run dev         # dev server
-npm run lint        # eslint
-npm run typecheck   # tsc --noEmit
-npm test            # vitest run (src/test/**)
-npm run build       # production build
+bun run dev         # dev server
+bun run lint        # eslint
+bun run typecheck   # tsc --noEmit
+bun run test        # vitest run (src/test/**)
+bun run build       # production build
 ```
+
+CI installs with `bun install --frozen-lockfile`; `bun.lock` is the only lockfile (`npm install` works as a fallback, `npm ci` does not). Use `bun run test`, not `bun test` (that is Bun's own runner, not Vitest).
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build — run all four
 before committing; keep them green.

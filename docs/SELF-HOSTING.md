@@ -418,7 +418,7 @@ The README and landing page images in `public/screenshots/` are captured from th
 (fictional data only, see [DEMO-DATA.md](DEMO-DATA.md)). With the dev server running on port 8080:
 
 ```sh
-npm run db:up && npm run seed:demo -- --reset && npm run screenshots
+bun run db:up && bun run seed:demo -- --reset && bun run screenshots
 ```
 
 Details: [DEMO-DATA.md → Regenerating screenshots](DEMO-DATA.md#regenerating-screenshots).

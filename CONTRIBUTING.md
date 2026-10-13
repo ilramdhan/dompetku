@@ -70,7 +70,7 @@ git checkout -b fix/budget-rollover-rounding
 
 Follow **[Running locally in docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#7-running-locally-for-developers)** — it explains how to install the tools, create a free Supabase project and fill in `.env`.
 
-No local setup? [Open the repo in GitHub Codespaces](https://codespaces.new/ilramdhan/dompetku) — the dev container in `.devcontainer/` installs dependencies and includes Docker for `npm run db:up`.
+No local setup? [Open the repo in GitHub Codespaces](https://codespaces.new/ilramdhan/dompetku) — the dev container in `.devcontainer/` installs dependencies and includes Docker for `bun run db:up`.
 
 The project uses [Bun](https://bun.sh) in CI, but npm works too:
 
@@ -83,6 +83,9 @@ The project uses [Bun](https://bun.sh) in CI, but npm works too:
 | Type-check             | `bun run typecheck` | `npm run typecheck` |
 | Production build       | `bun run build`     | `npm run build`     |
 | Format code (Prettier) | `bun run format`    | `npm run format`    |
+
+> [!NOTE]
+> `bun.lock` is the only lockfile, so CI and Docker use `bun install --frozen-lockfile`. With npm, use `npm install` (not `npm ci`) and don't commit a `package-lock.json`.
 
 > [!TIP]
 > Many changes (pure helpers, translations, docs) can be developed and tested with `bun run test` alone — you don't need a Supabase project for those.
