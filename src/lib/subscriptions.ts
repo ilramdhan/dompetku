@@ -21,11 +21,7 @@ export function subMonths(cycle: "monthly" | "yearly", interval: number): number
  * @param lastDue ISO date string (YYYY-MM-DD)
  * @returns ISO date string
  */
-export function subNextDue(
-  cycle: "monthly" | "yearly",
-  interval: number,
-  lastDue: string,
-): string {
+export function subNextDue(cycle: "monthly" | "yearly", interval: number, lastDue: string): string {
   const d = new Date(lastDue + "T00:00:00Z");
   const months = subMonths(cycle, interval);
   d.setUTCMonth(d.getUTCMonth() + months);
