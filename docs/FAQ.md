@@ -200,7 +200,7 @@ Only for **receipt OCR** and understanding **ambiguous chat messages**. Simple m
 <details>
 <summary><strong>Can the AI create wrong categories or save things without asking?</strong></summary>
 
-No. AI output is snapped onto your **existing** categories and accounts (falling back to "Lainnya"); it never creates new ones. Every bot entry is shown as a **preview** and is saved only when you tap ✅ — double taps and retries don't create duplicates, and `/undo` removes the last bot transaction.
+No. AI output is snapped onto your **existing** categories and accounts (falling back to "Lainnya"); it never creates new ones. Chat messages and receipt photos are shown as a **preview** and saved only when you tap ✅ — double taps and retries don't create duplicates, and `/undo` removes the last bot transaction. The exceptions are `/bayar <name>` (records a subscription or installment payment) and `/tarik <amount> dari <account>` (a cash withdrawal, which creates a cash account named `Tunai` if you have none): these are recorded immediately, without a preview.
 
 </details>
 

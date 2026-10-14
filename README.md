@@ -164,7 +164,9 @@ or dark). Regenerate them with `bun run screenshots` (see [Regenerating screensh
 - **Debts and installments** (paylater, loans) with payment tracking.
 - **Subscriptions**, monthly or yearly, in IDR or USD, with optional tax.
 - **Account fees**: transfer, top-up and monthly admin fees recorded as separate expenses.
-- **Recurring transactions** (salary, rent, regular transfers) posted automatically when due.
+- **Recurring transactions** (salary, rent, regular transfers) posted automatically when due. A
+  long-missed schedule posts only its latest 12 occurrences; resuming a paused one skips what was
+  missed while paused.
 - **Split transactions**: split one receipt across several categories.
 - **Up to 5 receipt photos** per transaction, stored privately, plus search by receipt item name.
 - **CSV import** with a preview, duplicate detection and optional creation of new categories or
@@ -191,8 +193,11 @@ or dark). Regenerate them with `bun run screenshots` (see [Regenerating screensh
 ### Automation
 
 - **Telegram bot**: record transactions by chat (`kopi 25rb`, `gaji masuk 8jt ke BCA`) or by sending
-  a receipt photo. Every entry is shown as a **preview with buttons** before it is saved (change the
-  category, account, type or description — even for a receipt); `/undo` removes the last one. Slash commands give balances, reports, bills, budgets and more.
+  a receipt photo. Chat and receipt entries are shown as a **preview with buttons** before they are
+  saved (change the category, account, type or description — even for a receipt); `/undo` removes
+  the last one. `/bayar <name>` (subscription or installment payment) and
+  `/tarik <amount> dari <account>` (cash withdrawal) are recorded immediately, without a preview.
+  Slash commands give balances, reports, bills, budgets and more.
 - **Receipt OCR** in the web app and the bot, using any OpenAI-compatible AI provider (for example
   Google Gemini or OpenAI).
 - **Reminders** for upcoming bills via Telegram or email, plus daily, weekly and monthly reports,
