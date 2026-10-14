@@ -376,6 +376,7 @@ sequenceDiagram
 - Logic lives in the web app (`bot.ts` pure, `bot.server.ts` DB). n8n only relays
   `{method, text, reply_markup}` to the Telegram Bot API.
 - Double taps and retries are harmless: the unique `external_id` makes the save idempotent.
+- `/bayar` (`botPay`) and `/tarik` (`cashWithdraw`) bypass `bot_drafts` and write immediately.
 - AI results are snapped to existing categories/accounts (`matchCategory`); the bot never
   creates categories. `BOT_TEXT_AI` (`auto` / `always` / `never`) and `AI_MODEL_TEXT` control token
   spend; chats without an amount or over 300 characters skip AI, and `BOT_AI_DAILY_LIMIT` caps
@@ -408,6 +409,9 @@ next time it matters:
   transactions.
 - Both are **idempotent**: fees are deduplicated by a notes marker from `fees.ts`; recurring items
   by a notes marker plus `external_id`. Recurring application never throws.
+- One run posts at most the latest `RECURRING_CATCHUP_CAP` (12) missed occurrences per schedule;
+  older ones are skipped. Resuming a paused schedule (`resumeNextDue`) jumps to the first
+  occurrence on/after today, so nothing missed while paused is posted.
 - Reminders (`/reminders`, `/api/public/n8n/reminders`, `-email`, `-send-email`) list upcoming
   subscription and installment bills. n8n workflow 02 calls them on a schedule; direct email uses
   Resend when `RESEND_API_KEY` / `EMAIL_FROM` / `EMAIL_TO` are set.
