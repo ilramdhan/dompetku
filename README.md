@@ -203,6 +203,16 @@ or dark). Regenerate them with `bun run screenshots` (see [Regenerating screensh
 - **Reminders** for upcoming bills via Telegram or email, plus daily, weekly and monthly reports,
   all scheduled by ready-to-import [n8n](https://n8n.io) workflows.
 
+### Invoices and payments
+
+- **Invoices** with automatic numbers, line items, due dates and partial or full payments booked as
+  income; an aging report and an unpaid-invoices card on the dashboard (schema v21).
+- **Public invoice link** the customer can open, print or save as PDF, and share via WhatsApp (v23).
+- **Bank transfer / QRIS instructions** with proof-of-transfer upload and an approval queue (v24).
+- **Invoice emails** via Resend: send the invoice, payment confirmations and due/overdue reminders.
+- **Online payment (optional)** through **Midtrans Snap** (QRIS, e-wallets, cards, VA) with
+  verified webhooks and refunds (v25) — step-by-step guide: [PAYMENT-GATEWAY.md](docs/PAYMENT-GATEWAY.md).
+
 ### Reports
 
 - Dashboard with cash flow, category breakdowns and net worth charts.
