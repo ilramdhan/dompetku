@@ -23,6 +23,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppDebtsRouteImport } from './routes/_app/debts'
 import { Route as AppGoalsRouteImport } from './routes/_app/goals'
 import { Route as AppGoldRouteImport } from './routes/_app/gold'
+import { Route as AppInvoicesRouteImport } from './routes/_app/invoices'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppReceivablesRouteImport } from './routes/_app/receivables'
 import { Route as AppRecurringRouteImport } from './routes/_app/recurring'
@@ -114,6 +115,11 @@ const AppGoalsRoute = AppGoalsRouteImport.update({
 const AppGoldRoute = AppGoldRouteImport.update({
   id: '/gold',
   path: '/gold',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInvoicesRoute = AppInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProfileRoute = AppProfileRouteImport.update({
@@ -250,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/debts': typeof AppDebtsRoute
   '/goals': typeof AppGoalsRoute
   '/gold': typeof AppGoldRoute
+  '/invoices': typeof AppInvoicesRoute
   '/profile': typeof AppProfileRoute
   '/receivables': typeof AppReceivablesRoute
   '/recurring': typeof AppRecurringRoute
@@ -288,6 +295,7 @@ export interface FileRoutesByTo {
   '/debts': typeof AppDebtsRoute
   '/goals': typeof AppGoalsRoute
   '/gold': typeof AppGoldRoute
+  '/invoices': typeof AppInvoicesRoute
   '/profile': typeof AppProfileRoute
   '/receivables': typeof AppReceivablesRoute
   '/recurring': typeof AppRecurringRoute
@@ -328,6 +336,7 @@ export interface FileRoutesById {
   '/_app/debts': typeof AppDebtsRoute
   '/_app/goals': typeof AppGoalsRoute
   '/_app/gold': typeof AppGoldRoute
+  '/_app/invoices': typeof AppInvoicesRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/receivables': typeof AppReceivablesRoute
   '/_app/recurring': typeof AppRecurringRoute
@@ -368,6 +377,7 @@ export interface FileRouteTypes {
     | '/debts'
     | '/goals'
     | '/gold'
+    | '/invoices'
     | '/profile'
     | '/receivables'
     | '/recurring'
@@ -406,6 +416,7 @@ export interface FileRouteTypes {
     | '/debts'
     | '/goals'
     | '/gold'
+    | '/invoices'
     | '/profile'
     | '/receivables'
     | '/recurring'
@@ -445,6 +456,7 @@ export interface FileRouteTypes {
     | '/_app/debts'
     | '/_app/goals'
     | '/_app/gold'
+    | '/_app/invoices'
     | '/_app/profile'
     | '/_app/receivables'
     | '/_app/recurring'
@@ -592,6 +604,13 @@ declare module '@tanstack/react-router' {
       path: '/gold'
       fullPath: '/gold'
       preLoaderRoute: typeof AppGoldRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/invoices': {
+      id: '/_app/invoices'
+      path: '/invoices'
+      fullPath: '/invoices'
+      preLoaderRoute: typeof AppInvoicesRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/profile': {
@@ -765,6 +784,7 @@ interface AppRouteChildren {
   AppDebtsRoute: typeof AppDebtsRoute
   AppGoalsRoute: typeof AppGoalsRoute
   AppGoldRoute: typeof AppGoldRoute
+  AppInvoicesRoute: typeof AppInvoicesRoute
   AppProfileRoute: typeof AppProfileRoute
   AppReceivablesRoute: typeof AppReceivablesRoute
   AppRecurringRoute: typeof AppRecurringRoute
@@ -784,6 +804,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDebtsRoute: AppDebtsRoute,
   AppGoalsRoute: AppGoalsRoute,
   AppGoldRoute: AppGoldRoute,
+  AppInvoicesRoute: AppInvoicesRoute,
   AppProfileRoute: AppProfileRoute,
   AppReceivablesRoute: AppReceivablesRoute,
   AppRecurringRoute: AppRecurringRoute,

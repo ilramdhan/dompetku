@@ -22,6 +22,7 @@ export const LLMS_FEATURES: ReadonlyArray<string> = [
   "Telegram bot for logging transactions in chat (quick text parsing, AI only when ambiguous) and receipt OCR through any OpenAI-compatible endpoint",
   "Budgets with rollover and 80%/100% alerts, pockets (envelopes) inside a wallet, savings goals and recurring transactions",
   "Debts and installments, subscriptions, receivables and gold holdings (live world/Antam prices) counted in net worth",
+  "Invoices with automatic numbers, line items and manual (partial) payments booked as income",
   "Reports, yearly recap, account reconciliation, CSV import/export and full JSON backup/restore",
   "Family members with per-wallet permissions, optional TOTP 2FA, privacy mode and an Indonesian/English UI",
   "Installable PWA; free to run on the free tiers of Vercel and Supabase",
