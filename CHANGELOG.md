@@ -9,6 +9,24 @@ Starting with v1.0.0, versioned entries (`## [x.y.z]`) are generated automatical
 > [!NOTE]
 > When an entry mentions a **schema section** (`v2`…`v13`), self-hosters must run that section of [`supabase/schema.sql`](supabase/schema.sql) on their Supabase project. Every section is safe to run more than once, and the app keeps working (with the feature disabled) until you do.
 
+## [1.11.0](https://github.com/ilramdhan/dompetku/compare/v1.10.2...v1.11.0) (2026-10-30)
+
+
+### Features
+
+* **invoices:** bank/QRIS payment methods with proof upload and verification queue ([#109](https://github.com/ilramdhan/dompetku/issues/109)) ([cfecf03](https://github.com/ilramdhan/dompetku/commit/cfecf0392698fc464ee136d23e54f1238490b192))
+* **invoices:** email invoices, payment confirmations and due reminders via Resend ([#111](https://github.com/ilramdhan/dompetku/issues/111)) ([e3cb1af](https://github.com/ilramdhan/dompetku/commit/e3cb1af602f0fbed33955b46e1ac8c612c59270e))
+* **invoices:** invoice core with items, numbering and manual payments ([#104](https://github.com/ilramdhan/dompetku/issues/104)) ([ab16e0b](https://github.com/ilramdhan/dompetku/commit/ab16e0b9f413e767e85071a2f8d9146e684cde66))
+* **invoices:** invoice report with aging and payment history ([#105](https://github.com/ilramdhan/dompetku/issues/105)) ([acdea49](https://github.com/ilramdhan/dompetku/commit/acdea49211e58369138a548acd8f1d851dd0e94a))
+* **invoices:** online invoice payments via Midtrans Snap with verified webhooks and refunds ([#112](https://github.com/ilramdhan/dompetku/issues/112)) ([570e3cd](https://github.com/ilramdhan/dompetku/commit/570e3cdb1a17f40b7cddec825d934d1ee1169228))
+* **invoices:** public tokenized invoice page with print to PDF ([#108](https://github.com/ilramdhan/dompetku/issues/108)) ([bf1de96](https://github.com/ilramdhan/dompetku/commit/bf1de96742fb78f54e563105be95897db412f541))
+* **notify:** per-member telegram reports and reminders scoped to wallets ([#106](https://github.com/ilramdhan/dompetku/issues/106)) ([54f4ee0](https://github.com/ilramdhan/dompetku/commit/54f4ee0baf3dac3746e2ebfaf57ffe6a3f5df95f))
+
+
+### Bug Fixes
+
+* **i18n:** add missing English translations and a test for missing keys ([#114](https://github.com/ilramdhan/dompetku/issues/114)) ([61510a0](https://github.com/ilramdhan/dompetku/commit/61510a0fd668892e88c7228ac7849caa341ed080))
+
 ## [1.10.2](https://github.com/ilramdhan/dompetku/compare/v1.10.1...v1.10.2) (2026-10-23)
 
 
