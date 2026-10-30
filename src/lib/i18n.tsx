@@ -1218,6 +1218,37 @@ const DICT: Record<string, string> = {
   "Kantong sudah diarsipkan": "The pocket is archived",
   "Nama kantong sudah dipakai di dompet ini": "This wallet already has a pocket with that name",
   "Kantong tidak ditemukan": "Pocket not found",
+  /* Per-member Telegram notifications (v22, issue #75) */
+  "Notifikasi Telegram": "Telegram notifications",
+  "Laporan & pengingat terjadwal (n8n) hanya berisi dompet yang boleh dilihat anggota ini. Chat ID ini tidak memberi akses ke bot.":
+    "Scheduled reports & reminders (n8n) only include wallets this member may view. This chat ID does not grant bot access.",
+  "Chat ID Telegram": "Telegram chat ID",
+  "Chat pribadi atau grup (ID grup diawali tanda minus, mis. -100…).":
+    "A private chat or a group (group IDs start with a minus, e.g. -100…).",
+  "Chat ID wajib diisi": "Chat ID is required",
+  "Chat ID harus berupa angka (grup diawali tanda minus)":
+    "Chat ID must be a number (groups start with a minus)",
+  "Chat ID tidak valid": "Invalid chat ID",
+  "Laporan terjadwal": "Scheduled reports",
+  "Pengingat tagihan": "Bill reminders",
+  "Dompet di notifikasi": "Wallets in notifications",
+  "Anggota ini belum punya akses dompet, jadi tidak akan menerima notifikasi.":
+    "This member has no wallet access yet, so they will not receive notifications.",
+  "Tidak ada yang dicentang = semua dompet yang boleh dilihat anggota.":
+    "Nothing checked = every wallet the member may view.",
+  "Hapus notifikasi": "Remove notifications",
+  "Jalankan bagian v22 di supabase/schema.sql untuk notifikasi Telegram per anggota.":
+    "Run section v22 of supabase/schema.sql for per-member Telegram notifications.",
+  "Dompet di luar akses anggota": "Wallet outside the member's access",
+  "Pemilik memakai TELEGRAM_ADMIN_CHAT_ID di Pengaturan → Integrasi":
+    "The owner uses TELEGRAM_ADMIN_CHAT_ID in Settings → Integrations",
+  "Notifikasi per anggota belum aktif — jalankan bagian v22 di supabase/schema.sql.":
+    "Per-member notifications are not enabled yet — run section v22 of supabase/schema.sql.",
+  "Notifikasi anggota diubah": "Member notifications changed",
+  "Notifikasi anggota dihapus": "Member notifications removed",
+  "Chat ID admin (notifikasi)": "Admin chat ID (notifications)",
+  "Penerima laporan & pengingat terjadwal semua dompet lewat endpoint n8n notifications. Pribadi atau grup (diawali minus). Tidak memberi akses bot.":
+    "Receives scheduled all-wallet reports & reminders via the n8n notifications endpoint. Private or group (starts with a minus). Does not grant bot access.",
   /* SEO (document head of public pages, issue #44) */
   "Dompetku — Pencatat Keuangan Open Source & Self-Hosted Expense Tracker":
     "Dompetku — Open Source, Self-Hosted Personal Finance & Expense Tracker",

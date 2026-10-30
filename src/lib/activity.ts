@@ -54,6 +54,8 @@ const SPECIAL: Record<string, string> = {
   "user.delete": "Anggota dihapus",
   "user.password_reset": "Password anggota direset",
   "permission.update": "Akses dompet diubah",
+  "notify.update": "Notifikasi anggota diubah",
+  "notify.delete": "Notifikasi anggota dihapus",
 };
 
 export function activityLabel(action: string, t: (s: string) => string = (s) => s): string {

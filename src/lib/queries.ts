@@ -40,6 +40,8 @@ export const rowsQuery = (table: CrudTable) =>
   });
 /** Settings → Pengguna (v18, admin only). */
 export const usersQueryKey = ["users"] as const;
+/** Settings → Pengguna → Notifikasi (v22, admin only). */
+export const notifyQueryKey = ["notify"] as const;
 /** Logged-in user's profile (v17); also feeds the header avatar. */
 export const profileQuery = () =>
   queryOptions({ queryKey: ["profile"], queryFn: () => getProfile(), staleTime: 5 * 60_000 });
@@ -213,7 +215,9 @@ const AFFECTS: Record<string, string[]> = {
   app_settings: ["branding", "app-settings", "activity", "dashboard", "reminders"],
   // v17 profile: the profile page, the header avatar and the activity log.
   // v18: user management list (Settings → Pengguna) too.
-  app_users: ["profile", "activity", "users"],
+  app_users: ["profile", "activity", "users", "notify"],
+  // v22 per-member Telegram notifications (Settings → Pengguna).
+  notify_recipients: ["notify", "activity"],
   // v19 Kantong: pocket cards/options/warnings, transactions (badges/filter) and the activity log.
   pockets: ["pockets", "tx", "activity"],
 };

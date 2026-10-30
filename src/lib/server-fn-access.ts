@@ -78,6 +78,11 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     setTelegramWebhook: "admin",
     deleteTelegramWebhook: "admin",
   },
+  "notify.functions.ts": {
+    getNotifySettingsFn: "admin",
+    saveNotifySettingsFn: "admin",
+    deleteNotifySettingsFn: "admin",
+  },
   "pockets.functions.ts": {
     getAccountPockets: "member",
     getPocketOptions: "member",
