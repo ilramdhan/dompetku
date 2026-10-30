@@ -26,6 +26,8 @@ import { EntityDialog } from "@/components/entity-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
 import { WalletFilter } from "@/components/wallet-filter";
 import { InvoiceSharePanel } from "@/components/invoice/invoice-share-panel";
+import { ProofQueue } from "@/components/invoice/proof-queue";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +49,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { errMsg, invalidateFor, invoiceQuery, invoicesQuery, rowsQuery } from "@/lib/queries";
+import {
+  errMsg,
+  invalidateFor,
+  invoiceQuery,
+  invoicesQuery,
+  paymentMethodsQuery,
+  rowsQuery,
+} from "@/lib/queries";
+import type { PaymentMethodRow } from "@/lib/invoice-payments";
 import {
   deleteInvoiceFn,
   deleteInvoicePaymentFn,
@@ -116,6 +126,7 @@ const STATUS_CLASS: Record<DisplayStatus, string> = {
   paid: "border-transparent bg-income/15 text-income",
   cancelled: "border-transparent bg-muted text-muted-foreground line-through",
   overdue: "border-transparent bg-expense/15 text-expense",
+  verifying: "border-transparent bg-primary/15 text-primary",
 };
 
 function StatusBadge({ status }: { status: DisplayStatus }) {
@@ -133,6 +144,8 @@ type FormState = {
   due_date: string;
   notes: string;
   items: ItemRow[];
+  /** v24: picked payment methods ([] = all active). */
+  method_ids: string[];
 };
 
 const newForm = (accountId: string): FormState => {
@@ -147,6 +160,7 @@ const newForm = (accountId: string): FormState => {
     due_date: addDays(issue, 14),
     notes: "",
     items: [emptyItemRow()],
+    method_ids: [],
   };
 };
 
@@ -298,6 +312,7 @@ function InvoicesPage() {
           </p>
         </Card>
       </div>
+      <ProofQueue locale={locale} />
       <div className="no-print mb-3 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
         <WalletFilter
           value={account}
@@ -506,6 +521,7 @@ function InvoicesPage() {
               unit_price: i.unit_price,
             }))
           : [emptyItemRow()],
+        method_ids: Array.isArray(d.method_ids) ? d.method_ids : [],
       });
     } catch (e) {
       toast.error(errMsg(e));
@@ -623,6 +639,15 @@ function InvoiceForm({
     );
   const items = itemsFromRows(f.items);
   const total = invoiceTotal(items.filter((i) => Number.isFinite(i.qty * i.unit_price)));
+  const pm = useQuery(paymentMethodsQuery()).data as
+    { ready: boolean; methods: PaymentMethodRow[] } | undefined;
+  const methodsReady = !!pm?.ready;
+  const methods = (pm?.methods ?? []).filter((m) => m.active || f.method_ids.includes(m.id));
+  const toggleMethod = (id: string, on: boolean) =>
+    set(
+      "method_ids",
+      on ? [...new Set([...f.method_ids, id])] : f.method_ids.filter((x) => x !== id),
+    );
 
   async function submit(e: FormEvent, issue: boolean) {
     e.preventDefault();
@@ -650,6 +675,7 @@ function InvoiceForm({
             account_id: f.account_id,
             notes: f.notes || null,
             ...(f.id ? {} : { issue }),
+            ...(methodsReady ? { method_ids: f.method_ids } : {}),
           } as never,
         },
       });
@@ -815,6 +841,33 @@ function InvoiceForm({
                 </p>
               </div>
             </div>
+            {methodsReady && methods.length ? (
+              <fieldset className="col-span-2 space-y-2">
+                <legend className="text-sm font-medium">{t("Metode pembayaran")}</legend>
+                <p className="text-xs text-muted-foreground">
+                  {t("Tidak dipilih = semua metode aktif tampil di halaman publik.")}
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {methods.map((m) => (
+                    <label
+                      key={m.id}
+                      className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md border p-2 text-sm"
+                    >
+                      <Checkbox
+                        checked={f.method_ids.includes(m.id)}
+                        onCheckedChange={(v) => toggleMethod(m.id, v === true)}
+                      />
+                      <span className="min-w-0 truncate">{m.label}</span>
+                      {!m.active ? (
+                        <Badge variant="outline" className="ml-auto">
+                          {t("Nonaktif")}
+                        </Badge>
+                      ) : null}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
             <div className="col-span-2 space-y-1.5">
               <Label htmlFor="inv-notes">{t("Catatan")}</Label>
               <Textarea
