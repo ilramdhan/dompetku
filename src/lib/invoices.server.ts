@@ -342,6 +342,7 @@ export async function invoiceAction(inv: InvoiceRow, action: InvoiceAction) {
     .maybeSingle();
   if (res.error) throw new Error(res.error.message);
   if (!res.data) throw new Error("Invoice berubah, muat ulang halaman");
+  await retireGatewayOrders(num(res.data));
   await (
     await fin()
   ).logActivity("invoices.update", "invoices", {
@@ -413,7 +414,22 @@ export async function syncInvoice(id: string): Promise<InvoiceRow> {
     .select()
     .single();
   if (res.error) throw new Error(res.error.message);
-  return num(res.data);
+  const out = num(res.data);
+  await retireGatewayOrders(out);
+  return out;
+}
+
+/**
+ * v25: once the remaining amount or status changes, pending Midtrans orders for another amount (or
+ * for an invoice that is no longer open) are expired so the customer cannot overpay. Never throws.
+ */
+async function retireGatewayOrders(inv: InvoiceRow) {
+  const open = inv.status === "unpaid" || inv.status === "partial";
+  const { gatewayAmount } = await import("./gateway/types");
+  const { retirePendingOrders } = await import("./gateway/payments.server");
+  await retirePendingOrders(inv.id, {
+    amount: open ? (gatewayAmount(remainingOf(inv.total, inv.paid)) ?? -1) : -1,
+  });
 }
 
 /**

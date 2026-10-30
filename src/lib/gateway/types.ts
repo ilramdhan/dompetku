@@ -129,7 +129,9 @@ export interface PaymentGateway {
     c: GatewayConfig,
     orderId: string,
     r: { key: string; amount: number; reason: string },
-  ): Promise<{ ok: true } | { ok: false; error: string }>;
+  ): Promise<{ ok: true; duplicate: boolean } | { ok: false; error: string }>;
+  /** Best effort: stop an unpaid (pending) order so it cannot be paid any more. */
+  expire(c: GatewayConfig, orderId: string): Promise<boolean>;
 }
 
 /* ---------------- order ids & amounts ---------------- */
@@ -274,6 +276,40 @@ export function refundKey(rowId: string, seq: number): string {
     .replace(/[^a-zA-Z0-9]/g, "")
     .slice(0, 12);
   return `rf-${id}-${Math.max(1, Math.floor(seq))}`;
+}
+
+/**
+ * Next refund sequence number: one past the highest number already used, counting both what
+ * Midtrans lists (its status API may lag) and the reversing expenses booked locally. Using only
+ * `refunds.length + 1` could reuse a key whose refund is not listed yet (Midtrans then answers 406).
+ */
+export function nextRefundSeq(
+  rowId: string,
+  providerKeys: readonly string[],
+  localExternalIds: readonly string[],
+): number {
+  const prefix = refundKey(rowId, 1).replace(/1$/, "");
+  const used = (k: string) => {
+    const m = k.startsWith(prefix) ? /^(\d+)$/.exec(k.slice(prefix.length)) : null;
+    return m ? Number(m[1]) : 0;
+  };
+  const localKeys = localExternalIds.map((x) => x.split(":").slice(2).join(":"));
+  const max = Math.max(0, ...providerKeys.map(used), ...localKeys.map(used));
+  return Math.max(max, providerKeys.length, localKeys.length) + 1;
+}
+
+/**
+ * After Midtrans answered 406 ("duplicate refund_key"), the refund only counts as done when the
+ * re-read status lists that key with exactly the requested amount. Anything else is an error:
+ * we never book a refund from the request amount after a 406.
+ */
+export function duplicateRefundOk(
+  refunds: readonly RefundEntry[] | null | undefined,
+  key: string,
+  amount: number,
+): boolean {
+  const hit = (refunds ?? []).find((r) => r.key === key);
+  return !!hit && amountsMatch(hit.amount, amount);
 }
 
 /** Idempotency key of the reversing expense of one refund. */

@@ -26,10 +26,12 @@ import {
   PAID_STATES,
   amountsMatch,
   cappedRefund,
+  duplicateRefundOk,
   gatewayAmount,
   gatewayAvailable,
   isGatewayStatus,
   makeOrderId,
+  nextRefundSeq,
   nextStatus,
   refundExternalId,
   refundKey,
@@ -183,6 +185,8 @@ export async function startGatewayPayment(
     throw new Error(PAY_FAILED);
   }
   const now = new Date();
+  // Pending orders for another amount (the remaining amount changed) are expired first.
+  await retirePendingOrders(inv.id, { amount });
   const reuse = ((open.data ?? []) as any[])
     .map(rowOf)
     .find((r) => reusablePending(r, amount, now));
@@ -237,6 +241,46 @@ export async function startGatewayPayment(
       .eq("status", "pending");
     (await import("../monitoring.server")).logError("gateway:create", e);
     throw new Error(PAY_FAILED);
+  }
+}
+
+/**
+ * Retires pending orders of an invoice that must not be paid any more (amount no longer equals
+ * the remaining amount, or the invoice is paid/cancelled/draft): best-effort Midtrans
+ * `POST /v2/{order}/expire`, and the local row becomes `expired` (conditional on still pending).
+ * If a customer still manages to pay one, the verified settlement moves it to success
+ * (`nextStatus`) and is booked or flagged as usual. Never throws; no-op before v25.
+ */
+export async function retirePendingOrders(
+  invoiceId: string,
+  keep: { amount: number | null; except?: string | undefined },
+) {
+  try {
+    const res = await table()
+      .select("id, order_id, gross_amount")
+      .eq("invoice_id", invoiceId)
+      .eq("status", "pending");
+    if (res.error || !res.data?.length) return;
+    const stale = (res.data as { id: string; order_id: string; gross_amount: number }[]).filter(
+      (r) =>
+        r.id !== keep.except &&
+        (keep.amount === null || !amountsMatch(r.gross_amount, keep.amount)),
+    );
+    if (!stale.length) return;
+    const c = await midtransConfig().catch(() => null);
+    for (const r of stale) {
+      if (c) await midtrans.expire(c, r.order_id);
+      await table()
+        .update({ status: "expired", updated_at: new Date().toISOString() })
+        .eq("id", r.id)
+        .eq("status", "pending");
+    }
+  } catch (e) {
+    try {
+      (await import("../monitoring.server")).logError("gateway:retire", e);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -556,50 +600,69 @@ export async function requireConfig(): Promise<GatewayConfig> {
  * refundable), sends a deterministic refund_key (retries/double clicks reuse it), then books the
  * reversing expense from the verified state.
  */
-export async function refundGateway(row: GatewayRow, amount: number, reason: string) {
+export async function refundGateway(row: GatewayRow, rawAmount: number, reason: string) {
   const c = await requireConfig();
+  const amount = Math.round(rawAmount * 100) / 100;
   const state = await midtrans.fetchStatus(c, row.order_id);
   if (!state) throw new Error("Transaksi tidak ditemukan di Midtrans");
   const synced = await applyState(row, state);
   const cur = synced.row;
   if (!cur.payment_id) throw new Error("Pembayaran belum tercatat; cek status dulu");
-  const problem = refundProblem(
-    { ...cur, provider_status: state.providerStatus },
-    Math.round(amount * 100) / 100,
-  );
+  const problem = refundProblem({ ...cur, provider_status: state.providerStatus }, amount);
   if (problem) throw new Error(problem);
-  const key = refundKey(cur.id, state.refunds.length + 1);
+  const local = await db()
+    .from("transactions")
+    .select("external_id")
+    .like("external_id", `${refundExternalId(cur.id, "")}%`);
+  if (local.error) throw new Error(local.error.message);
+  const seq = nextRefundSeq(
+    cur.id,
+    state.refunds.map((r) => r.key),
+    ((local.data ?? []) as { external_id: string | null }[]).map((r) => r.external_id ?? ""),
+  );
+  const key = refundKey(cur.id, seq);
   const r = await midtrans.refund(c, cur.order_id, { key, amount, reason: reason || "Refund" });
   if (!r.ok) throw new Error(r.error);
   const after = await midtrans.fetchStatus(c, cur.order_id);
-  // The status API may lag a moment: book from our own accepted request when the refund is not
-  // listed yet; the same key later dedupes it.
-  const listed = after?.refunds.some((x) => x.key === key);
-  const fallback: GatewayState = {
-    ...(after ?? state),
-    status: nextStatus(
-      cur.status,
-      amountsMatch(amount + cur.refunded_amount, cur.gross_amount) ? "refunded" : "partial_refund",
-    ),
-    refunds: listed
-      ? (after?.refunds ?? [])
-      : [...(after?.refunds ?? state.refunds), { key, amount, at: null }],
-    refundedAmount: listed
-      ? (after?.refundedAmount ?? 0)
-      : Math.max(after?.refundedAmount ?? 0, cur.refunded_amount + amount),
-  };
-  const done = await applyState(cur, fallback);
-  return done.row;
+  const listed = after?.refunds.find((x) => x.key === key);
+  if (r.duplicate) {
+    // 406: this key was already used. Only accept it when Midtrans lists it with this amount.
+    if (!after || !duplicateRefundOk(after.refunds, key, amount))
+      throw new Error(
+        "Refund dengan kunci ini sudah ada dengan jumlah berbeda; cek status lalu coba lagi",
+      );
+    return (await applyState(cur, after)).row;
+  }
+  // 200: the status API may lag a moment, so book from our own accepted request when the refund is
+  // not listed yet; the same key dedupes it once Midtrans lists it.
+  const base = after ?? state;
+  const fallback: GatewayState = listed
+    ? base
+    : {
+        ...base,
+        status: nextStatus(
+          cur.status,
+          amountsMatch(amount + cur.refunded_amount, cur.gross_amount)
+            ? "refunded"
+            : "partial_refund",
+        ),
+        refunds: [...base.refunds, { key, amount, at: null }],
+        refundedAmount: Math.max(base.refundedAmount, cur.refunded_amount + amount),
+      };
+  return (await applyState(cur, fallback)).row;
 }
 
 /**
  * Before deleting an invoice: refuse while any gateway row is not failed/expired (money was or may
  * be received); delete the dead ones so the FK (on delete restrict) lets the invoice go.
- * No-op before v25.
+ * No-op before v25; any other DB error refuses the delete (fail closed).
  */
 export async function releaseInvoiceGateway(invoiceId: string) {
   const res = await table().select("id, status").eq("invoice_id", invoiceId);
-  if (res.error) return;
+  if (res.error) {
+    if (await missing(res.error)) return;
+    throw new Error(res.error.message);
+  }
   const rows = (res.data ?? []) as { id: string; status: GatewayStatus }[];
   if (rows.some((r) => !DEAD_STATES.includes(r.status)))
     throw new Error(

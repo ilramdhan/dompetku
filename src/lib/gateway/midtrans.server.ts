@@ -123,13 +123,27 @@ export const midtrans: PaymentGateway = {
   async refund(c, orderId, x) {
     const r = await call(c, `${c.apiBase}/v2/${enc(orderId)}/refund`, {
       method: "POST",
-      body: { refund_key: x.key, amount: x.amount, reason: x.reason.slice(0, 255) },
+      body: { refund_key: x.key, amount: Math.round(x.amount), reason: x.reason.slice(0, 255) },
     });
     const b = (r.body ?? {}) as Record<string, unknown>;
     // Midtrans answers HTTP 200 with the outcome in `status_code`; 406 = this refund_key already
-    // exists (a retry of a refund that went through), which is treated as success.
+    // exists. The caller only accepts that after the re-read status lists the key with the same
+    // amount (duplicateRefundOk).
     const code = String(b["status_code"] ?? r.status);
-    if (r.status < 300 && (code === "200" || code === "406")) return { ok: true };
+    if (r.status < 300 && code === "200") return { ok: true, duplicate: false };
+    if (r.status < 300 && code === "406") return { ok: true, duplicate: true };
     return { ok: false, error: midtransError(r.body, Number(code) || r.status) };
+  },
+
+  async expire(c, orderId) {
+    // POST /v2/{order_id}/expire (Core API): body status_code 407 = expired. 404 = the customer
+    // never picked a payment method, so nothing can be paid at Midtrans anyway.
+    try {
+      const r = await call(c, `${c.apiBase}/v2/${enc(orderId)}/expire`, { method: "POST" });
+      const code = String(((r.body ?? {}) as Record<string, unknown>)["status_code"] ?? r.status);
+      return r.status < 300 && (code === "407" || code === "200" || code === "404");
+    } catch {
+      return false;
+    }
   },
 };
