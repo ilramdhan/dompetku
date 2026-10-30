@@ -12,6 +12,8 @@ const ENTITY: Record<string, string> = {
   receivables: "Piutang",
   recurring_transactions: "Transaksi Berulang",
   pockets: "Kantong",
+  invoices: "Invoice",
+  invoice_payments: "Pembayaran invoice",
 };
 
 const VERB: Record<string, string> = {
