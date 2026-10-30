@@ -40,6 +40,7 @@ import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-ic
 import { Route as ApiPublicN8nBackupRouteImport } from './routes/api/public/n8n/backup'
 import { Route as ApiPublicN8nBotRouteImport } from './routes/api/public/n8n/bot'
 import { Route as ApiPublicN8nCommandRouteImport } from './routes/api/public/n8n/command'
+import { Route as ApiPublicN8nInvoicesDueEmailRouteImport } from './routes/api/public/n8n/invoices-due-email'
 import { Route as ApiPublicN8nMessageRouteImport } from './routes/api/public/n8n/message'
 import { Route as ApiPublicN8nNotificationsRouteImport } from './routes/api/public/n8n/notifications'
 import { Route as ApiPublicN8nOcrRouteImport } from './routes/api/public/n8n/ocr'
@@ -205,6 +206,12 @@ const ApiPublicN8nCommandRoute = ApiPublicN8nCommandRouteImport.update({
   path: '/api/public/n8n/command',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicN8nInvoicesDueEmailRoute =
+  ApiPublicN8nInvoicesDueEmailRouteImport.update({
+    id: '/api/public/n8n/invoices-due-email',
+    path: '/api/public/n8n/invoices-due-email',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicN8nMessageRoute = ApiPublicN8nMessageRouteImport.update({
   id: '/api/public/n8n/message',
   path: '/api/public/n8n/message',
@@ -292,6 +299,7 @@ export interface FileRoutesByFullPath {
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
   '/api/public/n8n/command': typeof ApiPublicN8nCommandRoute
+  '/api/public/n8n/invoices-due-email': typeof ApiPublicN8nInvoicesDueEmailRoute
   '/api/public/n8n/message': typeof ApiPublicN8nMessageRoute
   '/api/public/n8n/notifications': typeof ApiPublicN8nNotificationsRoute
   '/api/public/n8n/ocr': typeof ApiPublicN8nOcrRoute
@@ -334,6 +342,7 @@ export interface FileRoutesByTo {
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
   '/api/public/n8n/command': typeof ApiPublicN8nCommandRoute
+  '/api/public/n8n/invoices-due-email': typeof ApiPublicN8nInvoicesDueEmailRoute
   '/api/public/n8n/message': typeof ApiPublicN8nMessageRoute
   '/api/public/n8n/notifications': typeof ApiPublicN8nNotificationsRoute
   '/api/public/n8n/ocr': typeof ApiPublicN8nOcrRoute
@@ -378,6 +387,7 @@ export interface FileRoutesById {
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
   '/api/public/n8n/command': typeof ApiPublicN8nCommandRoute
+  '/api/public/n8n/invoices-due-email': typeof ApiPublicN8nInvoicesDueEmailRoute
   '/api/public/n8n/message': typeof ApiPublicN8nMessageRoute
   '/api/public/n8n/notifications': typeof ApiPublicN8nNotificationsRoute
   '/api/public/n8n/ocr': typeof ApiPublicN8nOcrRoute
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
     | '/api/public/n8n/command'
+    | '/api/public/n8n/invoices-due-email'
     | '/api/public/n8n/message'
     | '/api/public/n8n/notifications'
     | '/api/public/n8n/ocr'
@@ -464,6 +475,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
     | '/api/public/n8n/command'
+    | '/api/public/n8n/invoices-due-email'
     | '/api/public/n8n/message'
     | '/api/public/n8n/notifications'
     | '/api/public/n8n/ocr'
@@ -507,6 +519,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
     | '/api/public/n8n/command'
+    | '/api/public/n8n/invoices-due-email'
     | '/api/public/n8n/message'
     | '/api/public/n8n/notifications'
     | '/api/public/n8n/ocr'
@@ -533,6 +546,7 @@ export interface RootRouteChildren {
   ApiPublicN8nBackupRoute: typeof ApiPublicN8nBackupRoute
   ApiPublicN8nBotRoute: typeof ApiPublicN8nBotRoute
   ApiPublicN8nCommandRoute: typeof ApiPublicN8nCommandRoute
+  ApiPublicN8nInvoicesDueEmailRoute: typeof ApiPublicN8nInvoicesDueEmailRoute
   ApiPublicN8nMessageRoute: typeof ApiPublicN8nMessageRoute
   ApiPublicN8nNotificationsRoute: typeof ApiPublicN8nNotificationsRoute
   ApiPublicN8nOcrRoute: typeof ApiPublicN8nOcrRoute
@@ -764,6 +778,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicN8nCommandRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/n8n/invoices-due-email': {
+      id: '/api/public/n8n/invoices-due-email'
+      path: '/api/public/n8n/invoices-due-email'
+      fullPath: '/api/public/n8n/invoices-due-email'
+      preLoaderRoute: typeof ApiPublicN8nInvoicesDueEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/n8n/message': {
       id: '/api/public/n8n/message'
       path: '/api/public/n8n/message'
@@ -895,6 +916,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicN8nBackupRoute: ApiPublicN8nBackupRoute,
   ApiPublicN8nBotRoute: ApiPublicN8nBotRoute,
   ApiPublicN8nCommandRoute: ApiPublicN8nCommandRoute,
+  ApiPublicN8nInvoicesDueEmailRoute: ApiPublicN8nInvoicesDueEmailRoute,
   ApiPublicN8nMessageRoute: ApiPublicN8nMessageRoute,
   ApiPublicN8nNotificationsRoute: ApiPublicN8nNotificationsRoute,
   ApiPublicN8nOcrRoute: ApiPublicN8nOcrRoute,

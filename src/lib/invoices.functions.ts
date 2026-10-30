@@ -157,7 +157,12 @@ export const recordInvoicePaymentFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { inv, s } = await manageable(context, data.id);
     await (await import("./demo.server")).assertDemoCapacity("invoice_payments");
-    return (await s.recordPayment(inv, data.values)) as any;
+    const updated = await s.recordPayment(inv, data.values);
+    // #95: best-effort confirmation mail (no link, never throws, no-op without Resend/email).
+    await (
+      await import("./invoice-email.server")
+    ).sendPaymentConfirmation(updated, data.values.amount);
+    return updated as any;
   });
 
 /** Deletes a payment and its income transaction. */
@@ -214,6 +219,30 @@ export const revokeInvoiceShareFn = createServerFn({ method: "POST" })
     const { inv } = await manageable(context, data.id);
     const share = await import("./invoice-share.server");
     return share.revokeShare(inv);
+  });
+
+/* ---------------- email to the customer (issue #95) ---------------- */
+
+/**
+ * "Kirim invoice": emails the customer the public link. Creates the link, or rotates the existing
+ * one (only the hash is stored, so it cannot be recovered; the UI confirms first). Preconditions
+ * (issued, customer email, Resend) are checked before the link is touched.
+ */
+export const sendInvoiceEmailFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({ id, expires_days: z.number().int().min(0).max(3650).nullable().optional() })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { inv } = await manageable(context, data.id);
+    (await import("./demo.server")).assertNotDemo();
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const { seoConfig } = await import("./seo.server");
+    const origin = seoConfig().siteUrl ?? new URL(getRequest().url).origin;
+    const mail = await import("./invoice-email.server");
+    return mail.sendInvoiceLinkEmail(inv, { origin, expiresDays: data.expires_days ?? null });
   });
 
 /* ---------------- v24 payment methods & proof verification (issue #94) ---------------- */
@@ -318,7 +347,9 @@ export const approveProofFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { proof, inv, pm } = await reviewable(context, data.id);
     await (await import("./demo.server")).assertDemoCapacity("invoice_payments");
-    return (await pm.approveProof(proof, inv, data.amount, data.paid_at)) as any;
+    const updated = await pm.approveProof(proof, inv, data.amount, data.paid_at);
+    await (await import("./invoice-email.server")).sendPaymentConfirmation(updated, data.amount);
+    return updated as any;
   });
 
 /** Reject with a reason (shown only to the admin). */

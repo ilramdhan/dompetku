@@ -89,6 +89,7 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     getInvoiceShareFn: "admin",
     createInvoiceShareFn: "admin",
     revokeInvoiceShareFn: "admin",
+    sendInvoiceEmailFn: "admin",
     // v24 (#94): payment methods and the proof verification queue.
     getPaymentMethodsFn: "admin",
     savePaymentMethodFn: "admin",
