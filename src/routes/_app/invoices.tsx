@@ -25,6 +25,7 @@ import { Empty } from "@/components/crud-page";
 import { EntityDialog } from "@/components/entity-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
 import { WalletFilter } from "@/components/wallet-filter";
+import { InvoiceSharePanel } from "@/components/invoice/invoice-share-panel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -593,6 +594,7 @@ function InvoiceDetail({
           <p className="text-muted-foreground">{t("Belum ada pembayaran.")}</p>
         )}
       </div>
+      <InvoiceSharePanel invoice={d} locale={locale} />
     </div>
   );
 }

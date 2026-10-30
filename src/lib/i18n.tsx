@@ -1306,6 +1306,47 @@ const DICT: Record<string, string> = {
   invoice: "invoices",
   "invoice belum lunas": "unpaid invoices",
   "lewat jatuh tempo": "past due",
+  /* Public invoice link & page (v23, issue #93) */
+  Bagikan: "Share",
+  "Belum ada tautan publik.": "No public link yet.",
+  "berikut invoice": "here is invoice",
+  "Buat tautan": "Create link",
+  "Buat tautan baru? Tautan lama tidak bisa dibuka lagi.":
+    "Create a new link? The old link will stop working.",
+  "Buat ulang tautan": "Create new link",
+  Cabut: "Revoke",
+  "Cabut tautan publik invoice ini?": "Revoke the public link of this invoice?",
+  "Cetak / simpan PDF": "Print / save PDF",
+  "Ditagihkan kepada": "Billed to",
+  Halo: "Hi",
+  "Invoice ini dibuat dengan": "This invoice was created with",
+  Kedaluwarsa: "Expiry",
+  "Kirim via WhatsApp": "Send via WhatsApp",
+  "Mode demo: tautan kedaluwarsa dalam": "Demo mode: links expire within",
+  "Pelanggan tidak bisa membuka tautan ini lagi.": "The customer can no longer open this link.",
+  Pratinjau: "Preview",
+  "Salin tautan": "Copy link",
+  "Simpan tautan ini sekarang: demi keamanan hanya hash-nya yang disimpan. Buat ulang untuk tautan baru.":
+    "Save this link now: for security only its hash is stored. Create a new link to get another one.",
+  "Sisa tagihan": "Amount due",
+  "Sudah dibayar": "Paid",
+  "Tagihan untuk pelanggan, bisa dicetak atau disimpan sebagai PDF.":
+    "Invoice for the customer, ready to print or save as PDF.",
+  "Tanpa kedaluwarsa": "No expiry",
+  "Tautan aktif, berlaku sampai": "Link active, valid until",
+  "Tautan aktif, tanpa kedaluwarsa.": "Link active, no expiry.",
+  "Tautan dibuat": "Link created",
+  "Tautan dicabut": "Link revoked",
+  "Tautan publik invoice belum aktif: jalankan bagian v23 di supabase/schema.sql.":
+    "Public invoice links are not active yet: run section v23 of supabase/schema.sql.",
+  "Tautan publik invoice dibuat": "Public invoice link created",
+  "Tautan publik invoice dicabut": "Public invoice link revoked",
+  "Tautan sudah dicabut.": "The link was revoked.",
+  "Tautan sudah kedaluwarsa.": "The link has expired.",
+  "Terbitkan invoice dulu untuk membuat tautan publik.":
+    "Issue the invoice first to create a public link.",
+  "Terbitkan invoice dulu; draft dan invoice batal tidak bisa dibagikan":
+    "Issue the invoice first; drafts and cancelled invoices cannot be shared",
   /* SEO (document head of public pages, issue #44) */
   "Dompetku — Pencatat Keuangan Open Source & Self-Hosted Expense Tracker":
     "Dompetku — Open Source, Self-Hosted Personal Finance & Expense Tracker",
