@@ -13,12 +13,17 @@ import {
   refundProblem,
   reusablePending,
   cappedRefund,
+  duplicateRefundOk,
+  nextRefundSeq,
   type GatewayStatus,
 } from "@/lib/gateway/types";
+import { netPaymentAmount, periodSummary } from "@/lib/invoice-report";
+import { toPublicInvoice } from "@/lib/invoice-share";
 import {
   MIDTRANS_HOSTS,
   baseOverride,
   basicAuth,
+  isSandboxKey,
   keyModeMismatch,
   mapMidtransStatus,
   midtransError,
@@ -337,5 +342,77 @@ describe("midtrans request/response helpers", () => {
       midtransError({ error_messages: ["transaction_details.gross_amount is required"] }, 400),
     ).toBe("Midtrans 400: transaction_details.gross_amount is required");
     expect(midtransError("x", 502)).toBe("Midtrans HTTP 502");
+  });
+});
+
+describe("refund keys after a lagging status (review #97)", () => {
+  const id = "6b1e8f2a-0000-4000-8000-000000000001";
+  const k = (n: number) => refundKey(id, n);
+  it("never reuses a key that Midtrans or the local ledger already used", () => {
+    expect(nextRefundSeq(id, [], [])).toBe(1);
+    // Midtrans lags (lists nothing) but the first refund is booked locally.
+    expect(nextRefundSeq(id, [], [refundExternalId(id, k(1))])).toBe(2);
+    expect(nextRefundSeq(id, [k(1)], [refundExternalId(id, k(1))])).toBe(2);
+    expect(nextRefundSeq(id, [k(1), k(2)], [refundExternalId(id, k(1))])).toBe(3);
+    // Dashboard refunds use foreign keys: still counted.
+    expect(nextRefundSeq(id, ["dash-abc", "dash-def"], [])).toBe(3);
+    expect(nextRefundSeq(id, [k(5)], [])).toBe(6);
+  });
+  it("accepts a 406 duplicate only with the same key and amount", () => {
+    const listed = [{ key: k(1), amount: 40000, at: null }];
+    expect(duplicateRefundOk(listed, k(1), 40000)).toBe(true);
+    expect(duplicateRefundOk(listed, k(1), 60000)).toBe(false);
+    expect(duplicateRefundOk(listed, k(2), 40000)).toBe(false);
+    expect(duplicateRefundOk([], k(1), 40000)).toBe(false);
+    expect(duplicateRefundOk(null, k(1), 40000)).toBe(false);
+  });
+});
+
+describe("refunds in reports and the public view (review #97)", () => {
+  it("nets refunded amounts out of payments", () => {
+    expect(netPaymentAmount({ amount: 100000, refunded: 40000 })).toBe(60000);
+    expect(netPaymentAmount({ amount: "100000" })).toBe(100000);
+    expect(netPaymentAmount({ amount: 100, refunded: 500 })).toBe(0);
+    const s = periodSummary(
+      [
+        {
+          id: "i1",
+          status: "partial",
+          total: 100000,
+          issue_date: "2026-10-01",
+          account_id: null,
+        },
+      ],
+      [{ invoice_id: "i1", amount: 100000, refunded: 40000, paid_at: "2026-10-05" }],
+      "2026-10",
+    );
+    expect(s.received).toBe(60000);
+  });
+  it("public page lists net payments and hides fully refunded ones", () => {
+    const pub = toPublicInvoice(
+      {
+        number: "INV-1",
+        issue_date: "2026-10-01",
+        customer_name: "Budi",
+        status: "partial",
+        total: 100000,
+        paid: 60000,
+      },
+      [],
+      [
+        { paid_at: "2026-10-05", amount: 100000, refunded: 40000 },
+        { paid_at: "2026-10-06", amount: 5000, refunded: 5000 },
+      ],
+      "2026-10-10",
+    );
+    expect(pub?.payments).toEqual([{ paid_at: "2026-10-05", amount: 60000 }]);
+  });
+});
+
+describe("key/mode guard (review #97)", () => {
+  it("detects sandbox keys", () => {
+    expect(isSandboxKey("SB-Mid-server-x")).toBe(true);
+    expect(isSandboxKey("Mid-server-x")).toBe(false);
+    expect(isSandboxKey(null)).toBe(false);
   });
 });

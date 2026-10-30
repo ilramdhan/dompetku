@@ -844,7 +844,8 @@ notify pgrst, 'reload schema';
 -- menghapus invoice bila semua transaksi gatewaynya gagal/kedaluwarsa (baris itu dihapus dulu); selain itu
 -- penghapusan ditolak dengan pesan yang jelas.
 -- payment_id: pembayaran invoice (income kategori "Invoice") yang dibuat saat status menjadi success.
--- claimed_at: klaim pencatatan (update bersyarat) agar dua webhook bersamaan tidak mencatat dua kali.
+-- claimed_at: klaim pencatatan atomik (update bersyarat) agar dua webhook bersamaan tidak mencatat dua kali;
+-- hanya klaim kedaluwarsa (>10 menit, crash) yang dilepas, percobaan gagal melepas klaimnya sendiri.
 -- raw: respons status Midtrans yang sudah disaring (whitelist kolom, tanpa signature/kunci).
 -- snap_token/redirect_url: token pembayaran Snap (kedaluwarsa ±24 jam), tidak ikut dicadangkan.
 create table if not exists public.gateway_transactions (
@@ -873,6 +874,10 @@ create index if not exists gateway_transactions_payment_idx on public.gateway_tr
 revoke all on public.gateway_transactions from anon, authenticated;
 grant all on public.gateway_transactions to service_role;
 alter table public.gateway_transactions enable row level security;
+
+-- Setelah refund gateway, invoice "ditahan": tombol "Bayar sekarang" dan pengingat jatuh tempo dimatikan
+-- sampai admin menekan "Tagih ulang" (refund_hold = false). Baris lain tidak terpengaruh.
+alter table public.gateway_transactions add column if not exists refund_hold boolean not null default false;
 
 -- Refund mengurangi "sudah dibayar" tanpa menghapus pembayaran: paid = jumlah (amount - refunded).
 alter table public.invoice_payments add column if not exists refunded numeric(18,2) not null default 0;

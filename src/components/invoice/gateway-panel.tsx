@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConfirm } from "@/components/confirm-dialog";
-import { refundGatewayFn, syncGatewayFn } from "@/lib/invoices.functions";
+import { refundGatewayFn, releaseRefundHoldFn, syncGatewayFn } from "@/lib/invoices.functions";
 import { errMsg, gatewayTxQuery, invalidateFor } from "@/lib/queries";
 import {
   FULL_REFUND_ONLY_TYPES,
@@ -39,6 +39,7 @@ type GatewayItem = {
   payment_type: string | null;
   payment_id: string | null;
   last_error: string | null;
+  refund_hold?: boolean;
   created_at: string;
 };
 
@@ -68,6 +69,8 @@ export function GatewayPanel({ invoiceId, locale }: { invoiceId: string; locale:
   const qc = useQueryClient();
   const { data } = useQuery(gatewayTxQuery(invoiceId));
   const sync = useServerFn(syncGatewayFn);
+  const rebill = useServerFn(releaseRefundHoldFn);
+  const ask = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const [refundFor, setRefundFor] = useState<GatewayItem | null>(null);
   const d = data as { ready: boolean; configured?: boolean; items: GatewayItem[] } | undefined;
@@ -88,6 +91,28 @@ export function GatewayPanel({ invoiceId, locale }: { invoiceId: string; locale:
       setBusy(null);
     }
   }
+
+  async function doRebill() {
+    const ok = await ask.confirm(t("Tagih ulang invoice ini?"), {
+      description: t(
+        "Tombol Bayar sekarang dan pengingat jatuh tempo aktif lagi untuk sisa tagihan. Pilih Batalkan invoice bila pelanggan tidak perlu membayar lagi.",
+      ),
+      confirmLabel: t("Tagih ulang"),
+    });
+    if (!ok) return;
+    setBusy("rebill");
+    try {
+      await rebill({ data: { id: invoiceId } });
+      await invalidateFor(qc, "gateway_transactions");
+      toast.success(t("Invoice ditagih ulang"));
+    } catch (e) {
+      toast.error(t(errMsg(e)));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const held = d.items.some((g) => g.refund_hold);
 
   const time = (s: string) =>
     new Date(s).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
@@ -151,7 +176,26 @@ export function GatewayPanel({ invoiceId, locale }: { invoiceId: string; locale:
           </li>
         ))}
       </ul>
+      {held ? (
+        <div className="mt-2 space-y-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs">
+          <p>
+            {t(
+              "Ada refund Midtrans: tombol Bayar sekarang dan pengingat jatuh tempo dihentikan. Batalkan invoice bila tidak ditagih lagi, atau tagih ulang sisanya.",
+            )}
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 sm:h-8"
+            disabled={busy === "rebill"}
+            onClick={() => void doRebill()}
+          >
+            {t("Tagih ulang")}
+          </Button>
+        </div>
+      ) : null}
       <RefundDialog item={refundFor} onClose={() => setRefundFor(null)} />
+      {ask.element}
     </div>
   );
 }

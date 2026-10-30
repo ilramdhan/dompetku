@@ -102,6 +102,7 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     getGatewayTransactionsFn: "admin",
     syncGatewayFn: "admin",
     refundGatewayFn: "admin",
+    releaseRefundHoldFn: "admin",
   },
   "invoice-report.functions.ts": {
     getInvoiceReport: "admin",

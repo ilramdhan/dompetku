@@ -415,3 +415,19 @@ export const refundGatewayFn = createServerFn({ method: "POST" })
     const r = await gw.refundGateway(row, data.amount, data.reason);
     return { status: r.status, refunded_amount: r.refunded_amount };
   });
+
+/** "Tagih ulang": lifts the refund hold so "Bayar sekarang" and due reminders come back. */
+export const releaseRefundHoldFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ id }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { inv } = await manageable(context, data.id);
+    const gw = await import("./gateway/payments.server");
+    const r = await gw.releaseRefundHold(inv.id);
+    await (
+      await import("./finance.server")
+    ).logActivity("invoices.gateway_rebill", "invoices", {
+      name: `${inv.number} · ${inv.customer_name}`,
+    });
+    return r;
+  });

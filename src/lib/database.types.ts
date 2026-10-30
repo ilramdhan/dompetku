@@ -1593,6 +1593,7 @@ export type Database = {
           redirect_url: string | null;
           expires_at: string | null;
           claimed_at: string | null;
+          refund_hold: boolean;
           last_error: string | null;
           raw: Json | null;
           created_at: string;
@@ -1613,6 +1614,7 @@ export type Database = {
           redirect_url?: string | null;
           expires_at?: string | null;
           claimed_at?: string | null;
+          refund_hold?: boolean;
           last_error?: string | null;
           raw?: Json | null;
           created_at?: string;
@@ -1633,6 +1635,7 @@ export type Database = {
           redirect_url?: string | null;
           expires_at?: string | null;
           claimed_at?: string | null;
+          refund_hold?: boolean;
           last_error?: string | null;
           raw?: Json | null;
           created_at?: string;

@@ -106,10 +106,42 @@ export async function gatewayReady(): Promise<boolean> {
   }
 }
 
+/**
+ * Invoices on refund hold (a gateway refund was booked and the admin has not re-billed yet).
+ * Empty before v25 or on error (reminders/pay button then behave as before v25).
+ */
+export async function refundHeldInvoices(ids: readonly string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  try {
+    const res = await table()
+      .select("invoice_id")
+      .eq("refund_hold", true)
+      .in("invoice_id", [...ids]);
+    if (res.error) return new Set();
+    return new Set(((res.data ?? []) as { invoice_id: string }[]).map((r) => r.invoice_id));
+  } catch {
+    return new Set();
+  }
+}
+
+/** "Tagih ulang": lifts the refund hold of an invoice (pay button and reminders come back). */
+export async function releaseRefundHold(invoiceId: string) {
+  const res = await table()
+    .update({ refund_hold: false, updated_at: new Date().toISOString() })
+    .eq("invoice_id", invoiceId)
+    .eq("refund_hold", true);
+  if (res.error) {
+    if (await missing(res.error)) throw new Error(V25_MISSING);
+    throw new Error(res.error.message);
+  }
+  return { ok: true };
+}
+
 /* ---------------- public page ---------------- */
 
-/** `{ available }` for the public page: v25 + configured + not demo + open + whole-rupiah amount. */
+/** `{ available }` for the public page: v25 + configured + not demo + open + whole-rupiah amount + no refund hold. */
 export async function publicGatewayFor(
+  invoiceId: string,
   status: string,
   remaining: number,
   demo: boolean,
@@ -119,6 +151,8 @@ export async function publicGatewayFor(
     const c = await midtransConfig();
     if (!c) return { available: false };
     const ready = await gatewayReady();
+    if (ready && (await refundHeldInvoices([invoiceId])).has(invoiceId))
+      return { available: false };
     return { available: gatewayAvailable({ ready, configured: true, demo, status, remaining }) };
   } catch {
     return { available: false };
@@ -166,6 +200,7 @@ export async function startGatewayPayment(
   const inv = await s.loadInvoice(invoiceId);
   if (!inv || (inv.status !== "unpaid" && inv.status !== "partial"))
     throw new Error(PAY_UNAVAILABLE);
+  if ((await refundHeldInvoices([inv.id])).has(inv.id)) throw new Error(PAY_UNAVAILABLE);
   const amount = gatewayAmount(remainingOf(inv.total, inv.paid));
   if (amount === null) throw new Error(PAY_UNAVAILABLE);
 
@@ -519,7 +554,13 @@ async function applyRefunds(row: GatewayRow, refunds: readonly RefundEntry[]): P
     refunds.reduce((sum, r) => sum + (r.amount > 0 ? r.amount : 0), 0),
   );
   await table()
-    .update({ refunded_amount: refunded, updated_at: new Date().toISOString() })
+    .update({
+      refunded_amount: refunded,
+      // A new refund puts the invoice on hold: no "Bayar sekarang", no due reminders, until the
+      // admin re-bills it ("Tagih ulang").
+      ...(fresh > 0 ? { refund_hold: true } : {}),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", row.id);
   const up = await (db() as any).from("invoice_payments").update({ refunded }).eq("id", pay.id);
   if (up.error) throw new Error(up.error.message);
@@ -581,7 +622,7 @@ export async function handleMidtransWebhook(body: unknown, ip: string): Promise<
 export async function listGatewayTransactions(invoiceId: string) {
   const res = await table()
     .select(
-      "id, order_id, gateway_tx_id, status, gross_amount, refunded_amount, payment_type, payment_id, last_error, created_at, updated_at",
+      "id, order_id, gateway_tx_id, status, gross_amount, refunded_amount, payment_type, payment_id, last_error, refund_hold, created_at, updated_at",
     )
     .eq("invoice_id", invoiceId)
     .order("created_at", { ascending: false })
