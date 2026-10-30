@@ -146,32 +146,33 @@ A **fork** is your own copy of the project on GitHub. Vercel will build the webs
 **What success looks like:** the result panel says **Success. No rows returned** (you may also see a small table from the last statement). In **Table Editor** you now see tables such as `accounts`, `categories`, `transactions`, `debts`, `subscriptions`, `budgets`, `goals` … and the `categories` table already has default categories.
 
 <details>
-<summary><strong>What are the sections v1 … v20?</strong></summary>
+<summary><strong>What are the sections v1 … v22?</strong></summary>
 
 The file grew with the app. Every section uses `if not exists` / `on conflict do nothing` / `create or replace`, so **the whole file is idempotent: running it again is always safe** and never deletes data. Run the whole file each time you update.
 
-| Section   | Adds                                                                                                                                     |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| base (v1) | Accounts, categories, transactions, debts & payments, subscriptions, budgets, goals, exchange rates; security (RLS on, no public access) |
-| v2        | Receipt photo column + private Storage bucket `receipts`                                                                                 |
-| v3        | Activity log, gold savings, receivables                                                                                                  |
-| v4        | Transfer/admin fees, monthly account fees, subscription tax                                                                              |
-| v5        | Gold metadata and indexes                                                                                                                |
-| v6        | Gold linked to accounts                                                                                                                  |
-| v7        | Telegram bot drafts and idempotency (`bot_drafts`, `external_id`)                                                                        |
-| v8        | Savings goals linked to an account                                                                                                       |
-| v9        | Report aggregation functions in Postgres (faster dashboards)                                                                             |
-| v10       | Recurring transactions                                                                                                                   |
-| v11       | Budget rollover and 80%/100% alerts                                                                                                      |
-| v12       | Split transactions, up to 5 receipt photos, item search                                                                                  |
-| v13       | Per-account report and bank reconciliation                                                                                               |
-| v14       | App settings (name, logo, time zone, landing page, bot defaults)                                                                         |
-| v15       | AI usage log and per-chat daily bot AI quota                                                                                             |
-| v16       | Integration settings (bot, AI, email, n8n keys) editable in Settings → Integrasi; secrets encrypted                                      |
-| v17       | Profile (name, address, photo) and changing the login password in the app (`app_users`)                                                  |
-| v18       | Multi-user for families: members with per-wallet view/manage access (`account_permissions`), needs v17                                   |
-| v19       | Kantong (pockets) inside a wallet with low/empty alerts (`pockets`, `transactions.pocket_id`, `pocket_alerts`)                           |
-| v20       | Subscription flexible interval: every N months/years (`subscriptions."interval"`)                                                        |
+| Section   | Adds                                                                                                                                                                 |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| base (v1) | Accounts, categories, transactions, debts & payments, subscriptions, budgets, goals, exchange rates; security (RLS on, no public access)                             |
+| v2        | Receipt photo column + private Storage bucket `receipts`                                                                                                             |
+| v3        | Activity log, gold savings, receivables                                                                                                                              |
+| v4        | Transfer/admin fees, monthly account fees, subscription tax                                                                                                          |
+| v5        | Gold metadata and indexes                                                                                                                                            |
+| v6        | Gold linked to accounts                                                                                                                                              |
+| v7        | Telegram bot drafts and idempotency (`bot_drafts`, `external_id`)                                                                                                    |
+| v8        | Savings goals linked to an account                                                                                                                                   |
+| v9        | Report aggregation functions in Postgres (faster dashboards)                                                                                                         |
+| v10       | Recurring transactions                                                                                                                                               |
+| v11       | Budget rollover and 80%/100% alerts                                                                                                                                  |
+| v12       | Split transactions, up to 5 receipt photos, item search                                                                                                              |
+| v13       | Per-account report and bank reconciliation                                                                                                                           |
+| v14       | App settings (name, logo, time zone, landing page, bot defaults)                                                                                                     |
+| v15       | AI usage log and per-chat daily bot AI quota                                                                                                                         |
+| v16       | Integration settings (bot, AI, email, n8n keys) editable in Settings → Integrasi; secrets encrypted                                                                  |
+| v17       | Profile (name, address, photo) and changing the login password in the app (`app_users`)                                                                              |
+| v18       | Multi-user for families: members with per-wallet view/manage access (`account_permissions`), needs v17                                                               |
+| v19       | Kantong (pockets) inside a wallet with low/empty alerts (`pockets`, `transactions.pocket_id`, `pocket_alerts`)                                                       |
+| v20       | Subscription flexible interval: every N months/years (`subscriptions."interval"`)                                                                                    |
+| v22       | Per-member Telegram notifications: chat id, toggles and wallet subset for scheduled reports & reminders (`notify_recipients`, `notify_recipient_wallets`), needs v18 |
 
 If a later section has not been run, the related page shows a hint instead of crashing, and the rest of the app keeps working.
 

@@ -140,7 +140,7 @@ These are the only `$env` values the templates use (set them in **n8n**, not in 
 | `FINTRACK_URL`              | 01, 02, 05 | Base URL of your deployed app, no trailing slash.                                             | `https://your-app.vercel.app`                |
 | `TELEGRAM_BOT_TOKEN`        | 01–04      | Bot token from @BotFather (used to call the Telegram Bot API).                                | `123456789:AA...`                            |
 | `TELEGRAM_ALLOWED_CHAT_IDS` | 01         | Comma-separated chat IDs allowed to use the bot. Empty = every chat is ignored (fail-closed). | `123456789` or `123456789,987654321`         |
-| `TELEGRAM_ADMIN_CHAT_ID`    | 02, 03     | Chat that receives reminders, reports and error alerts.                                       | `123456789`                                  |
+| `TELEGRAM_ADMIN_CHAT_ID`    | 02, 03     | Chat that receives reminders, reports and error alerts. (06 uses the app-side value.)         | `123456789`                                  |
 | `BACKUP_EMAIL_FROM`         | 05 (email) | Sender address. Must be your Gmail address or an address on your verified Resend domain.      | `Dompetku Backup <noreply@mail.example.com>` |
 | `BACKUP_EMAIL_TO`           | 05 (email) | Where backup emails go.                                                                       | `you@example.com`                            |
 
@@ -256,13 +256,14 @@ For each JSON file in [`n8n/`](../n8n):
 6. Workflows 01, 02, 05: open **⋯ → Settings → Error workflow** → choose `Dompetku – Error Handler` (import 03 first).
 7. Flip the **Active** switch (top right) for scheduled/triggered workflows. Workflow 03 does not need to be active to work as an error workflow; workflow 04 is run manually.
 
-| File                              | Purpose                                                                                                                      | Trigger                                   | Env vars                                                            | Credentials                                |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------ |
-| `01-dompetku-telegram-bot.json`   | Main bot: chat, receipt photos, `/` commands, inline buttons                                                                 | Telegram Trigger (messages + button taps) | `FINTRACK_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_CHAT_IDS`   | Telegram API, Header Auth                  |
-| `02-dompetku-jadwal.json`         | Bill reminders 08:00 (only if something is due), daily recap 21:00, weekly report Mon 07:30, monthly report on the 1st 07:00 | Schedule                                  | `FINTRACK_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`      | Header Auth                                |
-| `03-dompetku-error-handler.json`  | Telegram alert when another workflow fails                                                                                   | Error Trigger                             | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`                      | —                                          |
-| `04-dompetku-setup-commands.json` | One-off: registers the `/` command menu, shows webhook info                                                                  | Manual                                    | `TELEGRAM_BOT_TOKEN`                                                | —                                          |
-| `05-dompetku-backup.json`         | Weekly full backup → Google Drive (or email attachment)                                                                      | Schedule, Sunday 02:00                    | `FINTRACK_URL` (+ `BACKUP_EMAIL_FROM`, `BACKUP_EMAIL_TO` for email) | Header Auth, Google Drive OAuth2 (or SMTP) |
+| File                                  | Purpose                                                                                                                                                                           | Trigger                                   | Env vars                                                            | Credentials                                |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------ |
+| `01-dompetku-telegram-bot.json`       | Main bot: chat, receipt photos, `/` commands, inline buttons                                                                                                                      | Telegram Trigger (messages + button taps) | `FINTRACK_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_CHAT_IDS`   | Telegram API, Header Auth                  |
+| `02-dompetku-jadwal.json`             | Bill reminders 08:00 (only if something is due), daily recap 21:00, weekly report Mon 07:30, monthly report on the 1st 07:00                                                      | Schedule                                  | `FINTRACK_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`      | Header Auth                                |
+| `03-dompetku-error-handler.json`      | Telegram alert when another workflow fails                                                                                                                                        | Error Trigger                             | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`                      | —                                          |
+| `04-dompetku-setup-commands.json`     | One-off: registers the `/` command menu, shows webhook info                                                                                                                       | Manual                                    | `TELEGRAM_BOT_TOKEN`                                                | —                                          |
+| `05-dompetku-backup.json`             | Weekly full backup → Google Drive (or email attachment)                                                                                                                           | Schedule, Sunday 02:00                    | `FINTRACK_URL` (+ `BACKUP_EMAIL_FROM`, `BACKUP_EMAIL_TO` for email) | Header Auth, Google Drive OAuth2 (or SMTP) |
+| `06-dompetku-notifikasi-anggota.json` | Optional **alternative to 02**: same schedules, one message per recipient (owner + family members, scoped to their wallets) — see [below](#per-member-notifications-optional-v22) | Schedule                                  | `FINTRACK_URL`, `TELEGRAM_BOT_TOKEN`                                | Header Auth                                |
 
 All schedules use the workflow time zone **Asia/Jakarta** — change it under **⋯ → Settings → Timezone**, and keep it equal to the app's `APP_TIMEZONE` so "today" means the same day.
 
@@ -275,6 +276,7 @@ All requests send the header `x-api-key: <N8N_API_KEY>` (`Authorization: Bearer 
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | 01       | `POST /api/public/n8n/bot` body `{ update_id, chat_id, text?, image_base64?, mime_type?, callback_data?, chat_type?, reply_to_bot?, bot_username? }` (`chat_type` is `private`/`group`/`supergroup`/`channel`, `reply_to_bot` a boolean and `bot_username` a string — all optional, used for [group mode](#using-the-bot-in-a-telegram-group); `method: "none"` means send nothing; `mime_type` required with an image: `image/jpeg`, `image/png`, `image/webp`; body max 4.5 MB → 413) | `method` (`send`/`edit`/`none`), `text`, `reply_markup`, `toast`                                            |
 | 02       | `GET /api/public/n8n/reminders?days=3`                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `count`, `message`                                                                                          |
+| 06       | `GET /api/public/n8n/notifications?kind=report&period=…` or `?kind=reminders&days=3[&skip_empty=0]`                                                                                                                                                                                                                                                                                                                                                                                     | `messages[]` → `chat_id`, `text` (also `recipient`, `wallets`, `count`)                                     |
 | 02       | `GET /api/public/n8n/report?period=today\|lastweek\|lastmonth`                                                                                                                                                                                                                                                                                                                                                                                                                          | `message`                                                                                                   |
 | 05       | `GET /api/public/n8n/backup`                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Whole body saved as a file; `Content-Disposition: attachment; filename="dompetku-cadangan-YYYY-MM-DD.json"` |
 
@@ -283,6 +285,45 @@ Other routes under `src/routes/api/public/n8n/` (`reminders-email`, `reminders-s
 The Vercel function for `/bot` is allowed 60 s (`vite.config.ts`), enough for receipt OCR.
 
 </details>
+
+### Per-member notifications (optional, v22)
+
+Workflow 02 sends every report and reminder to **one** chat (`TELEGRAM_ADMIN_CHAT_ID`) with **all** wallets. If family members ([multi-user, v18](SELF-HOSTING.md)) should get their own reports, use workflow **06** instead:
+
+1. Run section **v22** of `supabase/schema.sql`.
+2. **Settings → Integrasi → Telegram → Chat ID admin (notifikasi)**: your own chat id (or set app env `TELEGRAM_ADMIN_CHAT_ID`). Leave empty to send only to members.
+3. **Settings → Pengguna → 🔔** next to a member: their private or group chat id (groups start with `-`), which notifications they get (reports / bill reminders), and optionally which of **their** wallets to include (none checked = every wallet they can view). The member must have started a chat with the bot (or the bot must be in the group).
+4. Import `06-dompetku-notifikasi-anggota.json`, set the credentials, then **deactivate workflow 02** (otherwise you get two copies) and activate 06.
+
+How it works: 06 calls `GET /api/public/n8n/notifications?kind=report&period=today` (or `kind=reminders&days=3`), which returns one message per recipient, and sends each `text` to its `chat_id`:
+
+```json
+{
+  "ok": true,
+  "kind": "report",
+  "count": 2,
+  "messages": [
+    {
+      "chat_id": "123456789",
+      "text": "📊 Laporan Hari ini …",
+      "recipient": "owner",
+      "wallets": null
+    },
+    {
+      "chat_id": "-1001234567890",
+      "text": "📊 Laporan Hari ini\n👛 Dompet: Toko Sembako …",
+      "recipient": "dini",
+      "wallets": 1
+    }
+  ]
+}
+```
+
+- The owner's text is **exactly** what `/report` / `/reminders` return. A member's text only counts income/expense recorded on their wallets (transfers excluded, balances of their wallets only); reminders list only debts, subscriptions, monthly fees and recurring items linked to those wallets (category budget alerts stay owner-only).
+- Scope always comes from the member's current wallet access: revoke a wallet and it disappears from their notifications; a member with no wallets gets nothing; inactive members get nothing.
+- `kind=reminders` skips recipients with nothing due (add `&skip_empty=0` to always send).
+- These chat ids are **separate from `BOT_ALLOWED_CHAT_IDS`**: receiving notifications never lets a chat use the bot.
+- Without v22 (or without members) the endpoint returns just the owner message, so 06 then behaves like 02.
 
 > [!NOTE]
 > Workflow 01 does **not** use the Telegram Trigger's _Restrict to Chat IDs_ option on purpose: that option silently drops button taps. The allow-list is enforced by the _Normalize & Guard_ node and again by the app (`BOT_ALLOWED_CHAT_IDS`).
