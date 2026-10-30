@@ -539,16 +539,26 @@ export async function syncRow(c: GatewayConfig, row: GatewayRow): Promise<SyncRe
 
 export type WebhookOutcome = { status: number; body: Record<string, unknown> };
 
+/** Unauthenticated noise only (bad payload / bad signature); signed requests are never limited. */
+const BAD_WEBHOOK_RULES = [{ name: "midtrans:bad", limit: 300, windowMs: 3_600_000 }] as const;
+
 /**
- * Midtrans notification. Order of checks: configured → v25 → signature (constant time) → known
- * order → re-read status from the API → amount → transition/booking. Answers 200 for anything
- * processed or ignorable so Midtrans stops retrying; 503 for transient failures (Midtrans retries).
+ * Midtrans notification. Order of checks: configured → signature (pure, constant time, no DB) →
+ * v25 → known order → re-read status from the API → amount → transition/booking.
+ * Only requests that FAIL the payload/signature check count against a per-IP limit (429 once
+ * exceeded), so a spoofed X-Forwarded-For can never block genuine, signed notifications.
+ * Answers 200 for anything processed or ignorable so Midtrans stops retrying; 503 for transient
+ * failures (Midtrans retries).
  */
-export async function handleMidtransWebhook(body: unknown): Promise<WebhookOutcome> {
+export async function handleMidtransWebhook(body: unknown, ip: string): Promise<WebhookOutcome> {
   const c = await midtransConfig();
   if (!c) return { status: 503, body: { ok: false } };
   const check = midtrans.verifyWebhook(c, body);
-  if (!check.ok) return { status: check.status, body: { ok: false } };
+  if (!check.ok) {
+    const { rateHit, subjectHash } = await import("../rate-limit.server");
+    const allowed = await rateHit(BAD_WEBHOOK_RULES, subjectHash(`ip:${ip}`));
+    return { status: allowed ? check.status : 429, body: { ok: false } };
+  }
   if (!(await gatewayReady())) return { status: 503, body: { ok: false } };
   const row = await loadGatewayRow({ order_id: check.orderId });
   // Not ours (e.g. another app on the same Midtrans account): acknowledge, nothing to do.
@@ -674,7 +684,10 @@ export async function releaseInvoiceGateway(invoiceId: string) {
 /** Payments booked from the gateway cannot be deleted by hand (refund them instead). */
 export async function assertPaymentNotGateway(paymentId: string) {
   const res = await table().select("id").eq("payment_id", paymentId).limit(1);
-  if (res.error) return;
+  if (res.error) {
+    if (await missing(res.error)) return;
+    throw new Error(res.error.message);
+  }
   if (res.data?.length)
     throw new Error("Pembayaran dari Midtrans tidak bisa dihapus; gunakan refund");
 }
