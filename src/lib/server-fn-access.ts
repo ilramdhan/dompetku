@@ -87,6 +87,11 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     recordInvoicePaymentFn: "admin",
     deleteInvoicePaymentFn: "admin",
   },
+  "invoice-report.functions.ts": {
+    getInvoiceReport: "admin",
+    getInvoicePayments: "admin",
+    getOpenInvoices: "admin",
+  },
   "pockets.functions.ts": {
     getAccountPockets: "member",
     getPocketOptions: "member",
