@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -272,9 +272,16 @@ function InvoicesPage() {
         title={t("Invoice")}
         subtitle={`${t("Belum dibayar:")} ${money(summary.outstanding)} · ${summary.open} ${t("invoice")}`}
         actions={
-          <Button onClick={() => setForm(newForm(account ?? accounts[0]?.id ?? ""))}>
-            <Plus className="size-4" /> {t("Buat invoice")}
-          </Button>
+          <>
+            <Button variant="outline" asChild>
+              <Link to="/invoices/report" search={account ? { account } : {}}>
+                {t("Laporan & aging")}
+              </Link>
+            </Button>
+            <Button onClick={() => setForm(newForm(account ?? accounts[0]?.id ?? ""))}>
+              <Plus className="size-4" /> {t("Buat invoice")}
+            </Button>
+          </>
         }
       />
       <div className="mb-4 grid grid-cols-1 gap-3 min-[430px]:grid-cols-2">
