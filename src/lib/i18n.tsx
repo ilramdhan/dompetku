@@ -254,6 +254,7 @@ const DICT: Record<string, string> = {
   "Catat pembayaran cicilan ke-": "Record installment payment #",
   "?": "?",
   "Cicilan tercatat & masuk ke pengeluaran": "Installment recorded as an expense",
+  "otomatis tercatat sebagai pengeluaran.": "recorded automatically as an expense.",
   Penyedia: "Provider",
   "Total pinjaman": "Total loan",
   "Cicilan per bulan": "Installment per month",
@@ -427,6 +428,7 @@ const DICT: Record<string, string> = {
   "peringatan di": "alert at",
   langganan: "subscription",
   budget: "budget",
+  target: "goal",
   "hutang / cicilan": "debt / installment",
   Emas: "Gold",
   Piutang: "Receivables",
@@ -1331,6 +1333,7 @@ const DICT: Record<string, string> = {
   Dompet: "Wallet",
   /* Per-member Telegram notifications (v22, issue #75) */
   "Notifikasi Telegram": "Telegram notifications",
+  Telegram: "Telegram",
   "Laporan & pengingat terjadwal (n8n) hanya berisi dompet yang boleh dilihat anggota ini. Chat ID ini tidak memberi akses ke bot.":
     "Scheduled reports & reminders (n8n) only include wallets this member may view. This chat ID does not grant bot access.",
   "Chat ID Telegram": "Telegram chat ID",
@@ -1542,6 +1545,11 @@ let activeLang: Lang = "id";
 /** Translate outside React (uses the provider's current language). */
 export function translateNow(s: string): string {
   return activeLang === "en" ? (DICT[s] ?? s) : s;
+}
+
+/** Whether `s` is a key of the dictionary (an English value may equal its key, e.g. "Status"). */
+export function hasTranslation(s: string): boolean {
+  return Object.hasOwn(DICT, s);
 }
 
 /** Pure lookup for code outside React that knows the language (route `head()`, JSON-LD). */

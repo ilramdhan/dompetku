@@ -24,7 +24,7 @@
 - Dark mode is a `.dark` class on `<html>` set by an inline script in `__root.tsx` (localStorage `dk-theme`); all colors must stay semantic tokens so both themes work.
 - Pure, client-safe parsing/formatting (CSV import preview, reminder email builder) lives in `src/lib/csv.ts` / `src/lib/email.ts` so it is unit-testable and shared.
 - Direct reminder email uses Resend over fetch (RESEND_API_KEY/EMAIL_FROM/EMAIL_TO, optional); n8n can instead consume the ready-made email payload endpoints.
-- Language switch (ID/EN) goes through `LanguageProvider`/`useI18n` in `src/lib/i18n.tsx`; dictionary keys are the original Indonesian strings, `t()` returns the input unchanged for id — wrap all new UI text in `t(...)` and register new keys in the dictionary.
+- Language switch (ID/EN) goes through `LanguageProvider`/`useI18n` in `src/lib/i18n.tsx`; dictionary keys are the original Indonesian strings, `t()` returns the input unchanged for id — wrap all new UI text in `t(...)` and register new keys in the dictionary. `i18n-keys.test.ts` fails when a literal `t("…")` key has no `DICT` entry.
 - PWA is manifest-only (public/manifest.webmanifest + public/icons, favicon.png referenced from `__root.tsx`); no service worker is used, keep it that way so previews stay safe.
 - Reads of optional tables (activity_log, gold__, receivables_) go through `isMissingTable()` and degrade to empty/`{ready:false}` so pages never crash before the user runs a new schema section.
 - Gold prices (world XAU + Antam) live in `src/lib/assets.server.ts`, cached one row per day per source in `gold_prices` with last-cache then estimate fallback; pure gold/receivable math lives in `src/lib/assets.ts`.
