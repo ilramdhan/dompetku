@@ -8,6 +8,8 @@ import {
   MIDTRANS_HOSTS,
   baseOverride,
   basicAuth,
+  isSandboxKey,
+  keyModeMismatch,
   midtransError,
   parseBool,
   parseNotification,
@@ -37,9 +39,14 @@ export async function midtransConfig(): Promise<GatewayConfig | null> {
   const serverKey = v.MIDTRANS_SERVER_KEY?.trim();
   if (!serverKey) return null;
   const production = parseBool(v.MIDTRANS_PRODUCTION, false);
+  // A sandbox key (SB-…) in production mode or a production key in sandbox mode would fail every
+  // call (and could hit the wrong environment): treat the gateway as off.
+  if (keyModeMismatch(serverKey, production)) return null;
   const hosts = production ? MIDTRANS_HOSTS.production : MIDTRANS_HOSTS.sandbox;
-  const api = baseOverride(process.env["MIDTRANS_API_BASE"], production);
-  const snap = baseOverride(process.env["MIDTRANS_SNAP_BASE"], production);
+  // Test-only overrides: sandbox mode AND a sandbox key, never with a production key.
+  const testable = !production && isSandboxKey(serverKey);
+  const api = testable ? baseOverride(process.env["MIDTRANS_API_BASE"], production) : null;
+  const snap = testable ? baseOverride(process.env["MIDTRANS_SNAP_BASE"], production) : null;
   return {
     provider: "midtrans",
     serverKey,

@@ -1597,6 +1597,19 @@ const DICT: Record<string, string> = {
   "Pembayaran Midtrans dibuat": "Midtrans payment created",
   "Pembayaran Midtrans diterima": "Midtrans payment received",
   "Refund Midtrans dicatat": "Midtrans refund recorded",
+  "Key Midtrans tidak cocok dengan mode: key sandbox diawali SB- dan hanya untuk MIDTRANS_PRODUCTION=false. Gateway nonaktif sampai key dan mode cocok.":
+    "Midtrans key does not match the mode: sandbox keys start with SB- and only work with MIDTRANS_PRODUCTION=false. The gateway stays off until key and mode match.",
+  "Refund dengan kunci ini sudah ada dengan jumlah berbeda; cek status lalu coba lagi":
+    "A refund with this key already exists with a different amount; check the status and try again",
+  "Chargeback dari Midtrans, cek manual": "Chargeback from Midtrans, check manually",
+  "Tagih ulang invoice ini?": "Bill this invoice again?",
+  "Tombol Bayar sekarang dan pengingat jatuh tempo aktif lagi untuk sisa tagihan. Pilih Batalkan invoice bila pelanggan tidak perlu membayar lagi.":
+    "The Pay now button and due reminders come back for the amount due. Cancel the invoice instead if the customer does not need to pay again.",
+  "Tagih ulang": "Bill again",
+  "Invoice ditagih ulang": "Invoice billed again",
+  "Ada refund Midtrans: tombol Bayar sekarang dan pengingat jatuh tempo dihentikan. Batalkan invoice bila tidak ditagih lagi, atau tagih ulang sisanya.":
+    "There is a Midtrans refund: the Pay now button and due reminders are paused. Cancel the invoice if it will not be billed again, or bill the remainder again.",
+  "Invoice ditagih ulang setelah refund": "Invoice billed again after a refund",
 };
 
 const LangContext = createContext<{

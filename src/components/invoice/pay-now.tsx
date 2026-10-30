@@ -57,10 +57,17 @@ function loadSnap(src: string, clientKey: string): Promise<boolean> {
   });
 }
 
-function safeRedirect(url: string): boolean {
+/**
+ * Only follows https://app(.sandbox).midtrans.com/… — except in the server-flagged test mode
+ * (`test_redirect`, sandbox key + MIDTRANS_SNAP_BASE override), where any http(s) URL is allowed.
+ */
+function safeRedirect(url: string, testMode: boolean): boolean {
   try {
     const u = new URL(url);
-    if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+    const ok = testMode
+      ? u.protocol === "https:" || u.protocol === "http:"
+      : u.protocol === "https:" && SNAP_HOSTS.includes(`${u.origin}/`);
+    if (!ok) return false;
     window.location.assign(u.toString());
     return true;
   } catch {
@@ -109,7 +116,7 @@ export function PayNowButton({
           onClose: () => void router.invalidate(),
           onError: () => setError(t("Pembayaran online gagal dibuat, coba lagi.")),
         });
-      } else if (!safeRedirect(r.redirect_url)) {
+      } else if (!safeRedirect(r.redirect_url, r.test_redirect)) {
         setError(t("Pembayaran online gagal dibuat, coba lagi."));
       }
     } catch (e) {

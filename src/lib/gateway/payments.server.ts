@@ -131,6 +131,8 @@ export type PublicPayStart = {
   client_key: string | null;
   /** snap.js URL (fixed Midtrans host) or null → use redirect_url. */
   snap_js: string | null;
+  /** Test-only base override active: the browser may follow a non-Midtrans redirect_url. */
+  test_redirect: boolean;
 };
 
 /**
@@ -172,6 +174,7 @@ export async function startGatewayPayment(
     redirect_url: r.redirect_url,
     client_key: c.clientKey,
     snap_js: c.clientKey && !c.overridden ? snapJsUrl(c.production) : null,
+    test_redirect: c.overridden,
   });
 
   const open = await table()

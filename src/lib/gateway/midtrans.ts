@@ -46,10 +46,13 @@ export const parseBool = (v: string | null | undefined, def: boolean) => {
   return def;
 };
 
-/** Sandbox keys start with "SB-"; warn when the mode does not match the key. */
+/** Sandbox keys start with "SB-" (Midtrans dashboard → Access Keys). */
+export const isSandboxKey = (key: string | null | undefined) => /^SB-/i.test(key ?? "");
+
+/** True when the key's environment does not match the mode (sandbox key in production or v.v.). */
 export function keyModeMismatch(serverKey: string | null | undefined, production: boolean) {
   if (!serverKey) return false;
-  return /^SB-/i.test(serverKey) === production;
+  return isSandboxKey(serverKey) === production;
 }
 
 /** String hashed for `signature_key` (exactly as received, no re-formatting). */

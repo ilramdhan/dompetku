@@ -106,8 +106,9 @@ export const createGatewayPayment = createServerFn({ method: "POST" })
     try {
       const req = getRequest();
       const { seoConfig } = await import("./seo.server");
-      const origin = seoConfig().siteUrl ?? new URL(req.url).origin;
-      return await gw.startGatewayPayment(data.token, clientIp(req.headers), origin);
+      // Finish URL only from the configured PUBLIC_SITE_URL (never the request Host header);
+      // without it Midtrans uses the Finish Redirect URL from its dashboard.
+      return await gw.startGatewayPayment(data.token, clientIp(req.headers), seoConfig().siteUrl);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (allowed.has(msg)) throw new Error(msg);
