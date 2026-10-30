@@ -376,26 +376,43 @@ User guide: [PAYMENT-GATEWAY.md](PAYMENT-GATEWAY.md).
   `callbacks.finish = /i/<token>?gw=1`). The browser gets token, redirect URL, client key and the
   fixed snap.js URL only; snap.js is injected on click with `data-client-key`, `redirect_url` is
   the fallback. `?gw=1` only shows "being processed".
-- **Webhook** `POST /api/public/payments/midtrans`: 403 demo, 503 off/no v25, ≤64 KB body, per-IP
-  `rateHit`, 401 bad signature, then **always** Get Status → amount must match the stored row →
-  `nextStatus` (late expire/cancel/deny never downgrade success; refund only from success) applied
-  with a conditional update on the read status. Entering a paid state books once: claim
-  `update … where payment_id is null and claimed_at is null`, then `bookPayment()` (method
-  `Midtrans (<type>)`, reference = Midtrans transaction id, income `invoice_pay:<payment id>`),
-  `payment_id` stored, confirmation mail best-effort. A crash between claim and link is recovered
-  by the payment reference; business errors (invoice paid/cancelled meanwhile) are kept in
-  `last_error` for the admin. Unknown orders → 200 (ignored); transient errors → 503 (Midtrans
-  retries).
-- **Refunds.** Admin `refundGatewayFn` re-reads the order (settlement + refundable payment type,
-  ShopeePay/OVO full only), sends `/v2/<order>/refund` with a deterministic `refund_key`
-  (`rf-<row>-<n>`; Midtrans 406 duplicate = already done). Every refund in the verified status (also
-  ones made in the dashboard) becomes a reversing **expense** in category "Invoice" with
-  `external_id = invoice_refund:<row id>:<refund key>` and sets `invoice_payments.refunded`;
-  `paidSum` subtracts it, so `syncInvoice` derives partial/unpaid. Nothing is deleted.
-- **History.** Invoices with pending/paid orders cannot be deleted (FK restrict + app check);
-  gateway payments cannot be deleted by hand. `gateway_transactions` is backed up without Snap
-  tokens. Test-only `MIDTRANS_API_BASE`/`MIDTRANS_SNAP_BASE` (env, sandbox mode only) point the
-  server at a mock; with an override the browser skips snap.js and uses `redirect_url`.
+- **Webhook** `POST /api/public/payments/midtrans`: 403 demo, 503 off/no v25 (also a key/mode
+  mismatch: an `SB-` key with production or vice versa disables the gateway), ≤64 KB body, then the
+  pure signature check first; only bad payloads/signatures hit a per-IP `rateHit` (429 once over),
+  so a spoofed `X-Forwarded-For` can never block signed notifications. Then **always** Get Status →
+  amount must match the stored row → `nextStatus` (late expire/cancel/deny never downgrade success;
+  refund only from success) applied with a conditional update on the read status. A chargeback
+  without refund entries keeps the status and sets `last_error` for a manual check.
+- **Booking claim.** Entering a paid state books once: only a stale claim (>10 min, crash) is
+  released, conditional on its exact `claimed_at`; the claim is one atomic
+  `update claimed_at = now, last_error = null where payment_id is null and claimed_at is null`;
+  `bookPayment()` (method `Midtrans (<type>)`, reference = Midtrans transaction id, income
+  `invoice_pay:<payment id>`); the link and every `last_error` write are conditional on
+  `payment_id is null`. A failed attempt (incl. business errors such as "invoice already paid",
+  shown in `last_error`) releases its own claim; crash recovery links a payment found under the
+  transaction id or order id. Unknown orders → 200 (ignored); transient errors → 503.
+- **Refunds.** Admin `refundGatewayFn` re-reads the order (settlement/partial_refund + refundable
+  payment type, ShopeePay/OVO full only) and sends `/v2/<order>/refund` with a rounded amount and
+  `refund_key = rf-<row>-<n>`, where n = 1 + max(refunds listed by Midtrans, local
+  `invoice_refund:<row>:%` expenses) so a lagging status never reuses a key. A 406 (duplicate key) is
+  accepted only when the re-read status lists that key with the same amount; otherwise it fails and
+  nothing is booked from the request. Every refund in the verified status (also dashboard ones)
+  becomes a reversing **expense** in category "Invoice" (`invoice_refund:<row id>:<refund key>`) and
+  sets `invoice_payments.refunded`; `paidSum`, the invoice report (`netPaymentAmount`) and the
+  public payment list net it out, so `syncInvoice` derives partial/unpaid. Nothing is deleted.
+- **Refund hold.** A newly booked refund sets `gateway_transactions.refund_hold`: the public pay
+  button and the due/overdue reminders skip that invoice until the admin clicks **Tagih ulang**
+  (`releaseRefundHoldFn`) or cancels it.
+- **Stale orders.** `retirePendingOrders()` expires pending orders whose amount no longer equals
+  the remaining amount (or whose invoice is no longer open) via best-effort
+  `POST /v2/<order>/expire` + local `expired`; it runs before creating a new order and after every
+  `syncInvoice`/manual status change. A late verified settlement still wins (`nextStatus`).
+- **History.** Invoices with pending/paid orders cannot be deleted (FK restrict + app check, fail
+  closed on DB errors); gateway payments cannot be deleted by hand. `gateway_transactions` is backed
+  up without Snap tokens. `callbacks.finish` is sent only when `PUBLIC_SITE_URL` is set (never from
+  the Host header). Test-only `MIDTRANS_API_BASE`/`MIDTRANS_SNAP_BASE` (env, sandbox mode with an
+  `SB-` key only) point the server at a mock; with an override the browser skips snap.js, uses
+  `redirect_url`, and only then may follow a non-Midtrans redirect host.
 
 ### Users and wallet-level access (RBAC, v18)
 

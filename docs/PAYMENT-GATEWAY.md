@@ -128,11 +128,10 @@ Di dashboard Midtrans (lingkungan yang sama dengan key Anda) → **Settings → 
 Klik **Update**.
 
 - Notification URL **wajib** dan harus `https://`, port standar, tanpa login.
-- Finish URL tidak wajib: Dompetku mengirim alamat kembali sendiri untuk tiap pembayaran
-  (`/i/<token>?gw=1`). Bila Anda mengisinya di dashboard, Dompetku tetap memakai alamat per
-  pembayaran.
-- Atur juga `PUBLIC_SITE_URL=https://dompet.example.com` agar alamat kembali memakai domain
-  publik Anda.
+- Finish URL: bila `PUBLIC_SITE_URL=https://dompet.example.com` diatur, Dompetku mengirim alamat
+  kembali per pembayaran (`/i/<token>?gw=1`), yang menang atas dashboard. **Tanpa
+  `PUBLIC_SITE_URL`** Dompetku tidak mengirim alamat kembali (header Host tidak dipercaya) dan
+  Midtrans memakai **Finish Redirect URL** dari dashboard, isi dengan domain Anda.
 
 ### 6. Uji di sandbox
 
@@ -179,8 +178,14 @@ Yang dilakukan Dompetku saat refund:
 - **Tidak menghapus apa pun.** Pembayaran asli tetap ada.
 - Mencatat **pengeluaran pembalik** di kategori "Invoice" pada dompet yang sama, sehingga saldo
   dompet ikut turun.
-- Mengurangi "sudah dibayar" pada invoice, sehingga statusnya kembali menjadi **Dibayar
-  sebagian** atau **Belum dibayar**.
+- Mengurangi "sudah dibayar" pada invoice (juga di laporan dan halaman publik), sehingga
+  statusnya kembali menjadi **Dibayar sebagian** atau **Belum dibayar**.
+- **Menahan penagihan:** setelah refund, tombol **Bayar sekarang** disembunyikan dan pengingat
+  jatuh tempo tidak dikirim, agar pelanggan yang baru di-refund tidak ditagih lagi. Di
+  **Transaksi Midtrans** pilih:
+  - **Batalkan invoice** (aksi biasa, setelah pembayaran dihapus/di-refund penuh) bila pelanggan
+    tidak perlu membayar lagi; atau
+  - **Tagih ulang** bila sisa tagihan memang harus dibayar lagi (tombol dan pengingat aktif lagi).
 - Refund yang dibuat langsung di dashboard Midtrans juga ikut dicatat ketika notifikasi
   `refund`/`partial_refund` masuk atau saat Anda menekan **Cek status**.
 
@@ -207,7 +212,8 @@ notifikasi.
 | Klik bayar → "Pembayaran online gagal dibuat" | Server Key salah atau tertukar sandbox/production (`SB-…` hanya untuk `MIDTRANS_PRODUCTION=false`). Lihat log server (Vercel → Logs, `gateway:create`).                                                                                |
 | Webhook tidak masuk                           | Notification URL salah/belum disimpan di lingkungan yang benar; domain tidak publik; HTTPS bermasalah. Di dashboard Midtrans buka transaksi → **Notification history** untuk melihat kode respons. Sementara itu pakai **Cek status**. |
 | Webhook dijawab **401**                       | Tanda tangan tidak cocok: Server Key di Dompetku berbeda dengan akun/lingkungan yang mengirim notifikasi.                                                                                                                              |
-| Webhook dijawab **503**                       | Gateway nonaktif, v25 belum dijalankan, atau `SESSION_SECRET` tidak ada (rate limit gagal tertutup). Midtrans akan mencoba ulang.                                                                                                      |
+| Webhook dijawab **503**                       | Gateway nonaktif (termasuk key dan mode tidak cocok) atau v25 belum dijalankan. Midtrans akan mencoba ulang.                                                                                                                           |
+| Tombol bayar hilang setelah refund            | Disengaja: invoice ditahan setelah refund. Buka **Transaksi Midtrans → Tagih ulang** atau batalkan invoice.                                                                                                                            |
 | Webhook dijawab **403**                       | Instance demo (`DEMO_MODE=true`): pembayaran online selalu nonaktif.                                                                                                                                                                   |
 | Status Berhasil tapi invoice tidak berubah    | Lihat pesan merah di **Transaksi Midtrans**: mis. invoice sudah lunas/dibatalkan lebih dulu atau jumlah tidak cocok. Uang tetap diterima: refund atau catat manual.                                                                    |
 | Invoice tidak bisa dihapus                    | Invoice punya transaksi Midtrans yang tertunda/berhasil. Batalkan invoice saja; riwayat pembayaran tidak boleh hilang.                                                                                                                 |
@@ -222,6 +228,13 @@ notifikasi.
   disimpan. Mengirim notifikasi palsu tidak bisa melunasi invoice.
 - **Jumlah dihitung server:** pelanggan tidak bisa mengubah nominal yang dibayar.
 - **Tidak ada pencatatan ganda:** notifikasi ganda atau bersamaan hanya mencatat satu pembayaran.
+- **Tanda tangan dicek dulu:** hanya permintaan dengan tanda tangan salah/payload rusak yang
+  dibatasi per IP (429). Notifikasi Midtrans yang sah tidak pernah diblokir rate limit.
+- **Order lama dihentikan:** bila sisa tagihan berubah (pembayaran manual, refund) atau invoice
+  lunas/dibatalkan, order Midtrans yang masih tertunda di-expire (`/v2/<order>/expire`, best-effort)
+  agar pelanggan tidak membayar lebih.
+- **Key harus cocok dengan mode:** key sandbox (`SB-…`) dengan `MIDTRANS_PRODUCTION=true` (atau
+  sebaliknya) membuat gateway nonaktif, dan Pengaturan menampilkan peringatan.
 - **Parameter di URL kembali** (`?order_id=…&transaction_status=…`) diabaikan; halaman hanya
   menampilkan "sedang diproses" sampai notifikasi terverifikasi masuk.
 - Tombol bayar dibatasi per tautan dan per IP; order tertunda dipakai ulang.
@@ -338,9 +351,10 @@ accounts **Settings → Payment → Notification URL**):
 Click **Update**.
 
 - The Notification URL is **required**: `https://`, standard port, no login.
-- The Finish URL is optional: Dompetku sends its own return address for every payment
-  (`/i/<token>?gw=1`), which takes precedence.
-- Also set `PUBLIC_SITE_URL=https://dompet.example.com` so return links use your public domain.
+- Finish URL: when `PUBLIC_SITE_URL=https://dompet.example.com` is set, Dompetku sends a return
+  address per payment (`/i/<token>?gw=1`), which takes precedence. **Without `PUBLIC_SITE_URL`**
+  Dompetku sends none (the request Host header is not trusted) and Midtrans uses the **Finish
+  Redirect URL** from its dashboard; set it to your domain.
 
 ### 6. Test in sandbox
 
@@ -383,7 +397,15 @@ What Dompetku does on a refund:
 
 - **Nothing is deleted.** The original payment stays.
 - A **reversing expense** in category "Invoice" is booked on the same wallet.
-- The invoice's paid amount goes down, so its status returns to **partial** or **unpaid**.
+- The invoice's paid amount goes down (also in reports and on the public page), so its status
+  returns to **partial** or **unpaid**.
+- **Billing is put on hold:** after a refund the **Bayar sekarang** button is hidden and due
+  reminders are not sent, so a customer who was just refunded is not billed again. Under
+  **Transaksi Midtrans** choose either:
+  - **Batalkan invoice** (cancel; the normal action once payments are removed/fully refunded)
+    when the customer does not need to pay again; or
+  - **Tagih ulang** (bill again) when the amount due really must be paid (button and reminders
+    come back).
 - Refunds made directly in the Midtrans dashboard are recorded too, when the `refund` /
   `partial_refund` notification arrives or when you click **Cek status**.
 
@@ -409,7 +431,8 @@ paid invoice is never undone by the order notifications arrive in.
 | Click → "Could not start the online payment" | Wrong Server Key or sandbox/production mix-up (`SB-…` only with `MIDTRANS_PRODUCTION=false`). Check server logs (`gateway:create`).                                                               |
 | Webhook never arrives                        | Notification URL wrong / saved in the other environment; domain not public; HTTPS issue. In the Midtrans dashboard open the transaction → **Notification history**. Meanwhile use **Cek status**. |
 | Webhook answered **401**                     | Signature mismatch: the Server Key in Dompetku is not the one of the sending account/environment.                                                                                                 |
-| Webhook answered **503**                     | Gateway off, v25 not run, or `SESSION_SECRET` missing (rate limit fails closed). Midtrans retries.                                                                                                |
+| Webhook answered **503**                     | Gateway off (including a key/mode mismatch) or v25 not run. Midtrans retries.                                                                                                                     |
+| Pay button gone after a refund               | By design: the invoice is on hold after a refund. Use **Transaksi Midtrans → Tagih ulang** or cancel the invoice.                                                                                 |
 | Webhook answered **403**                     | Demo instance (`DEMO_MODE=true`): online payments are always off.                                                                                                                                 |
 | Succeeded but invoice unchanged              | See the red note under **Transaksi Midtrans**, e.g. the invoice was paid/cancelled first or the amount did not match. The money did arrive: refund it or record it manually.                      |
 | Invoice cannot be deleted                    | It has a pending or successful Midtrans order. Cancel the invoice instead; payment history must not disappear.                                                                                    |
@@ -424,6 +447,13 @@ paid invoice is never undone by the order notifications arrive in.
   notification cannot mark an invoice paid.
 - **Server-computed amount:** customers cannot change what they pay.
 - **No double booking:** duplicate or concurrent notifications book one payment only.
+- **Signature first:** only requests with a bad signature or payload are rate limited per IP
+  (429). Genuine Midtrans notifications are never blocked by the rate limit.
+- **Old orders are stopped:** when the amount due changes (manual payment, refund) or the invoice
+  is paid/cancelled, still-pending Midtrans orders are expired (`/v2/<order>/expire`, best effort)
+  so the customer cannot overpay.
+- **Key must match the mode:** a sandbox key (`SB-…`) with `MIDTRANS_PRODUCTION=true` (or the
+  reverse) keeps the gateway off, and Settings shows a warning.
 - **Return URL parameters** (`?order_id=…&transaction_status=…`) are ignored; the page only says
   "being processed" until a verified notification arrives.
 - The pay button is rate limited per link and per IP; pending orders are reused.

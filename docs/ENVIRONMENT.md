@@ -128,8 +128,11 @@ Settings → Integrasi (wins over env). Off unless `MIDTRANS_ENABLED=true` and a
 | `MIDTRANS_SNAP_BASE`  | `http://127.0.0.1:4010` | **Test only**, env only: Snap base (create). Ignored in production; the browser then uses `redirect_url`.         | Leave empty.                                 |
 
 Set **Payment Notification URL** in the Midtrans dashboard to
-`https://<your-domain>/api/public/payments/midtrans` and set `PUBLIC_SITE_URL` so the return link
-uses your public domain.
+`https://<your-domain>/api/public/payments/midtrans`. Set `PUBLIC_SITE_URL` so the return link
+uses your public domain: without it no per-payment return link is sent (the request Host header is
+never trusted) and Midtrans uses the Finish Redirect URL from its dashboard. A sandbox key (`SB-…`)
+with `MIDTRANS_PRODUCTION=true`, or a production key in sandbox mode, keeps the gateway off. The
+test-only base overrides apply only in sandbox mode with an `SB-` server key.
 
 ## Monitoring (optional)
 
