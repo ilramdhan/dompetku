@@ -34,6 +34,8 @@ import {
   getInvoices,
   getPaymentMethodsFn,
 } from "./invoices.functions";
+import { getInvoicePayments, getInvoiceReport, getOpenInvoices } from "./invoice-report.functions";
+import type { PaymentSort } from "./invoice-report";
 import type { InvoiceFilter, InvoiceSort } from "./invoices";
 import type { CrudTable } from "./schemas";
 
@@ -204,6 +206,46 @@ export const invoiceQuery = (id: string) =>
   queryOptions({
     queryKey: ["invoices", "detail", id],
     queryFn: () => getInvoiceFn({ data: { id } }),
+  });
+/** Invoice reports (#98): month summary + aging, cross-invoice payments, dashboard card. */
+export const invoiceReportQuery = (month?: string, account?: string) =>
+  queryOptions({
+    queryKey: ["invoices", "report", month ?? "", account ?? ""],
+    queryFn: () =>
+      getInvoiceReport({
+        data: { ...(month ? { month } : {}), ...(account ? { account } : {}) },
+      }),
+    staleTime: FRESH,
+  });
+export type InvoicePaymentsFilter = {
+  offset?: number;
+  limit?: number;
+  sort?: PaymentSort;
+  direction?: "asc" | "desc";
+  month?: string;
+  account?: string;
+};
+export const invoicePaymentsQuery = (f: InvoicePaymentsFilter = {}) =>
+  queryOptions({
+    queryKey: ["invoices", "payments", f],
+    queryFn: () =>
+      getInvoicePayments({
+        data: {
+          offset: f.offset ?? 0,
+          limit: f.limit ?? 20,
+          sort: f.sort ?? "paid_at",
+          direction: f.direction ?? "desc",
+          ...(f.month ? { month: f.month } : {}),
+          ...(f.account ? { account: f.account } : {}),
+        },
+      }),
+    staleTime: FRESH,
+  });
+export const openInvoicesQuery = () =>
+  queryOptions({
+    queryKey: ["invoices", "open-card"],
+    queryFn: () => getOpenInvoices(),
+    staleTime: FRESH,
   });
 /** v24 payment methods (Settings card + invoice form). */
 export const paymentMethodsQuery = () =>

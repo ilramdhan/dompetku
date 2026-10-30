@@ -35,6 +35,7 @@ import { Route as AppSubscriptionsRouteImport } from './routes/_app/subscription
 import { Route as AppTransactionsRouteImport } from './routes/_app/transactions'
 import { Route as ITokenRouteImport } from './routes/i.$token'
 import { Route as AppAccountsIdRouteImport } from './routes/_app/accounts_.$id'
+import { Route as AppInvoicesReportRouteImport } from './routes/_app/invoices_.report'
 import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-icon'
 import { Route as ApiPublicN8nBackupRouteImport } from './routes/api/public/n8n/backup'
 import { Route as ApiPublicN8nBotRouteImport } from './routes/api/public/n8n/bot'
@@ -178,6 +179,11 @@ const AppAccountsIdRoute = AppAccountsIdRouteImport.update({
   path: '/accounts/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInvoicesReportRoute = AppInvoicesReportRouteImport.update({
+  id: '/invoices_/report',
+  path: '/invoices/report',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiPublicAppIconRoute = ApiPublicAppIconRouteImport.update({
   id: '/api/public/app-icon',
   path: '/api/public/app-icon',
@@ -274,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/transactions': typeof AppTransactionsRoute
   '/i/$token': typeof ITokenRoute
   '/accounts/$id': typeof AppAccountsIdRoute
+  '/invoices/report': typeof AppInvoicesReportRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
@@ -314,6 +321,7 @@ export interface FileRoutesByTo {
   '/transactions': typeof AppTransactionsRoute
   '/i/$token': typeof ITokenRoute
   '/accounts/$id': typeof AppAccountsIdRoute
+  '/invoices/report': typeof AppInvoicesReportRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
@@ -356,6 +364,7 @@ export interface FileRoutesById {
   '/_app/transactions': typeof AppTransactionsRoute
   '/i/$token': typeof ITokenRoute
   '/_app/accounts_/$id': typeof AppAccountsIdRoute
+  '/_app/invoices_/report': typeof AppInvoicesReportRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
@@ -398,6 +407,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/i/$token'
     | '/accounts/$id'
+    | '/invoices/report'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
@@ -438,6 +448,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/i/$token'
     | '/accounts/$id'
+    | '/invoices/report'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
@@ -479,6 +490,7 @@ export interface FileRouteTypes {
     | '/_app/transactions'
     | '/i/$token'
     | '/_app/accounts_/$id'
+    | '/_app/invoices_/report'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
@@ -703,6 +715,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/invoices_/report': {
+      id: '/_app/invoices_/report'
+      path: '/invoices/report'
+      fullPath: '/invoices/report'
+      preLoaderRoute: typeof AppInvoicesReportRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/public/app-icon': {
       id: '/api/public/app-icon'
       path: '/api/public/app-icon'
@@ -815,6 +834,7 @@ interface AppRouteChildren {
   AppSubscriptionsRoute: typeof AppSubscriptionsRoute
   AppTransactionsRoute: typeof AppTransactionsRoute
   AppAccountsIdRoute: typeof AppAccountsIdRoute
+  AppInvoicesReportRoute: typeof AppInvoicesReportRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -835,6 +855,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSubscriptionsRoute: AppSubscriptionsRoute,
   AppTransactionsRoute: AppTransactionsRoute,
   AppAccountsIdRoute: AppAccountsIdRoute,
+  AppInvoicesReportRoute: AppInvoicesReportRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
