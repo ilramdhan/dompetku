@@ -27,6 +27,16 @@ import { getRecurring } from "./recurring.functions";
 import { getAccountReport, getReconcileTransactions } from "./account-report.functions";
 import { getProfile } from "./profile.functions";
 import { getAccountPockets, getPocketOptions, getPocketWarnings } from "./pockets.functions";
+import {
+  getInvoiceFn,
+  getInvoiceProofsFn,
+  getInvoiceShareFn,
+  getInvoices,
+  getPaymentMethodsFn,
+} from "./invoices.functions";
+import { getInvoicePayments, getInvoiceReport, getOpenInvoices } from "./invoice-report.functions";
+import type { PaymentSort } from "./invoice-report";
+import type { InvoiceFilter, InvoiceSort } from "./invoices";
 import type { CrudTable } from "./schemas";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -167,6 +177,99 @@ export const pocketWarningsQuery = (month: string) =>
     queryFn: () => getPocketWarnings({ data: { month } }),
     staleTime: FRESH,
   });
+/** v21 Invoice list (server pagination/sort/filter) and one invoice with items + payments. */
+export type InvoiceListFilter = {
+  offset?: number;
+  limit?: number;
+  sort?: InvoiceSort;
+  direction?: "asc" | "desc";
+  status?: InvoiceFilter;
+  account?: string;
+  search?: string;
+};
+export const invoicesQuery = (f: InvoiceListFilter = {}) =>
+  queryOptions({
+    queryKey: ["invoices", "list", f],
+    queryFn: () =>
+      getInvoices({
+        data: {
+          offset: f.offset ?? 0,
+          limit: f.limit ?? 20,
+          sort: f.sort ?? "issue_date",
+          direction: f.direction ?? "desc",
+          ...(f.status ? { status: f.status } : {}),
+          ...(f.account ? { account: f.account } : {}),
+          ...(f.search ? { search: f.search } : {}),
+        },
+      }),
+    staleTime: FRESH,
+  });
+export const invoiceQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["invoices", "detail", id],
+    queryFn: () => getInvoiceFn({ data: { id } }),
+  });
+/** Invoice reports (#98): month summary + aging, cross-invoice payments, dashboard card. */
+export const invoiceReportQuery = (month?: string, account?: string) =>
+  queryOptions({
+    queryKey: ["invoices", "report", month ?? "", account ?? ""],
+    queryFn: () =>
+      getInvoiceReport({
+        data: { ...(month ? { month } : {}), ...(account ? { account } : {}) },
+      }),
+    staleTime: FRESH,
+  });
+export type InvoicePaymentsFilter = {
+  offset?: number;
+  limit?: number;
+  sort?: PaymentSort;
+  direction?: "asc" | "desc";
+  month?: string;
+  account?: string;
+};
+export const invoicePaymentsQuery = (f: InvoicePaymentsFilter = {}) =>
+  queryOptions({
+    queryKey: ["invoices", "payments", f],
+    queryFn: () =>
+      getInvoicePayments({
+        data: {
+          offset: f.offset ?? 0,
+          limit: f.limit ?? 20,
+          sort: f.sort ?? "paid_at",
+          direction: f.direction ?? "desc",
+          ...(f.month ? { month: f.month } : {}),
+          ...(f.account ? { account: f.account } : {}),
+        },
+      }),
+    staleTime: FRESH,
+  });
+export const openInvoicesQuery = () =>
+  queryOptions({
+    queryKey: ["invoices", "open-card"],
+    queryFn: () => getOpenInvoices(),
+    staleTime: FRESH,
+  });
+/** v24 payment methods (Settings card + invoice form). */
+export const paymentMethodsQuery = () =>
+  queryOptions({
+    queryKey: ["payment-methods"],
+    queryFn: () => getPaymentMethodsFn(),
+  });
+
+export type ProofFilter = "pending" | "approved" | "rejected" | "all";
+/** v24 proof verification queue. */
+export const invoiceProofsQuery = (status: ProofFilter, offset = 0, limit = 20) =>
+  queryOptions({
+    queryKey: ["invoice-proofs", status, offset, limit],
+    queryFn: () => getInvoiceProofsFn({ data: { status, offset, limit } }),
+  });
+
+/** v23 public link status of one invoice (invalidated with the "invoices" key). */
+export const invoiceShareQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["invoices", "share", id],
+    queryFn: () => getInvoiceShareFn({ data: { id } }),
+  });
 export const reconcileTxQuery = (id: string, from: string, to: string) =>
   queryOptions({
     queryKey: ["account-recon", id, from, to],
@@ -220,6 +323,15 @@ const AFFECTS: Record<string, string[]> = {
   notify_recipients: ["notify", "activity"],
   // v19 Kantong: pocket cards/options/warnings, transactions (badges/filter) and the activity log.
   pockets: ["pockets", "tx", "activity"],
+  // v21 Invoice: editing/cancelling only touches invoice lists; payments book income transactions.
+  invoices: ["invoices", "activity"],
+  // v23 public link: share status lives under the "invoices" key.
+  invoice_shares: ["invoices", "activity"],
+  invoice_payments: [...MONEY, "invoices"],
+  // v24: methods feed Settings, the invoice form and the public page; proofs drive the queue and
+  // the "Menunggu verifikasi" status; approving books a payment (money).
+  payment_methods: ["payment-methods", "invoices", "activity"],
+  invoice_proofs: [...MONEY, "invoices", "invoice-proofs"],
 };
 
 export function invalidateFor(qc: QueryClient, table: string) {

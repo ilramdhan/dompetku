@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/app-shell";
 import { RouteError } from "@/components/route-error";
 import { TransactionDialog, newTxDraft, type TxDraft } from "@/components/transaction-dialog";
 import { AssetsOverview } from "@/components/assets-overview";
+import { OpenInvoicesCard } from "@/components/open-invoices-card";
 import {
   CashflowAreaChart,
   DonutChart,
@@ -185,6 +186,8 @@ function Dashboard() {
       {month === currentMonth() ? <PocketWarnings month={month} /> : null}
 
       {isAdmin ? <AssetsOverview /> : null}
+
+      {isAdmin ? <OpenInvoicesCard /> : null}
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="min-w-0 p-5 lg:col-span-2">

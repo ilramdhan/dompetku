@@ -30,5 +30,15 @@ export const appSettingsInputSchema = z.object({
     (v) => (v === "" || v === undefined ? null : v),
     z.coerce.number().int().min(1).max(365).nullable(),
   ),
+  /** v21 invoice number prefix; optional so older clients keep working (empty = default INV). */
+  invoice_prefix: z
+    .preprocess(
+      (v) => (typeof v === "string" ? v.trim().toUpperCase() || null : v),
+      z
+        .string()
+        .regex(/^[A-Z0-9]{1,10}$/, "Prefix invoice hanya huruf/angka, maks. 10")
+        .nullable(),
+    )
+    .optional(),
 });
 export type AppSettingsInput = z.output<typeof appSettingsInputSchema>;

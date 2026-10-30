@@ -14,6 +14,7 @@ import { listUsersFn } from "@/lib/users.functions";
 import { displayNameOf } from "@/lib/users";
 import { AppSettingsCard } from "@/components/app-settings-card";
 import { IntegrationsCard } from "@/components/integrations-card";
+import { PaymentMethodsCard } from "@/components/invoice/payment-methods-card";
 import { AboutCard } from "@/components/about-card";
 import { DemoDisabled } from "@/components/demo";
 import { RowActions, useCrudDialog } from "@/components/crud-page";
@@ -284,6 +285,9 @@ function SettingsPage() {
       <DemoDisabled>
         <AppSettingsCard />
       </DemoDisabled>
+
+      {/* v24: bank/QRIS for invoices. Demo: capped rows, QRIS image upload refused. */}
+      <PaymentMethodsCard />
 
       <DemoDisabled>
         <IntegrationsCard />

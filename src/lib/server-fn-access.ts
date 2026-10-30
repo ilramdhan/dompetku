@@ -78,10 +78,43 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     setTelegramWebhook: "admin",
     deleteTelegramWebhook: "admin",
   },
+  "invoices.functions.ts": {
+    getInvoices: "admin",
+    getInvoiceFn: "admin",
+    saveInvoiceFn: "admin",
+    invoiceActionFn: "admin",
+    deleteInvoiceFn: "admin",
+    recordInvoicePaymentFn: "admin",
+    deleteInvoicePaymentFn: "admin",
+    getInvoiceShareFn: "admin",
+    createInvoiceShareFn: "admin",
+    revokeInvoiceShareFn: "admin",
+    // v24 (#94): payment methods and the proof verification queue.
+    getPaymentMethodsFn: "admin",
+    savePaymentMethodFn: "admin",
+    deletePaymentMethodFn: "admin",
+    getInvoiceProofsFn: "admin",
+    getProofUrlFn: "admin",
+    approveProofFn: "admin",
+    rejectProofFn: "admin",
+  },
+  "invoice-report.functions.ts": {
+    getInvoiceReport: "admin",
+    getInvoicePayments: "admin",
+    getOpenInvoices: "admin",
+  },
   "notify.functions.ts": {
     getNotifySettingsFn: "admin",
     saveNotifySettingsFn: "admin",
     deleteNotifySettingsFn: "admin",
+  },
+  // v23 (#93): customer view by share token; returns only the toPublicInvoice() whitelist.
+  // v24 (#94): proof upload by share token; demo-off, rate limited, answers only { ok }.
+  "invoice-public.functions.ts": { getPublicInvoice: "public", submitInvoiceProof: "public" },
+  "invoice-report.functions.ts": {
+    getInvoiceReport: "admin",
+    getInvoicePayments: "admin",
+    getOpenInvoices: "admin",
   },
   "pockets.functions.ts": {
     getAccountPockets: "member",

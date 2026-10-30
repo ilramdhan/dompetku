@@ -23,6 +23,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppDebtsRouteImport } from './routes/_app/debts'
 import { Route as AppGoalsRouteImport } from './routes/_app/goals'
 import { Route as AppGoldRouteImport } from './routes/_app/gold'
+import { Route as AppInvoicesRouteImport } from './routes/_app/invoices'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppReceivablesRouteImport } from './routes/_app/receivables'
 import { Route as AppRecurringRouteImport } from './routes/_app/recurring'
@@ -32,7 +33,9 @@ import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSubscriptionsRouteImport } from './routes/_app/subscriptions'
 import { Route as AppTransactionsRouteImport } from './routes/_app/transactions'
+import { Route as ITokenRouteImport } from './routes/i.$token'
 import { Route as AppAccountsIdRouteImport } from './routes/_app/accounts_.$id'
+import { Route as AppInvoicesReportRouteImport } from './routes/_app/invoices_.report'
 import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-icon'
 import { Route as ApiPublicN8nBackupRouteImport } from './routes/api/public/n8n/backup'
 import { Route as ApiPublicN8nBotRouteImport } from './routes/api/public/n8n/bot'
@@ -117,6 +120,11 @@ const AppGoldRoute = AppGoldRouteImport.update({
   path: '/gold',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInvoicesRoute = AppInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -162,9 +170,19 @@ const AppTransactionsRoute = AppTransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => AppRoute,
 } as any)
+const ITokenRoute = ITokenRouteImport.update({
+  id: '/i/$token',
+  path: '/i/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppAccountsIdRoute = AppAccountsIdRouteImport.update({
   id: '/accounts_/$id',
   path: '/accounts/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInvoicesReportRoute = AppInvoicesReportRouteImport.update({
+  id: '/invoices_/report',
+  path: '/invoices/report',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiPublicAppIconRoute = ApiPublicAppIconRouteImport.update({
@@ -257,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/debts': typeof AppDebtsRoute
   '/goals': typeof AppGoalsRoute
   '/gold': typeof AppGoldRoute
+  '/invoices': typeof AppInvoicesRoute
   '/profile': typeof AppProfileRoute
   '/receivables': typeof AppReceivablesRoute
   '/recurring': typeof AppRecurringRoute
@@ -266,7 +285,9 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/subscriptions': typeof AppSubscriptionsRoute
   '/transactions': typeof AppTransactionsRoute
+  '/i/$token': typeof ITokenRoute
   '/accounts/$id': typeof AppAccountsIdRoute
+  '/invoices/report': typeof AppInvoicesReportRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
@@ -296,6 +317,7 @@ export interface FileRoutesByTo {
   '/debts': typeof AppDebtsRoute
   '/goals': typeof AppGoalsRoute
   '/gold': typeof AppGoldRoute
+  '/invoices': typeof AppInvoicesRoute
   '/profile': typeof AppProfileRoute
   '/receivables': typeof AppReceivablesRoute
   '/recurring': typeof AppRecurringRoute
@@ -305,7 +327,9 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/subscriptions': typeof AppSubscriptionsRoute
   '/transactions': typeof AppTransactionsRoute
+  '/i/$token': typeof ITokenRoute
   '/accounts/$id': typeof AppAccountsIdRoute
+  '/invoices/report': typeof AppInvoicesReportRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
@@ -337,6 +361,7 @@ export interface FileRoutesById {
   '/_app/debts': typeof AppDebtsRoute
   '/_app/goals': typeof AppGoalsRoute
   '/_app/gold': typeof AppGoldRoute
+  '/_app/invoices': typeof AppInvoicesRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/receivables': typeof AppReceivablesRoute
   '/_app/recurring': typeof AppRecurringRoute
@@ -346,7 +371,9 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/subscriptions': typeof AppSubscriptionsRoute
   '/_app/transactions': typeof AppTransactionsRoute
+  '/i/$token': typeof ITokenRoute
   '/_app/accounts_/$id': typeof AppAccountsIdRoute
+  '/_app/invoices_/report': typeof AppInvoicesReportRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
@@ -378,6 +405,7 @@ export interface FileRouteTypes {
     | '/debts'
     | '/goals'
     | '/gold'
+    | '/invoices'
     | '/profile'
     | '/receivables'
     | '/recurring'
@@ -387,7 +415,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscriptions'
     | '/transactions'
+    | '/i/$token'
     | '/accounts/$id'
+    | '/invoices/report'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
@@ -417,6 +447,7 @@ export interface FileRouteTypes {
     | '/debts'
     | '/goals'
     | '/gold'
+    | '/invoices'
     | '/profile'
     | '/receivables'
     | '/recurring'
@@ -426,7 +457,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscriptions'
     | '/transactions'
+    | '/i/$token'
     | '/accounts/$id'
+    | '/invoices/report'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
@@ -457,6 +490,7 @@ export interface FileRouteTypes {
     | '/_app/debts'
     | '/_app/goals'
     | '/_app/gold'
+    | '/_app/invoices'
     | '/_app/profile'
     | '/_app/receivables'
     | '/_app/recurring'
@@ -466,7 +500,9 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/subscriptions'
     | '/_app/transactions'
+    | '/i/$token'
     | '/_app/accounts_/$id'
+    | '/_app/invoices_/report'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
@@ -492,6 +528,7 @@ export interface RootRouteChildren {
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
+  ITokenRoute: typeof ITokenRoute
   ApiPublicAppIconRoute: typeof ApiPublicAppIconRoute
   ApiPublicN8nBackupRoute: typeof ApiPublicN8nBackupRoute
   ApiPublicN8nBotRoute: typeof ApiPublicN8nBotRoute
@@ -608,6 +645,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppGoldRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/invoices': {
+      id: '/_app/invoices'
+      path: '/invoices'
+      fullPath: '/invoices'
+      preLoaderRoute: typeof AppInvoicesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/profile': {
       id: '/_app/profile'
       path: '/profile'
@@ -671,11 +715,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTransactionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/i/$token': {
+      id: '/i/$token'
+      path: '/i/$token'
+      fullPath: '/i/$token'
+      preLoaderRoute: typeof ITokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/accounts_/$id': {
       id: '/_app/accounts_/$id'
       path: '/accounts/$id'
       fullPath: '/accounts/$id'
       preLoaderRoute: typeof AppAccountsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/invoices_/report': {
+      id: '/_app/invoices_/report'
+      path: '/invoices/report'
+      fullPath: '/invoices/report'
+      preLoaderRoute: typeof AppInvoicesReportRouteImport
       parentRoute: typeof AppRoute
     }
     '/api/public/app-icon': {
@@ -786,6 +844,7 @@ interface AppRouteChildren {
   AppDebtsRoute: typeof AppDebtsRoute
   AppGoalsRoute: typeof AppGoalsRoute
   AppGoldRoute: typeof AppGoldRoute
+  AppInvoicesRoute: typeof AppInvoicesRoute
   AppProfileRoute: typeof AppProfileRoute
   AppReceivablesRoute: typeof AppReceivablesRoute
   AppRecurringRoute: typeof AppRecurringRoute
@@ -796,6 +855,7 @@ interface AppRouteChildren {
   AppSubscriptionsRoute: typeof AppSubscriptionsRoute
   AppTransactionsRoute: typeof AppTransactionsRoute
   AppAccountsIdRoute: typeof AppAccountsIdRoute
+  AppInvoicesReportRoute: typeof AppInvoicesReportRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -805,6 +865,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDebtsRoute: AppDebtsRoute,
   AppGoalsRoute: AppGoalsRoute,
   AppGoldRoute: AppGoldRoute,
+  AppInvoicesRoute: AppInvoicesRoute,
   AppProfileRoute: AppProfileRoute,
   AppReceivablesRoute: AppReceivablesRoute,
   AppRecurringRoute: AppRecurringRoute,
@@ -815,6 +876,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSubscriptionsRoute: AppSubscriptionsRoute,
   AppTransactionsRoute: AppTransactionsRoute,
   AppAccountsIdRoute: AppAccountsIdRoute,
+  AppInvoicesReportRoute: AppInvoicesReportRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -828,6 +890,7 @@ const rootRouteChildren: RootRouteChildren = {
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
+  ITokenRoute: ITokenRoute,
   ApiPublicAppIconRoute: ApiPublicAppIconRoute,
   ApiPublicN8nBackupRoute: ApiPublicN8nBackupRoute,
   ApiPublicN8nBotRoute: ApiPublicN8nBotRoute,

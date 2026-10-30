@@ -64,6 +64,8 @@ export type AppSettingsRow = {
   github_url: string | null;
   bot_default_account_id: string | null;
   reminder_days: number | null;
+  /** v21 (optional column): invoice number prefix. */
+  invoice_prefix?: string | null;
   updated_at?: string | null;
 };
 
@@ -90,6 +92,8 @@ export type ResolvedSettings = {
   bot_default_account_name: string | null;
   /** Null = each consumer keeps its own default (bot 14 days, n8n 7 days). */
   reminder_days: number | null;
+  /** v21: invoice number prefix (A–Z/0–9, ≤ 10); "INV" when unset or the column is missing. */
+  invoice_prefix: string;
   updated_at: string | null;
   /** env PUBLIC_DEMO_URL when it is an https URL. */
   demo_url: string | null;
@@ -107,6 +111,16 @@ export type Branding = {
   /** Public demo instance link (env PUBLIC_DEMO_URL, https only); null hides "Coba demo". */
   demo_url: string | null;
 };
+
+export const DEFAULT_INVOICE_PREFIX = "INV";
+
+/** v21 invoice number prefix: uppercase letters/digits, 1–10 chars; anything else → INV. */
+export function normalizeInvoicePrefix(prefix: string | null | undefined): string {
+  const p = String(prefix ?? "")
+    .trim()
+    .toUpperCase();
+  return /^[A-Z0-9]{1,10}$/.test(p) ? p : DEFAULT_INVOICE_PREFIX;
+}
 
 export function isValidTimezone(tz: string | null | undefined): tz is string {
   if (!tz) return false;
@@ -178,6 +192,7 @@ export function resolveSettings(
     demo_url: isHttpsUrl(clean(env.PUBLIC_DEMO_URL)) ? clean(env.PUBLIC_DEMO_URL) : null,
     reminder_days:
       r.reminder_days != null && Number.isInteger(days) && days >= 1 && days <= 365 ? days : null,
+    invoice_prefix: normalizeInvoicePrefix(r.invoice_prefix),
     updated_at: r.updated_at ?? null,
   };
 }
