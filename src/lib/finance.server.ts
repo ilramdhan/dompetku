@@ -405,7 +405,11 @@ export async function findByExternalId(externalId: string): Promise<TxRow | null
   return r.data ?? null;
 }
 
-export async function createFromExternal(t: ExternalTx) {
+/**
+ * `opts.account_id` (server callers only, e.g. invoice payments) pins the wallet by id instead of
+ * matching `t.account` by name; n8n/bot callers never pass it.
+ */
+export async function createFromExternal(t: ExternalTx, opts?: { account_id?: string | null }) {
   if (t.external_id) {
     const dup = await findByExternalId(t.external_id);
     if (dup)
@@ -424,7 +428,10 @@ export async function createFromExternal(t: ExternalTx) {
     kind: t.kind,
     amount: t.amount,
     currency: t.currency,
-    account_id: (await findAccount(t.account)) ?? (botSource ? await defaultAccountId() : null),
+    account_id:
+      opts?.account_id ??
+      (await findAccount(t.account)) ??
+      (botSource ? await defaultAccountId() : null),
     to_account_id: t.kind === "transfer" ? await findAccount(t.to_account) : null,
     category_id,
     description: t.description ?? null,
@@ -1894,6 +1901,9 @@ export async function exportBackup() {
     "app_users",
     "account_permissions",
     "pocket_alerts",
+    "invoices",
+    "invoice_items",
+    "invoice_payments",
   ] as const;
   const { stripSecrets } = await import("./backup");
   const data: Record<string, any[]> = {};
