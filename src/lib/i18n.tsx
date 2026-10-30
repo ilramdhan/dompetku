@@ -1524,6 +1524,79 @@ const DICT: Record<string, string> = {
     "What data this Dompetku instance stores, where it is stored, and which third-party services may be used.",
   "Ketentuan penggunaan Dompetku: lisensi MIT, tanpa jaminan, bukan nasihat keuangan.":
     "Terms of use for Dompetku: MIT license, no warranty, not financial advice.",
+  // v25 payment gateway (#97)
+  "Aktifkan Midtrans": "Enable Midtrans",
+  'true = tombol "Bayar sekarang" di halaman invoice publik (butuh skema v25 dan server key).':
+    'true = "Pay now" button on the public invoice page (needs schema v25 and a server key).',
+  "Isi true atau false": "Enter true or false",
+  "Server key Midtrans": "Midtrans server key",
+  "Dashboard Midtrans → Settings → Access Keys. Sandbox diawali SB-Mid-server-. Tidak pernah dikirim ke browser.":
+    "Midtrans dashboard → Settings → Access Keys. Sandbox keys start with SB-Mid-server-. Never sent to the browser.",
+  "Format key Midtrans tidak valid": "Invalid Midtrans key format",
+  "Client key Midtrans": "Midtrans client key",
+  "Publik, dipakai Snap JS di browser pelanggan.":
+    "Public, used by Snap JS in the customer's browser.",
+  "Mode production Midtrans": "Midtrans production mode",
+  "false = sandbox (uji coba, default). true = transaksi uang sungguhan; pakai key production.":
+    "false = sandbox (testing, default). true = real money; use production keys.",
+  "Payment gateway (Midtrans)": "Payment gateway (Midtrans)",
+  "Butuh skema v25. Pasang Payment Notification URL di dashboard Midtrans ke":
+    "Needs schema v25. Set the Payment Notification URL in the Midtrans dashboard to",
+  "Mulai dengan sandbox. Panduan: docs/PAYMENT-GATEWAY.md.":
+    "Start with sandbox. Guide: docs/PAYMENT-GATEWAY.md.",
+  "Bayar online": "Pay online",
+  "Kartu, e-wallet, QRIS, atau virtual account lewat Midtrans.":
+    "Card, e-wallet, QRIS or virtual account via Midtrans.",
+  "Bayar sekarang": "Pay now",
+  "Pembayaran sedang diproses. Status invoice diperbarui otomatis setelah Midtrans mengonfirmasi.":
+    "Payment is being processed. The invoice status updates automatically once Midtrans confirms it.",
+  "Muat ulang": "Reload",
+  "Pembayaran online tidak tersedia untuk invoice ini.":
+    "Online payment is not available for this invoice.",
+  "Terlalu banyak percobaan, coba lagi nanti.": "Too many attempts, try again later.",
+  "Pembayaran online gagal dibuat, coba lagi.": "Could not start the online payment, try again.",
+  "Transaksi Midtrans": "Midtrans transactions",
+  "Menunggu pembayaran": "Awaiting payment",
+  Berhasil: "Succeeded",
+  Gagal: "Failed",
+  "Lewat batas waktu": "Expired",
+  Dikembalikan: "Refunded",
+  "Dikembalikan sebagian": "Partially refunded",
+  "Cek status": "Check status",
+  "Status diperbarui": "Status updated",
+  Refund: "Refund",
+  refund: "refund",
+  "Refund Midtrans": "Midtrans refund",
+  "Sisa yang bisa dikembalikan": "Refundable remainder",
+  "Alasan (opsional)": "Reason (optional)",
+  "Jumlah refund tidak valid": "Invalid refund amount",
+  "Kirim refund ke Midtrans?": "Send the refund to Midtrans?",
+  "Dana dikembalikan ke pelanggan dan tidak bisa dibatalkan. Pengeluaran pembalik dicatat di kategori Invoice.":
+    "The money goes back to the customer and cannot be undone. A reversing expense is recorded in the Invoice category.",
+  "Refund dikirim": "Refund sent",
+  "Metode ini hanya mendukung refund penuh": "This method only supports full refunds",
+  "Hanya pembayaran berhasil yang bisa dikembalikan": "Only successful payments can be refunded",
+  "Pembayaran belum settlement; coba lagi nanti": "Payment is not settled yet; try again later",
+  "Metode ini tidak bisa direfund lewat Midtrans (mis. transfer bank/VA); kembalikan dana secara manual":
+    "This method cannot be refunded through Midtrans (e.g. bank transfer/VA); return the money manually",
+  "Jumlah refund harus bilangan bulat": "Refund amount must be a whole number",
+  "Jumlah melebihi sisa yang bisa dikembalikan": "Amount exceeds the refundable remainder",
+  "Jumlah dari Midtrans tidak cocok dengan pesanan":
+    "Amount from Midtrans does not match the order",
+  "Payment gateway belum aktif: jalankan bagian v25 di supabase/schema.sql.":
+    "Payment gateway is not active: run section v25 in supabase/schema.sql.",
+  "Midtrans belum diaktifkan di Pengaturan → Integrasi":
+    "Midtrans is not enabled in Settings → Integrations",
+  "Transaksi tidak ditemukan di Midtrans": "Transaction not found at Midtrans",
+  "Pembayaran belum tercatat; cek status dulu": "Payment not recorded yet; check the status first",
+  "Transaksi gateway tidak ditemukan": "Gateway transaction not found",
+  "Invoice punya transaksi Midtrans yang tertunda atau berhasil; tidak bisa dihapus (batalkan saja)":
+    "This invoice has a pending or successful Midtrans transaction and cannot be deleted (cancel it instead)",
+  "Pembayaran dari Midtrans tidak bisa dihapus; gunakan refund":
+    "Midtrans payments cannot be deleted; use a refund",
+  "Pembayaran Midtrans dibuat": "Midtrans payment created",
+  "Pembayaran Midtrans diterima": "Midtrans payment received",
+  "Refund Midtrans dicatat": "Midtrans refund recorded",
 };
 
 const LangContext = createContext<{

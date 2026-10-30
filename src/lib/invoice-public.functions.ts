@@ -84,3 +84,38 @@ export const submitInvoiceProof = createServerFn({ method: "POST" })
       throw new Error(pm.PROOF_FAILED);
     }
   });
+
+/**
+ * PUBLIC (v25, issue #97): "Bayar sekarang" — creates (or reuses) a Midtrans Snap order for the
+ * invoice behind `token`. Only a string token goes in; demo-off, rate limited per IP and per
+ * token (persistent, fails closed), hashed token lookup, amount = remaining computed server-side.
+ * Answers only the Snap token, redirect URL, public client key and the fixed snap.js URL.
+ */
+export const createGatewayPayment = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => {
+    const token = (d as { token?: unknown } | null)?.token;
+    return { token: typeof token === "string" ? token.slice(0, 128) : "" };
+  })
+  .handler(async ({ data }) => {
+    const gw = await import("./gateway/payments.server");
+    const { isDemo } = await import("./demo.server");
+    const { DEMO_DISABLED, clientIp } = await import("./demo");
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const allowed = new Set([gw.PAY_UNAVAILABLE, gw.PAY_RATE_LIMITED, gw.PAY_FAILED]);
+    if (isDemo()) throw new Error(DEMO_DISABLED);
+    try {
+      const req = getRequest();
+      const { seoConfig } = await import("./seo.server");
+      const origin = seoConfig().siteUrl ?? new URL(req.url).origin;
+      return await gw.startGatewayPayment(data.token, clientIp(req.headers), origin);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (allowed.has(msg)) throw new Error(msg);
+      try {
+        (await import("./monitoring.server")).logError("public:gateway", e);
+      } catch {
+        /* ignore */
+      }
+      throw new Error(gw.PAY_FAILED);
+    }
+  });

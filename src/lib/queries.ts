@@ -31,6 +31,7 @@ import {
   getInvoiceFn,
   getInvoiceProofsFn,
   getInvoiceShareFn,
+  getGatewayTransactionsFn,
   getInvoices,
   getPaymentMethodsFn,
 } from "./invoices.functions";
@@ -265,6 +266,12 @@ export const invoiceProofsQuery = (status: ProofFilter, offset = 0, limit = 20) 
   });
 
 /** v23 public link status of one invoice (invalidated with the "invoices" key). */
+/** v25 Midtrans orders of one invoice (under the "invoices" key, so payment changes refresh it). */
+export const gatewayTxQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["invoices", "gateway", id],
+    queryFn: () => getGatewayTransactionsFn({ data: { id } }),
+  });
 export const invoiceShareQuery = (id: string) =>
   queryOptions({
     queryKey: ["invoices", "share", id],
@@ -332,6 +339,8 @@ const AFFECTS: Record<string, string[]> = {
   // the "Menunggu verifikasi" status; approving books a payment (money).
   payment_methods: ["payment-methods", "invoices", "activity"],
   invoice_proofs: [...MONEY, "invoices", "invoice-proofs"],
+  // v25: status checks / refunds book payments and reversing expenses (money).
+  gateway_transactions: [...MONEY, "invoices", "gateway"],
 };
 
 export function invalidateFor(qc: QueryClient, table: string) {

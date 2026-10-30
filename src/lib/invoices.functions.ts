@@ -174,6 +174,8 @@ export const deleteInvoicePaymentFn = createServerFn({ method: "POST" })
     const pay = await s.loadPayment(data.id);
     if (!pay) throw new Error("Pembayaran tidak ditemukan");
     const { inv } = await manageable(context, pay.invoice_id);
+    // v25: a Midtrans payment is undone with a refund, never deleted.
+    await (await import("./gateway/payments.server")).assertPaymentNotGateway(pay.id);
     return (await s.deletePayment(inv, pay)) as any;
   });
 
@@ -361,4 +363,55 @@ export const rejectProofFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { proof, inv, pm } = await reviewable(context, data.id);
     return pm.rejectProof(proof, inv, data.reason);
+  });
+
+/* ---------------- v25 payment gateway (issue #97) ---------------- */
+
+/** Midtrans orders of one invoice (status, amount, time). `{ ready:false }` before v25. */
+export const getGatewayTransactionsFn = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ id }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { inv } = await manageable(context, data.id);
+    const gw = await import("./gateway/payments.server");
+    return (await gw.listGatewayTransactions(inv.id)) as any;
+  });
+
+async function gatewayRowFor(ctx: Ctx, rowId: string) {
+  const gw = await import("./gateway/payments.server");
+  const row = await gw.loadGatewayRow({ id: rowId });
+  if (!row) throw new Error("Transaksi gateway tidak ditemukan");
+  const { inv } = await manageable(ctx, row.invoice_id);
+  return { row, inv, gw };
+}
+
+/** "Cek status": re-reads one order from Midtrans and applies it (books a missed settlement). */
+export const syncGatewayFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ id }).parse(d))
+  .handler(async ({ data, context }) => {
+    (await import("./demo.server")).assertNotDemo();
+    const { row, gw } = await gatewayRowFor(context, data.id);
+    const c = await gw.requireConfig();
+    const r = await gw.syncRow(c, row);
+    return { status: r.row.status, booked: r.booked, note: r.note };
+  });
+
+/** Refund (full or partial) through the Midtrans API; books a reversing expense. */
+export const refundGatewayFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        id,
+        amount: z.coerce.number().finite().positive().max(1e12),
+        reason: z.string().trim().max(255).default(""),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    (await import("./demo.server")).assertNotDemo();
+    const { row, gw } = await gatewayRowFor(context, data.id);
+    const r = await gw.refundGateway(row, data.amount, data.reason);
+    return { status: r.status, refunded_amount: r.refunded_amount };
   });
