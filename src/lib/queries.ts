@@ -27,7 +27,7 @@ import { getRecurring } from "./recurring.functions";
 import { getAccountReport, getReconcileTransactions } from "./account-report.functions";
 import { getProfile } from "./profile.functions";
 import { getAccountPockets, getPocketOptions, getPocketWarnings } from "./pockets.functions";
-import { getInvoiceFn, getInvoices } from "./invoices.functions";
+import { getInvoiceFn, getInvoiceShareFn, getInvoices } from "./invoices.functions";
 import type { InvoiceFilter, InvoiceSort } from "./invoices";
 import type { CrudTable } from "./schemas";
 
@@ -199,6 +199,12 @@ export const invoiceQuery = (id: string) =>
     queryKey: ["invoices", "detail", id],
     queryFn: () => getInvoiceFn({ data: { id } }),
   });
+/** v23 public link status of one invoice (invalidated with the "invoices" key). */
+export const invoiceShareQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["invoices", "share", id],
+    queryFn: () => getInvoiceShareFn({ data: { id } }),
+  });
 export const reconcileTxQuery = (id: string, from: string, to: string) =>
   queryOptions({
     queryKey: ["account-recon", id, from, to],
@@ -252,6 +258,8 @@ const AFFECTS: Record<string, string[]> = {
   pockets: ["pockets", "tx", "activity"],
   // v21 Invoice: editing/cancelling only touches invoice lists; payments book income transactions.
   invoices: ["invoices", "activity"],
+  // v23 public link: share status lives under the "invoices" key.
+  invoice_shares: ["invoices", "activity"],
   invoice_payments: [...MONEY, "invoices"],
 };
 
