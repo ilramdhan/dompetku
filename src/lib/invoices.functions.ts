@@ -8,6 +8,7 @@ import {
   MAX_INVOICE_ITEMS,
   PAYMENT_METHODS,
 } from "./invoices";
+import { MAX_METHODS, METHOD_KINDS, PROOF_LIMITS, PROOF_STATUSES } from "./invoice-payments";
 
 /*
  * v21 Invoice (issue #92). `invoices` is an admin module (ADMIN_MODULES), so every fn uses
@@ -38,6 +39,8 @@ const invoiceSchema = z.object({
   notes: optText(2000),
   items: z.array(itemSchema).min(1).max(MAX_INVOICE_ITEMS),
   issue: z.boolean().optional(),
+  /** v24: payment methods shown on the public page ([] = all active; omitted = unchanged). */
+  method_ids: z.array(id).max(MAX_METHODS).optional(),
 });
 
 const paymentSchema = z.object({
@@ -110,15 +113,23 @@ export const saveInvoiceFn = createServerFn({ method: "POST" })
     const rbac = await import("./rbac.server");
     rbac.assertWalletView(context, data.values.account_id);
     rbac.assertWalletManage(context, data.values.account_id);
+    const pm = await import("./invoice-payments.server");
     if (data.id) {
       const { inv, s } = await manageable(context, data.id);
-      return (await s.updateInvoice(inv, data.values)) as any;
+      const row = await s.updateInvoice(inv, data.values);
+      await pm.setInvoiceMethods(row.id, data.values.method_ids);
+      return row as any;
     }
     const demo = await import("./demo.server");
     await demo.assertDemoCapacity("invoices");
     await demo.assertDemoCapacity("invoice_items");
     const s = await import("./invoices.server");
-    return (await s.createInvoice(data.values)) as any;
+    const row = await s.createInvoice(data.values);
+    if (data.values.method_ids?.length) {
+      await demo.assertDemoCapacity("invoice_payment_methods");
+      await pm.setInvoiceMethods(row.id, data.values.method_ids);
+    }
+    return row as any;
   });
 
 /** issue / cancel / reopen / unissue. */
@@ -203,4 +214,120 @@ export const revokeInvoiceShareFn = createServerFn({ method: "POST" })
     const { inv } = await manageable(context, data.id);
     const share = await import("./invoice-share.server");
     return share.revokeShare(inv);
+  });
+
+/* ---------------- v24 payment methods & proof verification (issue #94) ---------------- */
+
+const methodSchema = z.object({
+  kind: z.enum(METHOD_KINDS),
+  label: z.string().trim().min(1).max(60),
+  bank_name: optText(60),
+  account_number: optText(40),
+  account_holder: optText(80),
+  // ≤200 KB raster data URL (validated again by validateMethod / isLogoDataUrl).
+  qris_image: z.string().max(300_000).nullable().optional(),
+  account_id: z.preprocess(blank, id.nullable()).optional(),
+  active: z.boolean().optional(),
+});
+
+/** Bank/QRIS methods (admin view incl. linked wallet). `{ ready:false }` before v24. */
+export const getPaymentMethodsFn = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .handler(async () => {
+    const pm = await import("./invoice-payments.server");
+    return (await pm.listMethods()) as any;
+  });
+
+/**
+ * Create/edit a method. Demo: new rows are capped, and QRIS images are refused like the logo
+ * (image uploads are off in demo).
+ */
+export const savePaymentMethodFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z.object({ id: id.nullable().optional(), values: methodSchema }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const demo = await import("./demo.server");
+    if (data.values.qris_image) demo.assertNotDemo();
+    if (data.values.account_id) {
+      const rbac = await import("./rbac.server");
+      rbac.assertWalletManage(context, data.values.account_id);
+    }
+    if (!data.id) await demo.assertDemoCapacity("payment_methods");
+    const pm = await import("./invoice-payments.server");
+    return (await pm.saveMethod(data.id ?? null, data.values as any)) as any;
+  });
+
+export const deletePaymentMethodFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ id }).parse(d))
+  .handler(async ({ data }) => {
+    const pm = await import("./invoice-payments.server");
+    return pm.deleteMethod(data.id);
+  });
+
+/** Verification queue: pending (oldest first) or history, scoped to the caller's wallets. */
+export const getInvoiceProofsFn = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        status: z.enum([...PROOF_STATUSES, "all"]).default("pending"),
+        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().min(1).max(50).default(20),
+        invoice: id.optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { accountScope } = await import("./rbac.server");
+    const pm = await import("./invoice-payments.server");
+    return (await pm.listProofs(data, accountScope(context))) as any;
+  });
+
+async function reviewable(ctx: Ctx, proofId: string) {
+  const pm = await import("./invoice-payments.server");
+  const proof = await pm.loadProof(proofId);
+  if (!proof) throw new Error("Bukti tidak ditemukan");
+  const { inv, s } = await manageable(ctx, proof.invoice_id);
+  return { proof, inv, s, pm };
+}
+
+/** 2-minute signed URL of a proof image (private bucket). */
+export const getProofUrlFn = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ id }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { proof, pm } = await reviewable(context, data.id);
+    return { url: await pm.proofUrl(proof) };
+  });
+
+/** Approve: books an invoice payment (+ income) for `amount` (≤ remaining), once. */
+export const approveProofFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        id,
+        amount: z.coerce.number().finite().positive().max(1e14),
+        paid_at: optDate,
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { proof, inv, pm } = await reviewable(context, data.id);
+    await (await import("./demo.server")).assertDemoCapacity("invoice_payments");
+    return (await pm.approveProof(proof, inv, data.amount, data.paid_at)) as any;
+  });
+
+/** Reject with a reason (shown only to the admin). */
+export const rejectProofFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z.object({ id, reason: z.string().trim().min(1).max(PROOF_LIMITS.reject_reason) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { proof, inv, pm } = await reviewable(context, data.id);
+    return pm.rejectProof(proof, inv, data.reason);
   });

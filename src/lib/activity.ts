@@ -14,6 +14,7 @@ const ENTITY: Record<string, string> = {
   pockets: "Kantong",
   invoices: "Invoice",
   invoice_payments: "Pembayaran invoice",
+  payment_methods: "Metode pembayaran",
 };
 
 const VERB: Record<string, string> = {
@@ -58,6 +59,9 @@ const SPECIAL: Record<string, string> = {
   "permission.update": "Akses dompet diubah",
   "invoice_shares.create": "Tautan publik invoice dibuat",
   "invoice_shares.delete": "Tautan publik invoice dicabut",
+  "invoice_proofs.create": "Bukti transfer diterima",
+  "invoice_proofs.approve": "Bukti transfer disetujui",
+  "invoice_proofs.reject": "Bukti transfer ditolak",
 };
 
 export function activityLabel(action: string, t: (s: string) => string = (s) => s): string {
