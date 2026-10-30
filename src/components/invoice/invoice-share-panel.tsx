@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, ExternalLink, Link2, Link2Off, MessageCircle, RefreshCw } from "lucide-react";
+import { Copy, ExternalLink, Link2, Link2Off, Mail, MessageCircle, RefreshCw } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,11 @@ import {
 import { useConfirm } from "@/components/confirm-dialog";
 import { useIsDemo } from "@/components/demo";
 import { seoQuery } from "@/components/landing/seo-config";
-import { createInvoiceShareFn, revokeInvoiceShareFn } from "@/lib/invoices.functions";
+import {
+  createInvoiceShareFn,
+  revokeInvoiceShareFn,
+  sendInvoiceEmailFn,
+} from "@/lib/invoices.functions";
 import { errMsg, invalidateFor, invoiceShareQuery } from "@/lib/queries";
 import {
   DEMO_SHARE_MAX_DAYS,
@@ -48,6 +52,7 @@ export function InvoiceSharePanel({
     status: InvoiceStatus;
     customer_name: string;
     customer_phone?: string | null;
+    customer_email?: string | null;
     remaining: number;
   };
   locale: string;
@@ -62,6 +67,7 @@ export function InvoiceSharePanel({
   const status = useQuery({ ...invoiceShareQuery(invoice.id), enabled: shareable });
   const create = useServerFn(createInvoiceShareFn);
   const revoke = useServerFn(revokeInvoiceShareFn);
+  const sendMail = useServerFn(sendInvoiceEmailFn);
   const [days, setDays] = useState("0");
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -99,6 +105,46 @@ export function InvoiceSharePanel({
       setLink(shareUrl(siteUrl ?? window.location.origin, r.token));
       await invalidateFor(qc, "invoice_shares");
       toast.success(t("Tautan dibuat"));
+    } catch (e) {
+      toast.error(t(errMsg(e)));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** "Kirim invoice" (#95): emails the link; an existing link is rotated, so confirm first. */
+  async function sendEmail() {
+    const rotates = state === "active";
+    if (
+      !(await ask.confirm(
+        rotates
+          ? t(
+              "Kirim invoice ke email pelanggan? Tautan lama akan diganti dan tidak bisa dibuka lagi.",
+            )
+          : t("Kirim invoice ke email pelanggan?"),
+        {
+          description: `${invoice.customer_email} · ${
+            rotates
+              ? t(
+                  "Demi keamanan hanya hash tautan yang disimpan, jadi tautan baru dibuat saat mengirim.",
+                )
+              : t("Tautan publik dibuat otomatis.")
+          }`,
+          destructive: rotates,
+        },
+      ))
+    )
+      return;
+    setBusy(true);
+    try {
+      const r = await sendMail({ data: { id: invoice.id, expires_days: Number(days) || null } });
+      if (r.link) setLink(r.link);
+      await invalidateFor(qc, "invoice_shares");
+      if (r.sent) toast.success(`${t("Email terkirim ke")} ${r.to}`);
+      else
+        toast.error(
+          `${t(r.reason ?? "Gagal mengirim email.")} ${t("Tautan baru tetap dibuat dan tampil di bawah.")}`,
+        );
     } catch (e) {
       toast.error(t(errMsg(e)));
     } finally {
@@ -207,6 +253,15 @@ export function InvoiceSharePanel({
         <Button size="sm" onClick={generate} disabled={busy}>
           {state === "none" ? <Link2 className="size-4" /> : <RefreshCw className="size-4" />}
           {state === "none" ? t("Buat tautan") : t("Buat ulang tautan")}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={sendEmail}
+          disabled={busy || demo || !invoice.customer_email}
+          title={!invoice.customer_email ? t("Pelanggan belum punya alamat email.") : undefined}
+        >
+          <Mail className="size-4" /> {t("Kirim invoice")}
         </Button>
         {state === "active" ? (
           <Button

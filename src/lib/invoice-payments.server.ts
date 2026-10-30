@@ -536,3 +536,20 @@ export async function removeInvoiceProofFiles(invoiceId: string) {
     /* best effort */
   }
 }
+
+/** Text-only payment methods for emails (#95): the same visible list as the public page, no images. */
+export async function emailMethodsFor(invoiceId: string) {
+  try {
+    const rows = await visibleRows(invoiceId);
+    if (!rows) return [];
+    return visibleMethods(rows.methods, rows.selected).map((m) => ({
+      kind: m.kind === "qris" ? "qris" : "bank",
+      label: String(m.label ?? ""),
+      bank_name: m.bank_name ?? null,
+      account_number: m.account_number ?? null,
+      account_holder: m.account_holder ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}

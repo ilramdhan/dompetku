@@ -1365,6 +1365,23 @@ const DICT: Record<string, string> = {
   "Belum ada tautan publik.": "No public link yet.",
   "berikut invoice": "here is invoice",
   "Buat tautan": "Create link",
+  "Kirim invoice ke email pelanggan? Tautan lama akan diganti dan tidak bisa dibuka lagi.":
+    "Email the invoice to the customer? The old link will be replaced and stop working.",
+  "Kirim invoice ke email pelanggan?": "Email the invoice to the customer?",
+  "Demi keamanan hanya hash tautan yang disimpan, jadi tautan baru dibuat saat mengirim.":
+    "For security only a hash of the link is stored, so a new link is created when sending.",
+  "Tautan publik dibuat otomatis.": "A public link is created automatically.",
+  "Email terkirim ke": "Email sent to",
+  "Tautan baru tetap dibuat dan tampil di bawah.":
+    "The new link was still created and is shown below.",
+  "Kirim invoice": "Send invoice",
+  "Pelanggan belum punya alamat email.": "The customer has no email address.",
+  "Email belum dikonfigurasi (RESEND_API_KEY dan EMAIL_FROM).":
+    "Email is not configured (RESEND_API_KEY and EMAIL_FROM).",
+  "Gagal mengirim email.": "Failed to send the email.",
+  "Terbitkan invoice dulu; draft dan invoice batal tidak bisa dikirim":
+    "Issue the invoice first; drafts and cancelled invoices cannot be sent",
+  "Email invoice dikirim": "Invoice email sent",
   "Buat tautan baru? Tautan lama tidak bisa dibuka lagi.":
     "Create a new link? The old link will stop working.",
   "Buat ulang tautan": "Create new link",
