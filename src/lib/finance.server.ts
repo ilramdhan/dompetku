@@ -10,6 +10,7 @@ import { receiptColumns } from "./receipts";
 import { budgetPercent } from "./budget";
 import type { Json, Tables, TablesInsert } from "./database.types";
 import { scopeIds, txScopeFilter, walletNetByMonth } from "./permissions";
+import { inNotifyScope } from "./notify";
 import { walletAggRows, type WalletTx } from "./report-filter";
 import { subMonthly, subNextDue } from "./subscriptions";
 import {
@@ -987,6 +988,13 @@ export type ReminderInputs = {
   debts?: MaybePromise<Awaited<ReturnType<typeof computeDebts>>>;
   /** Budgets for the current month (today().slice(0, 7)). */
   budgets?: MaybePromise<Awaited<ReturnType<typeof computeBudgets>>>;
+  /**
+   * v22 member notifications: only items linked to these wallets (debt/subscription/recurring
+   * account, fee wallet); budget alerts are global per category and are left out. Computed
+   * server-side from the member's grants (notify.server.ts), never from request input.
+   * null/undefined = every item, unchanged.
+   */
+  scope?: readonly string[] | null;
 };
 
 export async function computeReminders(days = 30, pre: ReminderInputs = {}): Promise<Reminder[]> {
@@ -1001,11 +1009,13 @@ export async function computeReminders(days = 30, pre: ReminderInputs = {}): Pro
     pre.debts ?? computeDebts(),
     db().from("subscriptions").select("*").eq("active", true).lte("next_due", limit),
     db().from("accounts").select("*").eq("archived", false),
-    pre.budgets ?? computeBudgets(t.slice(0, 7)),
+    pre.budgets ?? (pre.scope ? [] : computeBudgets(t.slice(0, 7))),
   ]);
+  const scope = pre.scope ?? null;
   const out: Reminder[] = [];
   for (const d of debts) {
     if (!d.next_due || d.next_due > limit) continue;
+    if (!inNotifyScope(scope, d.account_id)) continue;
     out.push({
       type: "debt",
       id: d.id,
@@ -1020,6 +1030,7 @@ export async function computeReminders(days = 30, pre: ReminderInputs = {}): Pro
   }
   const subs = must(subsRes);
   for (const s of subs) {
+    if (!inNotifyScope(scope, s.account_id)) continue;
     const amt = withTax(Number(s.amount), s.tax_percent);
     const interval = Math.max(1, s.interval || 1);
     const cycleText =
@@ -1044,6 +1055,7 @@ export async function computeReminders(days = 30, pre: ReminderInputs = {}): Pro
   }
   for (const a of must(accRes)) {
     if (!(Number(a.monthly_fee) > 0)) continue;
+    if (!inNotifyScope(scope, a.id)) continue;
     let due = feeDate(t.slice(0, 7), Number(a.monthly_fee_day) || 1);
     if (due < t) due = feeDate(shiftMonth(t.slice(0, 7), 1), Number(a.monthly_fee_day) || 1);
     if (due > limit) continue;
@@ -1060,7 +1072,7 @@ export async function computeReminders(days = 30, pre: ReminderInputs = {}): Pro
       overdue: false,
     });
   }
-  for (const b of budgets) {
+  for (const b of scope ? [] : budgets) {
     if (b.percent >= b.alert_percent) {
       out.push({
         type: "budget",
@@ -1077,7 +1089,7 @@ export async function computeReminders(days = 30, pre: ReminderInputs = {}): Pro
   }
   // v10: manual recurring items (auto_post off) — empty when the table does not exist yet.
   const { recurringReminders } = await import("./recurring.server");
-  out.push(...(await recurringReminders(t, limit, rate)));
+  out.push(...(await recurringReminders(t, limit, rate, scope)));
   return out.sort((a, b) => a.due_date.localeCompare(b.due_date));
 }
 
@@ -1894,6 +1906,8 @@ export async function exportBackup() {
     "app_users",
     "account_permissions",
     "pocket_alerts",
+    "notify_recipients",
+    "notify_recipient_wallets",
   ] as const;
   const { stripSecrets } = await import("./backup");
   const data: Record<string, any[]> = {};
@@ -1902,6 +1916,8 @@ export async function exportBackup() {
     fx_rates: ["rate_date", "base", "quote"],
     gold_prices: ["price_date", "source"],
     account_permissions: ["user_id", "account_id"],
+    notify_recipients: ["user_id"],
+    notify_recipient_wallets: ["user_id", "account_id"],
   };
   const results = await Promise.all(
     tables.map((t) =>
