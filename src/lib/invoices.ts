@@ -62,7 +62,8 @@ const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 const EPS = 0.005;
 
 export type InvoiceItem = { description: string; qty: number; unit_price: number };
-export type InvoicePaymentLike = { amount: number | string };
+/** `refunded` (v25, optional): part of the payment given back through a gateway refund. */
+export type InvoicePaymentLike = { amount: number | string; refunded?: number | string | null };
 
 export function lineTotal(qty: number | string, unitPrice: number | string): number {
   const q = Number(qty);
@@ -78,8 +79,9 @@ export function invoiceTotal(
   return r2(items.reduce((s, i) => s + lineTotal(i.qty, i.unit_price), 0));
 }
 
+/** Net paid: every payment minus what was refunded of it (v25; missing column = 0). */
 export function paidSum(payments: readonly InvoicePaymentLike[]): number {
-  return r2(payments.reduce((s, p) => s + (Number(p.amount) || 0), 0));
+  return r2(payments.reduce((s, p) => s + (Number(p.amount) || 0) - (Number(p.refunded) || 0), 0));
 }
 
 /** Amount still to pay (never negative). */
