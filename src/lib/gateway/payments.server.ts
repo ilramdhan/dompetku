@@ -257,7 +257,7 @@ export type SyncResult = {
   note: string | null;
 };
 
-/** Business reasons a verified payment cannot be booked automatically (kept, never retried). */
+/** Business reasons a verified payment cannot be booked now: kept in last_error for the admin; the next sync retries safely. */
 const KEEP_ERRORS = new Set([
   "Invoice ini tidak bisa menerima pembayaran",
   "Pembayaran melebihi sisa tagihan",
