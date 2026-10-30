@@ -1306,6 +1306,60 @@ const DICT: Record<string, string> = {
   invoice: "invoices",
   "invoice belum lunas": "unpaid invoices",
   "lewat jatuh tempo": "past due",
+  /* Invoice reports (issue #98) */
+  "Laporan invoice": "Invoice report",
+  "Ringkasan tagihan, umur piutang (aging), dan riwayat pembayaran.":
+    "Billing summary, receivables aging and payment history.",
+  Diterbitkan: "Issued",
+  Diterima: "Received",
+  pembayaran: "payments",
+  "Outstanding akhir periode": "Outstanding at period end",
+  Outstanding: "Outstanding",
+  "Umur piutang (aging)": "Receivables aging",
+  "Per hari ini": "As of today",
+  "Tidak ada invoice yang belum lunas.": "No unpaid invoices.",
+  "Belum jatuh tempo": "Not yet due",
+  "1–30 hari": "1–30 days",
+  "31–60 hari": "31–60 days",
+  "61–90 hari": "61–90 days",
+  "> 90 hari": "> 90 days",
+  "Per dompet": "Per wallet",
+  "Pembayaran diterima": "Payments received",
+  "Belum ada pembayaran pada periode ini.": "No payments in this period.",
+  "Invoice belum lunas": "Unpaid invoices",
+  "Laporan & aging": "Report & aging",
+  Dompet: "Wallet",
+  /* Per-member Telegram notifications (v22, issue #75) */
+  "Notifikasi Telegram": "Telegram notifications",
+  "Laporan & pengingat terjadwal (n8n) hanya berisi dompet yang boleh dilihat anggota ini. Chat ID ini tidak memberi akses ke bot.":
+    "Scheduled reports & reminders (n8n) only include wallets this member may view. This chat ID does not grant bot access.",
+  "Chat ID Telegram": "Telegram chat ID",
+  "Chat pribadi atau grup (ID grup diawali tanda minus, mis. -100…).":
+    "A private chat or a group (group IDs start with a minus, e.g. -100…).",
+  "Chat ID wajib diisi": "Chat ID is required",
+  "Chat ID harus berupa angka (grup diawali tanda minus)":
+    "Chat ID must be a number (groups start with a minus)",
+  "Chat ID tidak valid": "Invalid chat ID",
+  "Laporan terjadwal": "Scheduled reports",
+  "Pengingat tagihan": "Bill reminders",
+  "Dompet di notifikasi": "Wallets in notifications",
+  "Anggota ini belum punya akses dompet, jadi tidak akan menerima notifikasi.":
+    "This member has no wallet access yet, so they will not receive notifications.",
+  "Tidak ada yang dicentang = semua dompet yang boleh dilihat anggota.":
+    "Nothing checked = every wallet the member may view.",
+  "Hapus notifikasi": "Remove notifications",
+  "Jalankan bagian v22 di supabase/schema.sql untuk notifikasi Telegram per anggota.":
+    "Run section v22 of supabase/schema.sql for per-member Telegram notifications.",
+  "Dompet di luar akses anggota": "Wallet outside the member's access",
+  "Pemilik memakai TELEGRAM_ADMIN_CHAT_ID di Pengaturan → Integrasi":
+    "The owner uses TELEGRAM_ADMIN_CHAT_ID in Settings → Integrations",
+  "Notifikasi per anggota belum aktif — jalankan bagian v22 di supabase/schema.sql.":
+    "Per-member notifications are not enabled yet — run section v22 of supabase/schema.sql.",
+  "Notifikasi anggota diubah": "Member notifications changed",
+  "Notifikasi anggota dihapus": "Member notifications removed",
+  "Chat ID admin (notifikasi)": "Admin chat ID (notifications)",
+  "Penerima laporan & pengingat terjadwal semua dompet lewat endpoint n8n notifications. Pribadi atau grup (diawali minus). Tidak memberi akses bot.":
+    "Receives scheduled all-wallet reports & reminders via the n8n notifications endpoint. Private or group (starts with a minus). Does not grant bot access.",
   /* Public invoice link & page (v23, issue #93) */
   Bagikan: "Share",
   "Belum ada tautan publik.": "No public link yet.",
@@ -1444,29 +1498,6 @@ const DICT: Record<string, string> = {
   "Unggah gambar QRIS": "Upload QRIS image",
   "Unggah gambar dinonaktifkan di mode demo.": "Image upload is disabled in demo mode.",
   menunggu: "pending",
-  /* Invoice reports (issue #98) */
-  "Laporan invoice": "Invoice report",
-  "Ringkasan tagihan, umur piutang (aging), dan riwayat pembayaran.":
-    "Billing summary, receivables aging and payment history.",
-  Diterbitkan: "Issued",
-  Diterima: "Received",
-  pembayaran: "payments",
-  "Outstanding akhir periode": "Outstanding at period end",
-  Outstanding: "Outstanding",
-  "Umur piutang (aging)": "Receivables aging",
-  "Per hari ini": "As of today",
-  "Tidak ada invoice yang belum lunas.": "No unpaid invoices.",
-  "Belum jatuh tempo": "Not yet due",
-  "1–30 hari": "1–30 days",
-  "31–60 hari": "31–60 days",
-  "61–90 hari": "61–90 days",
-  "> 90 hari": "> 90 days",
-  "Per dompet": "Per wallet",
-  "Pembayaran diterima": "Payments received",
-  "Belum ada pembayaran pada periode ini.": "No payments in this period.",
-  "Invoice belum lunas": "Unpaid invoices",
-  "Laporan & aging": "Report & aging",
-  Dompet: "Wallet",
   /* SEO (document head of public pages, issue #44) */
   "Dompetku — Pencatat Keuangan Open Source & Self-Hosted Expense Tracker":
     "Dompetku — Open Source, Self-Hosted Personal Finance & Expense Tracker",

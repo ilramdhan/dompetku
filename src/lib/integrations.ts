@@ -90,6 +90,15 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
     },
   },
   {
+    key: "TELEGRAM_ADMIN_CHAT_ID",
+    group: "telegram",
+    secret: false,
+    label: "Chat ID admin (notifikasi)",
+    help: "Penerima laporan & pengingat terjadwal semua dompet lewat endpoint n8n notifications. Pribadi atau grup (diawali minus). Tidak memberi akses bot.",
+    placeholder: "123456789",
+    validate: (v) => (CHAT_ID.test(v) && !/^-?0+$/.test(v) ? null : "Chat ID harus berupa angka"),
+  },
+  {
     key: "BOT_TEXT_AI",
     group: "telegram",
     secret: false,
@@ -193,6 +202,7 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
 export type IntegrationKey =
   | "TELEGRAM_BOT_TOKEN"
   | "BOT_ALLOWED_CHAT_IDS"
+  | "TELEGRAM_ADMIN_CHAT_ID"
   | "BOT_TEXT_AI"
   | "BOT_AI_DAILY_LIMIT"
   | "AI_API_URL"

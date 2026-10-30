@@ -14,6 +14,7 @@ import {
   type Reminder,
 } from "./finance.server";
 import { diffDays } from "./dates";
+import { inNotifyScope } from "./notify";
 import { dueOccurrences, recurringExternalId, recurringMarker, resumeNextDue } from "./recurring";
 
 type RecurringRow = Tables<"recurring_transactions">;
@@ -111,6 +112,7 @@ export async function recurringReminders(
   t: string,
   limit: string,
   rate: number,
+  scope: readonly string[] | null = null,
 ): Promise<Reminder[]> {
   try {
     const res = await db()
@@ -124,22 +126,26 @@ export async function recurringReminders(
         console.error("recurring reminders failed", res.error.message);
       return [];
     }
-    return (res.data ?? [])
-      .filter((r) => !r.end_date || r.next_due <= r.end_date)
-      .map((r) => {
-        const amount = Number(r.amount);
-        return {
-          type: "recurring" as const,
-          id: r.id,
-          title: `Berulang: ${r.name} (${KIND_LABEL[r.kind]})`,
-          amount,
-          currency: r.currency,
-          amount_idr: Math.round(amount * (r.currency === "USD" ? rate : 1) * 100) / 100,
-          due_date: r.next_due,
-          days_left: diffDays(t, r.next_due),
-          overdue: r.next_due < t,
-        };
-      });
+    return (
+      (res.data ?? [])
+        .filter((r) => !r.end_date || r.next_due <= r.end_date)
+        // v22 member notifications: only items on (or transferring to) a wallet in scope.
+        .filter((r) => !scope || inNotifyScope(scope, r.account_id, r.to_account_id))
+        .map((r) => {
+          const amount = Number(r.amount);
+          return {
+            type: "recurring" as const,
+            id: r.id,
+            title: `Berulang: ${r.name} (${KIND_LABEL[r.kind]})`,
+            amount,
+            currency: r.currency,
+            amount_idr: Math.round(amount * (r.currency === "USD" ? rate : 1) * 100) / 100,
+            due_date: r.next_due,
+            days_left: diffDays(t, r.next_due),
+            overdue: r.next_due < t,
+          };
+        })
+    );
   } catch (e) {
     console.error("recurring reminders failed", e);
     return [];

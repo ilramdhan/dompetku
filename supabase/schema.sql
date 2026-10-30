@@ -686,6 +686,42 @@ grant all on public.invoice_payments to service_role;
 alter table public.invoice_payments enable row level security;
 notify pgrst, 'reload schema';
 
+-- ============ v22: notifikasi Telegram per anggota — laporan & pengingat terjadwal (aman dijalankan ulang) ============
+-- Opsional: tanpa bagian ini laporan & pengingat terjadwal tetap hanya ke chat admin persis seperti sebelumnya.
+-- Butuh v17 + v18 (app_users, account_permissions). (v21 dicadangkan untuk modul lain.)
+-- notify_recipients: satu baris per anggota — chat id Telegram pribadi atau grup (grup = angka negatif),
+-- aktif/nonaktif, dan jenis notifikasi (laporan, pengingat). Pemilik memakai TELEGRAM_ADMIN_CHAT_ID
+-- (Pengaturan → Integrasi atau env), bukan tabel ini.
+-- notify_recipient_wallets: subset dompet opsional (kosong = semua dompet yang boleh dilihat anggota).
+-- Isi notifikasi selalu dibatasi ke dompet yang masih boleh dilihat anggota (account_permissions);
+-- dompet di subset yang aksesnya sudah dicabut diabaikan.
+-- Chat id di sini TERPISAH dari BOT_ALLOWED_CHAT_IDS: menerima notifikasi tidak memberi akses ke bot.
+create table if not exists public.notify_recipients (
+  user_id uuid primary key references public.app_users(id) on delete cascade,
+  chat_id text not null check (chat_id ~ '^-?[0-9]{1,20}$'),
+  enabled boolean not null default true,
+  send_report boolean not null default true,
+  send_reminders boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+revoke all on public.notify_recipients from anon, authenticated;
+grant all on public.notify_recipients to service_role;
+alter table public.notify_recipients enable row level security;
+
+create table if not exists public.notify_recipient_wallets (
+  user_id uuid not null references public.notify_recipients(user_id) on delete cascade,
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, account_id)
+);
+create index if not exists notify_recipient_wallets_account_idx
+  on public.notify_recipient_wallets (account_id);
+revoke all on public.notify_recipient_wallets from anon, authenticated;
+grant all on public.notify_recipient_wallets to service_role;
+alter table public.notify_recipient_wallets enable row level security;
+notify pgrst, 'reload schema';
+
 -- ============ v23: tautan publik invoice bertoken — lihat & cetak/simpan PDF oleh pelanggan (aman dijalankan ulang) ============
 -- Opsional, butuh v21. (v22 dipakai bagian lain.) Tanpa bagian ini tombol "Bagikan" hanya menampilkan petunjuk
 -- dan tautan /i/<token> selalu "tidak ditemukan".

@@ -1,0 +1,333 @@
+{
+  "name": "Dompetku – Notifikasi per Anggota",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 👥 Dompetku — Per-member notifications (optional, schema v22)\nAlternative to workflow 02: same schedules, but each recipient gets their own message. The owner (TELEGRAM_ADMIN_CHAT_ID from Settings → Integrasi, else app env) gets the all-wallet text; each member set in Settings → Pengguna → 🔔 gets only their wallets. **Use 02 or 06, not both** (the owner would get every message twice).\n\nEnv: `FINTRACK_URL`, `TELEGRAM_BOT_TOKEN`. Credential: Header Auth `x-api-key` (replace `REPLACE_ME` on all 4 HTTP nodes). Recipients with no bills due are skipped by the app.",
+        "height": 260,
+        "width": 640,
+        "color": "6"
+      },
+      "id": "081d776a-20e7-44cc-8db3-b585ec0e674e",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-40, -260]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "8cb07db1-14c1-4756-80fc-f714d9928ea1",
+      "name": "Tiap hari 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FINTRACK_URL }}/api/public/n8n/notifications?kind=reminders&days=3",
+        "options": {
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "539064a3-8132-4a03-8218-5873a0f44e6c",
+      "name": "Tagihan ≤ 3 hari",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Fintrack x-api-key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 21
+            }
+          ]
+        }
+      },
+      "id": "385adda3-8e21-453c-a551-b0366be7f133",
+      "name": "Tiap hari 21:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FINTRACK_URL }}/api/public/n8n/notifications?kind=report&period=today",
+        "options": {
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "233ae2f1-aea5-43d1-8f24-0ddbe47f62c1",
+      "name": "Rekap hari ini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 200],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Fintrack x-api-key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [1],
+              "triggerAtHour": 7,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "74570e11-34fd-4af9-9202-29066d8d1146",
+      "name": "Senin 07:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FINTRACK_URL }}/api/public/n8n/notifications?kind=report&period=lastweek",
+        "options": {
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "dc019c60-768c-4c07-a0f9-31139fcc9743",
+      "name": "Laporan minggu lalu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 400],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Fintrack x-api-key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "monthsInterval": 1,
+              "triggerAtDayOfMonth": 1,
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "c48215a4-6f8c-4b67-901d-58178fb8b8db",
+      "name": "Tanggal 1 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 600]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FINTRACK_URL }}/api/public/n8n/notifications?kind=report&period=lastmonth",
+        "options": {
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "908b4398-aae5-439d-aa06-2f2481e174e1",
+      "name": "Laporan bulan lalu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 600],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Fintrack x-api-key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "messages",
+        "options": {}
+      },
+      "id": "4b50593f-c702-4531-a0e2-846994844dc4",
+      "name": "Pisah per penerima",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "options": {
+          "timeout": 15000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chat_id, text: String($json.text || '').slice(0, 4000), disable_web_page_preview: true }) }}"
+      },
+      "id": "5971d950-a8f1-4b59-8af8-7158014091d1",
+      "name": "Kirim ke Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Tiap hari 08:00": {
+      "main": [
+        [
+          {
+            "node": "Tagihan ≤ 3 hari",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tagihan ≤ 3 hari": {
+      "main": [
+        [
+          {
+            "node": "Pisah per penerima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiap hari 21:00": {
+      "main": [
+        [
+          {
+            "node": "Rekap hari ini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rekap hari ini": {
+      "main": [
+        [
+          {
+            "node": "Pisah per penerima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Senin 07:30": {
+      "main": [
+        [
+          {
+            "node": "Laporan minggu lalu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Laporan minggu lalu": {
+      "main": [
+        [
+          {
+            "node": "Pisah per penerima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tanggal 1 07:00": {
+      "main": [
+        [
+          {
+            "node": "Laporan bulan lalu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Laporan bulan lalu": {
+      "main": [
+        [
+          {
+            "node": "Pisah per penerima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pisah per penerima": {
+      "main": [
+        [
+          {
+            "node": "Kirim ke Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jakarta",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "pinData": {},
+  "active": false,
+  "tags": []
+}

@@ -173,6 +173,7 @@ The file grew with the app. Every section uses `if not exists` / `on conflict do
 | v19       | Kantong (pockets) inside a wallet with low/empty alerts (`pockets`, `transactions.pocket_id`, `pocket_alerts`)                                                                            |
 | v20       | Subscription flexible interval: every N months/years (`subscriptions."interval"`)                                                                                                         |
 | v21       | Invoices with automatic numbers, items and manual payments (`invoices`, `invoice_items`, `invoice_payments`, `app_settings.invoice_prefix`)                                               |
+| v22       | Per-member Telegram notifications: chat id, toggles and wallet subset for scheduled reports & reminders (`notify_recipients`, `notify_recipient_wallets`), needs v18                      |
 | v23       | Public invoice links for customers (`invoice_shares`, only a hash of each link is stored), needs v21                                                                                      |
 | v24       | Invoice bank/QRIS payment methods, customer transfer-proof upload and verification queue (`payment_methods`, `invoice_payment_methods`, `invoice_proofs`, `rate_limits`), needs v21 + v23 |
 

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
-import { KeyRound, Plus, ShieldCheck, Trash2, UserCog, Users } from "lucide-react";
+import { Bell, KeyRound, Plus, ShieldCheck, Trash2, UserCog, Users } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useConfirm } from "@/components/confirm-dialog";
 import { UserAvatar } from "@/components/user-avatar";
+import { NotifyDialog, type NotifyEntry } from "@/components/notify-dialog";
+import { getNotifySettingsFn } from "@/lib/notify.functions";
 import {
   createMemberFn,
   deleteMemberFn,
@@ -34,7 +36,7 @@ import {
   setMemberPermissionsFn,
   updateMemberFn,
 } from "@/lib/users.functions";
-import { errMsg, invalidateFor, rowsQuery, usersQueryKey } from "@/lib/queries";
+import { errMsg, invalidateFor, notifyQueryKey, rowsQuery, usersQueryKey } from "@/lib/queries";
 import { passwordProblems } from "@/lib/password";
 import {
   displayNameOf,
@@ -60,7 +62,19 @@ export function UsersCard() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [resetting, setResetting] = useState<User | null>(null);
+  const [notifying, setNotifying] = useState<User | null>(null);
   const ready = q.data?.ready ?? false;
+  const listNotify = useServerFn(getNotifySettingsFn);
+  // v22 (optional): per-member Telegram notifications; `ready: false` hides the bell button.
+  const nq = useQuery({
+    queryKey: notifyQueryKey,
+    queryFn: () => listNotify(),
+    enabled: ready,
+    retry: false,
+  });
+  const notifyReady = nq.data?.ready ?? false;
+  const notifyOf = (id: string | null): NotifyEntry | null =>
+    (id && nq.data?.items.find((n) => n.user_id === id)) || null;
 
   return (
     <Card className="mt-4 min-w-0 p-5">
@@ -94,6 +108,8 @@ export function UsersCard() {
               accounts={accounts}
               onEdit={() => setEditing(u)}
               onReset={() => setResetting(u)}
+              notify={notifyReady ? notifyOf(u.id) : undefined}
+              onNotify={() => setNotifying(u)}
             />
           ))}
         </ul>
@@ -104,6 +120,19 @@ export function UsersCard() {
           user={editing}
           accounts={accounts}
           onOpenChange={(o) => !o && setEditing(null)}
+        />
+      ) : null}
+      {nq.data && !nq.data.ready && q.data?.users.some((u) => !u.owner) ? (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {t("Jalankan bagian v22 di supabase/schema.sql untuk notifikasi Telegram per anggota.")}
+        </p>
+      ) : null}
+      {notifying ? (
+        <NotifyDialog
+          user={notifying}
+          accounts={accounts}
+          current={notifyOf(notifying.id)}
+          onOpenChange={(o) => !o && setNotifying(null)}
         />
       ) : null}
       {resetting ? (
@@ -118,11 +147,16 @@ function UserRow({
   accounts,
   onEdit,
   onReset,
+  notify,
+  onNotify,
 }: {
   user: User;
   accounts: Account[];
   onEdit: () => void;
   onReset: () => void;
+  /** undefined = v22 not available; null = not configured. */
+  notify?: NotifyEntry | null | undefined;
+  onNotify: () => void;
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -186,6 +220,11 @@ function UserRow({
           {user.must_change_password ? (
             <Badge variant="outline">{t("Menunggu ganti password")}</Badge>
           ) : null}
+          {notify?.enabled ? (
+            <Badge variant="outline" className="gap-1">
+              <Bell className="size-3" /> {t("Telegram")}
+            </Badge>
+          ) : null}
         </p>
         <p className="truncate text-xs text-muted-foreground">@{user.username}</p>
         {user.owner ? (
@@ -220,6 +259,17 @@ function UserRow({
           <Button size="sm" variant="outline" onClick={onEdit}>
             <UserCog className="size-4" /> {t("Akses")}
           </Button>
+          {notify !== undefined ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={onNotify}
+              aria-label={t("Notifikasi Telegram")}
+              title={t("Notifikasi Telegram")}
+            >
+              <Bell className="size-4" />
+            </Button>
+          ) : null}
           <Button size="icon" variant="ghost" onClick={onReset} aria-label={t("Reset password")}>
             <KeyRound className="size-4" />
           </Button>

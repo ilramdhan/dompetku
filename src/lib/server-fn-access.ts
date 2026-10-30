@@ -98,14 +98,19 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     approveProofFn: "admin",
     rejectProofFn: "admin",
   },
-  // v23 (#93): customer view by share token; returns only the toPublicInvoice() whitelist.
-  // v24 (#94): proof upload by share token; demo-off, rate limited, answers only { ok }.
-  "invoice-public.functions.ts": { getPublicInvoice: "public", submitInvoiceProof: "public" },
   "invoice-report.functions.ts": {
     getInvoiceReport: "admin",
     getInvoicePayments: "admin",
     getOpenInvoices: "admin",
   },
+  "notify.functions.ts": {
+    getNotifySettingsFn: "admin",
+    saveNotifySettingsFn: "admin",
+    deleteNotifySettingsFn: "admin",
+  },
+  // v23 (#93): customer view by share token; returns only the toPublicInvoice() whitelist.
+  // v24 (#94): proof upload by share token; demo-off, rate limited, answers only { ok }.
+  "invoice-public.functions.ts": { getPublicInvoice: "public", submitInvoiceProof: "public" },
   "pockets.functions.ts": {
     getAccountPockets: "member",
     getPocketOptions: "member",

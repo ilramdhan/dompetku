@@ -57,6 +57,8 @@ const SPECIAL: Record<string, string> = {
   "user.delete": "Anggota dihapus",
   "user.password_reset": "Password anggota direset",
   "permission.update": "Akses dompet diubah",
+  "notify.update": "Notifikasi anggota diubah",
+  "notify.delete": "Notifikasi anggota dihapus",
   "invoice_shares.create": "Tautan publik invoice dibuat",
   "invoice_shares.delete": "Tautan publik invoice dicabut",
   "invoice_proofs.create": "Bukti transfer diterima",
