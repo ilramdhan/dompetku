@@ -18,6 +18,7 @@ import {
 import { getAppSettingsFull, saveAppSettingsFn } from "@/lib/app-settings.functions";
 import {
   DEFAULT_APP_NAME,
+  DEFAULT_INVOICE_PREFIX,
   DEFAULT_TAGLINE,
   LOGO_SIZE,
   TIMEZONES,
@@ -41,6 +42,7 @@ type Form = {
   github_url: string;
   bot_default_account_id: string;
   reminder_days: string;
+  invoice_prefix: string;
 };
 
 function toForm(s: ResolvedSettings): Form {
@@ -55,6 +57,7 @@ function toForm(s: ResolvedSettings): Form {
     github_url: s.github_url ?? "",
     bot_default_account_id: s.bot_default_account_id ?? "",
     reminder_days: s.reminder_days == null ? "" : String(s.reminder_days),
+    invoice_prefix: s.invoice_prefix === DEFAULT_INVOICE_PREFIX ? "" : s.invoice_prefix,
   };
 }
 
@@ -130,6 +133,7 @@ export function AppSettingsCard() {
         data: {
           ...form,
           reminder_days: form.reminder_days === "" ? null : Number(form.reminder_days),
+          invoice_prefix: form.invoice_prefix.trim().toUpperCase() || null,
           bot_default_account_id: form.bot_default_account_id || null,
         },
       });
@@ -309,6 +313,19 @@ export function AppSettingsCard() {
               placeholder={t("bot 14 · n8n 7")}
               value={form.reminder_days}
               onChange={(e) => set("reminder_days", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="as-invprefix">{t("Prefix nomor invoice")}</Label>
+            <Input
+              id="as-invprefix"
+              maxLength={10}
+              autoCapitalize="characters"
+              placeholder={DEFAULT_INVOICE_PREFIX}
+              value={form.invoice_prefix}
+              onChange={(e) =>
+                set("invoice_prefix", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+              }
             />
           </div>
 

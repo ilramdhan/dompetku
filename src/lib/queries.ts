@@ -27,6 +27,8 @@ import { getRecurring } from "./recurring.functions";
 import { getAccountReport, getReconcileTransactions } from "./account-report.functions";
 import { getProfile } from "./profile.functions";
 import { getAccountPockets, getPocketOptions, getPocketWarnings } from "./pockets.functions";
+import { getInvoiceFn, getInvoices } from "./invoices.functions";
+import type { InvoiceFilter, InvoiceSort } from "./invoices";
 import type { CrudTable } from "./schemas";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -165,6 +167,38 @@ export const pocketWarningsQuery = (month: string) =>
     queryFn: () => getPocketWarnings({ data: { month } }),
     staleTime: FRESH,
   });
+/** v21 Invoice list (server pagination/sort/filter) and one invoice with items + payments. */
+export type InvoiceListFilter = {
+  offset?: number;
+  limit?: number;
+  sort?: InvoiceSort;
+  direction?: "asc" | "desc";
+  status?: InvoiceFilter;
+  account?: string;
+  search?: string;
+};
+export const invoicesQuery = (f: InvoiceListFilter = {}) =>
+  queryOptions({
+    queryKey: ["invoices", "list", f],
+    queryFn: () =>
+      getInvoices({
+        data: {
+          offset: f.offset ?? 0,
+          limit: f.limit ?? 20,
+          sort: f.sort ?? "issue_date",
+          direction: f.direction ?? "desc",
+          ...(f.status ? { status: f.status } : {}),
+          ...(f.account ? { account: f.account } : {}),
+          ...(f.search ? { search: f.search } : {}),
+        },
+      }),
+    staleTime: FRESH,
+  });
+export const invoiceQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["invoices", "detail", id],
+    queryFn: () => getInvoiceFn({ data: { id } }),
+  });
 export const reconcileTxQuery = (id: string, from: string, to: string) =>
   queryOptions({
     queryKey: ["account-recon", id, from, to],
@@ -216,6 +250,9 @@ const AFFECTS: Record<string, string[]> = {
   app_users: ["profile", "activity", "users"],
   // v19 Kantong: pocket cards/options/warnings, transactions (badges/filter) and the activity log.
   pockets: ["pockets", "tx", "activity"],
+  // v21 Invoice: editing/cancelling only touches invoice lists; payments book income transactions.
+  invoices: ["invoices", "activity"],
+  invoice_payments: [...MONEY, "invoices"],
 };
 
 export function invalidateFor(qc: QueryClient, table: string) {

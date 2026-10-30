@@ -13,7 +13,7 @@ so you can follow along even if you are new to web development.
 - [Tech stack](#tech-stack)
 - [System diagram](#system-diagram)
 - [Directory structure](#directory-structure)
-- [Database schema sections (v1–v20)](#database-schema-sections-v1v20)
+- [Database schema sections (v1–v21)](#database-schema-sections-v1v21)
 - [Key flows](#key-flows)
 - [Conventions and contributor rules](#conventions-and-contributor-rules)
 - [Testing and CI](#testing-and-ci)
@@ -128,7 +128,7 @@ collapsed. Lovable planning drafts in `.lovable/` are omitted.
 │   ├── icons/                     # PWA icons (collapsed)
 │   ├── manifest.webmanifest       # PWA manifest (no service worker)
 │   └── (robots.txt and sitemap.xml are server routes in src/routes)
-├── supabase/schema.sql            # Full database schema, sections v1–v20, safe to re-run
+├── supabase/schema.sql            # Full database schema, sections v1–v21, safe to re-run
 ├── src/
 │   ├── server.ts                  # Server entry wrapper: catches SSR errors → logError + error page
 │   ├── start.ts                   # Global request middleware: security headers, error page, CSRF
@@ -208,35 +208,36 @@ File-name suffixes tell you where code may run:
 | `i18n.tsx`                                                                    | `LanguageProvider` / `useI18n`, ID→EN dictionary.                                                                      |
 | `dates.ts`, `head.ts`, `utils.ts`                                             | Date helpers, page `<head>` helper, `cn()` class merge.                                                                |
 
-## Database schema sections (v1–v20)
+## Database schema sections (v1–v21)
 
 `supabase/schema.sql` is one file, organised in sections that are **safe to re-run** (`if not
 exists` everywhere). A fresh install runs the whole file once. Existing installs run any newer
 section. Every section after v1 is optional: the related feature hides itself or falls back until
 the section is run.
 
-| Section | Adds                                                                                                                                                                                                                            |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| v1      | Core tables: `accounts`, `categories`, `transactions`, `debts`, `debt_payments`, `subscriptions`, `budgets`, `goals`, `activity_log`, `fx_rates`; `account_balances` view; grants (service_role only); RLS; default categories. |
-| v2      | `transactions.receipt_path` and the private `receipts` storage bucket (5 MB limit).                                                                                                                                             |
-| v3      | `activity_log` (if missing), gold (`gold_purchases`, `gold_prices`) and receivables (`receivables`, `receivable_payments`).                                                                                                     |
-| v4      | Account fees (`transfer_fees`, `topup_fees`, `monthly_fee`, `monthly_fee_day`), subscription `tax_percent`, index for auto-fee markers.                                                                                         |
-| v5      | Gold metadata (`gold_type`, `product_number`) and main query indexes.                                                                                                                                                           |
-| v6      | Gold linked to an account and a transaction (`account_id`, `transaction_id`).                                                                                                                                                   |
-| v7      | Telegram bot: `transactions.external_id` (unique) for idempotency, `bot_drafts` previews.                                                                                                                                       |
-| v8      | Savings goals linked to an account (`goals.account_id`).                                                                                                                                                                        |
-| v9      | Report aggregation functions `dk_month_totals`, `dk_category_totals`, `dk_month_category_totals`, `dk_monthly_net`.                                                                                                             |
-| v10     | `recurring_transactions`.                                                                                                                                                                                                       |
-| v11     | Budget `rollover` flag and `budget_alerts`.                                                                                                                                                                                     |
-| v12     | Split transactions (`split_group`), multiple photos (`receipt_paths`), generated `items_search` column for receipt item search.                                                                                                 |
-| v13     | `dk_account_monthly` function and `account_reconciliations`.                                                                                                                                                                    |
-| v14     | `app_settings` (single row: name, tagline, logo data URL, time zone, base currency, landing, bot default account, reminder days).                                                                                               |
-| v15     | `ai_usage` log (one row per AI call: source, chat, kind, model, tokens) for the bot daily AI quota.                                                                                                                             |
-| v16     | `integration_settings` (key/value/is_secret): bot, AI, email and n8n values from Settings → Integrasi over env; secrets AES-256-GCM encrypted, excluded from backups.                                                           |
-| v17     | `app_users` (username, display_name, address, avatar data URL, password_hash, role, is_active, session_version): profile + in-app password change; backups carry profile fields only.                                           |
-| v18     | Multi-user: `app_users.must_change_password`, `account_permissions` (user_id, account_id, level `view`/`manage`, PK both, cascade), optional `activity_log.actor`.                                                              |
-| v19     | Kantong: `pockets` (account_id cascade, name unique per wallet, allocated, min_balance, period `monthly`/`none`), optional `transactions.pocket_id` (on delete set null), `pocket_alerts` (pocket, month, level `low`/`empty`). |
-| v20     | Subscription flexible interval: `subscriptions."interval"` (default 1, check ≥ 1) enables custom intervals like every 3 months, 6 months, 3 years.                                                                              |
+| Section | Adds                                                                                                                                                                                                                                                                  |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1      | Core tables: `accounts`, `categories`, `transactions`, `debts`, `debt_payments`, `subscriptions`, `budgets`, `goals`, `activity_log`, `fx_rates`; `account_balances` view; grants (service_role only); RLS; default categories.                                       |
+| v2      | `transactions.receipt_path` and the private `receipts` storage bucket (5 MB limit).                                                                                                                                                                                   |
+| v3      | `activity_log` (if missing), gold (`gold_purchases`, `gold_prices`) and receivables (`receivables`, `receivable_payments`).                                                                                                                                           |
+| v4      | Account fees (`transfer_fees`, `topup_fees`, `monthly_fee`, `monthly_fee_day`), subscription `tax_percent`, index for auto-fee markers.                                                                                                                               |
+| v5      | Gold metadata (`gold_type`, `product_number`) and main query indexes.                                                                                                                                                                                                 |
+| v6      | Gold linked to an account and a transaction (`account_id`, `transaction_id`).                                                                                                                                                                                         |
+| v7      | Telegram bot: `transactions.external_id` (unique) for idempotency, `bot_drafts` previews.                                                                                                                                                                             |
+| v8      | Savings goals linked to an account (`goals.account_id`).                                                                                                                                                                                                              |
+| v9      | Report aggregation functions `dk_month_totals`, `dk_category_totals`, `dk_month_category_totals`, `dk_monthly_net`.                                                                                                                                                   |
+| v10     | `recurring_transactions`.                                                                                                                                                                                                                                             |
+| v11     | Budget `rollover` flag and `budget_alerts`.                                                                                                                                                                                                                           |
+| v12     | Split transactions (`split_group`), multiple photos (`receipt_paths`), generated `items_search` column for receipt item search.                                                                                                                                       |
+| v13     | `dk_account_monthly` function and `account_reconciliations`.                                                                                                                                                                                                          |
+| v14     | `app_settings` (single row: name, tagline, logo data URL, time zone, base currency, landing, bot default account, reminder days).                                                                                                                                     |
+| v15     | `ai_usage` log (one row per AI call: source, chat, kind, model, tokens) for the bot daily AI quota.                                                                                                                                                                   |
+| v16     | `integration_settings` (key/value/is_secret): bot, AI, email and n8n values from Settings → Integrasi over env; secrets AES-256-GCM encrypted, excluded from backups.                                                                                                 |
+| v17     | `app_users` (username, display_name, address, avatar data URL, password_hash, role, is_active, session_version): profile + in-app password change; backups carry profile fields only.                                                                                 |
+| v18     | Multi-user: `app_users.must_change_password`, `account_permissions` (user_id, account_id, level `view`/`manage`, PK both, cascade), optional `activity_log.actor`.                                                                                                    |
+| v19     | Kantong: `pockets` (account_id cascade, name unique per wallet, allocated, min_balance, period `monthly`/`none`), optional `transactions.pocket_id` (on delete set null), `pocket_alerts` (pocket, month, level `low`/`empty`).                                       |
+| v20     | Subscription flexible interval: `subscriptions."interval"` (default 1, check ≥ 1) enables custom intervals like every 3 months, 6 months, 3 years.                                                                                                                    |
+| v21     | Invoice core: `invoices` (number unique, customer, wallet, issue/due date, status `draft`/`unpaid`/`partial`/`paid`/`cancelled`, total, paid), `invoice_items` (cascade), `invoice_payments` (amount, date, method, `transaction_id`), `app_settings.invoice_prefix`. |
 
 ## Key flows
 
@@ -285,6 +286,24 @@ the section is run.
 - **RBAC.** View on a wallet → see its pockets; manage → assign transactions to them and create,
   edit, archive or delete them (`assertWalletManage`). `maskTx` clears `pocket_id` when the source
   wallet is hidden. The bot (`#tag`, `/kantong`) is owner-only like the rest of the bot.
+
+### Invoice (v21)
+
+- **What.** Bills to customers with automatic numbers `<PREFIX>-YYYYMM-####` (prefix in
+  Settings → Aplikasi, default `INV`; sequence per issue month, retried on a unique violation),
+  line items, one receiving wallet and manual (partial) payments. IDR only.
+- **Math & rules** (`invoices.ts`, pure, tested). The server recomputes the total from items and
+  never trusts a client total. Stored status: `draft`/`cancelled` are manual (`issue`, `cancel`,
+  `reopen`, `unissue`); `unpaid`/`partial`/`paid` are derived from the sum of payments after every
+  payment change. **Overdue** is computed (`due_date < today` in the app time zone, open invoices
+  only) and never stored. Paid/cancelled invoices cannot be edited; an edit may not drop the total
+  below what was paid or move the wallet once payments exist.
+- **Payments.** Each payment books one income transaction in category "Invoice" on the invoice
+  wallet via `createFromExternal` with `external_id = invoice_pay:<payment id>` (idempotent).
+  Deleting a payment or the invoice deletes those transactions. A payment never exceeds the
+  remaining amount (re-checked after insert against concurrent payments).
+- **RBAC.** `invoices` is an admin module; the server fns still scope by `accountScope()` and
+  `assertWalletManage` so the module can be granted to members later.
 
 ### Users and wallet-level access (RBAC, v18)
 

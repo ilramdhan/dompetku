@@ -1052,6 +1052,8 @@ export type Database = {
           github_url: string | null;
           bot_default_account_id: string | null;
           reminder_days: number | null;
+          /** v21 (optional column) */
+          invoice_prefix?: string | null;
           updated_at: string;
         };
         Insert: {
@@ -1066,6 +1068,7 @@ export type Database = {
           github_url?: string | null;
           bot_default_account_id?: string | null;
           reminder_days?: number | null;
+          invoice_prefix?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -1080,6 +1083,7 @@ export type Database = {
           github_url?: string | null;
           bot_default_account_id?: string | null;
           reminder_days?: number | null;
+          invoice_prefix?: string | null;
           updated_at?: string;
         };
         Relationships: [
@@ -1169,6 +1173,160 @@ export type Database = {
             columns: ["pocket_id"];
             isOneToOne: false;
             referencedRelation: "pockets";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** v21 (optional table): invoices (number <PREFIX>-YYYYMM-####, totals recomputed server-side). */
+      invoices: {
+        Row: {
+          id: string;
+          number: string;
+          customer_name: string;
+          customer_email: string | null;
+          customer_phone: string | null;
+          account_id: string | null;
+          issue_date: string;
+          due_date: string | null;
+          notes: string | null;
+          status: "draft" | "unpaid" | "partial" | "paid" | "cancelled";
+          currency: string;
+          total: number;
+          paid: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          number: string;
+          customer_name: string;
+          customer_email?: string | null;
+          customer_phone?: string | null;
+          account_id?: string | null;
+          issue_date?: string;
+          due_date?: string | null;
+          notes?: string | null;
+          status?: "draft" | "unpaid" | "partial" | "paid" | "cancelled";
+          currency?: string;
+          total?: number;
+          paid?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          number?: string;
+          customer_name?: string;
+          customer_email?: string | null;
+          customer_phone?: string | null;
+          account_id?: string | null;
+          issue_date?: string;
+          due_date?: string | null;
+          notes?: string | null;
+          status?: "draft" | "unpaid" | "partial" | "paid" | "cancelled";
+          currency?: string;
+          total?: number;
+          paid?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invoices_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: false;
+            referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** v21 (optional table): invoice line items. */
+      invoice_items: {
+        Row: {
+          id: string;
+          invoice_id: string;
+          description: string;
+          qty: number;
+          unit_price: number;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_id: string;
+          description: string;
+          qty?: number;
+          unit_price?: number;
+          position?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_id?: string;
+          description?: string;
+          qty?: number;
+          unit_price?: number;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** v21 (optional table): invoice payments; each one books an income transaction. */
+      invoice_payments: {
+        Row: {
+          id: string;
+          invoice_id: string;
+          amount: number;
+          paid_at: string;
+          method: string;
+          reference: string | null;
+          note: string | null;
+          transaction_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_id: string;
+          amount: number;
+          paid_at?: string;
+          method?: string;
+          reference?: string | null;
+          note?: string | null;
+          transaction_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_id?: string;
+          amount?: number;
+          paid_at?: string;
+          method?: string;
+          reference?: string | null;
+          note?: string | null;
+          transaction_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invoice_payments_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoice_payments_transaction_id_fkey";
+            columns: ["transaction_id"];
+            isOneToOne: false;
+            referencedRelation: "transactions";
             referencedColumns: ["id"];
           },
         ];

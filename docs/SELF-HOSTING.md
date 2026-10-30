@@ -146,32 +146,33 @@ A **fork** is your own copy of the project on GitHub. Vercel will build the webs
 **What success looks like:** the result panel says **Success. No rows returned** (you may also see a small table from the last statement). In **Table Editor** you now see tables such as `accounts`, `categories`, `transactions`, `debts`, `subscriptions`, `budgets`, `goals` … and the `categories` table already has default categories.
 
 <details>
-<summary><strong>What are the sections v1 … v20?</strong></summary>
+<summary><strong>What are the sections v1 … v21?</strong></summary>
 
 The file grew with the app. Every section uses `if not exists` / `on conflict do nothing` / `create or replace`, so **the whole file is idempotent: running it again is always safe** and never deletes data. Run the whole file each time you update.
 
-| Section   | Adds                                                                                                                                     |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| base (v1) | Accounts, categories, transactions, debts & payments, subscriptions, budgets, goals, exchange rates; security (RLS on, no public access) |
-| v2        | Receipt photo column + private Storage bucket `receipts`                                                                                 |
-| v3        | Activity log, gold savings, receivables                                                                                                  |
-| v4        | Transfer/admin fees, monthly account fees, subscription tax                                                                              |
-| v5        | Gold metadata and indexes                                                                                                                |
-| v6        | Gold linked to accounts                                                                                                                  |
-| v7        | Telegram bot drafts and idempotency (`bot_drafts`, `external_id`)                                                                        |
-| v8        | Savings goals linked to an account                                                                                                       |
-| v9        | Report aggregation functions in Postgres (faster dashboards)                                                                             |
-| v10       | Recurring transactions                                                                                                                   |
-| v11       | Budget rollover and 80%/100% alerts                                                                                                      |
-| v12       | Split transactions, up to 5 receipt photos, item search                                                                                  |
-| v13       | Per-account report and bank reconciliation                                                                                               |
-| v14       | App settings (name, logo, time zone, landing page, bot defaults)                                                                         |
-| v15       | AI usage log and per-chat daily bot AI quota                                                                                             |
-| v16       | Integration settings (bot, AI, email, n8n keys) editable in Settings → Integrasi; secrets encrypted                                      |
-| v17       | Profile (name, address, photo) and changing the login password in the app (`app_users`)                                                  |
-| v18       | Multi-user for families: members with per-wallet view/manage access (`account_permissions`), needs v17                                   |
-| v19       | Kantong (pockets) inside a wallet with low/empty alerts (`pockets`, `transactions.pocket_id`, `pocket_alerts`)                           |
-| v20       | Subscription flexible interval: every N months/years (`subscriptions."interval"`)                                                        |
+| Section   | Adds                                                                                                                                        |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| base (v1) | Accounts, categories, transactions, debts & payments, subscriptions, budgets, goals, exchange rates; security (RLS on, no public access)    |
+| v2        | Receipt photo column + private Storage bucket `receipts`                                                                                    |
+| v3        | Activity log, gold savings, receivables                                                                                                     |
+| v4        | Transfer/admin fees, monthly account fees, subscription tax                                                                                 |
+| v5        | Gold metadata and indexes                                                                                                                   |
+| v6        | Gold linked to accounts                                                                                                                     |
+| v7        | Telegram bot drafts and idempotency (`bot_drafts`, `external_id`)                                                                           |
+| v8        | Savings goals linked to an account                                                                                                          |
+| v9        | Report aggregation functions in Postgres (faster dashboards)                                                                                |
+| v10       | Recurring transactions                                                                                                                      |
+| v11       | Budget rollover and 80%/100% alerts                                                                                                         |
+| v12       | Split transactions, up to 5 receipt photos, item search                                                                                     |
+| v13       | Per-account report and bank reconciliation                                                                                                  |
+| v14       | App settings (name, logo, time zone, landing page, bot defaults)                                                                            |
+| v15       | AI usage log and per-chat daily bot AI quota                                                                                                |
+| v16       | Integration settings (bot, AI, email, n8n keys) editable in Settings → Integrasi; secrets encrypted                                         |
+| v17       | Profile (name, address, photo) and changing the login password in the app (`app_users`)                                                     |
+| v18       | Multi-user for families: members with per-wallet view/manage access (`account_permissions`), needs v17                                      |
+| v19       | Kantong (pockets) inside a wallet with low/empty alerts (`pockets`, `transactions.pocket_id`, `pocket_alerts`)                              |
+| v20       | Subscription flexible interval: every N months/years (`subscriptions."interval"`)                                                           |
+| v21       | Invoices with automatic numbers, items and manual payments (`invoices`, `invoice_items`, `invoice_payments`, `app_settings.invoice_prefix`) |
 
 If a later section has not been run, the related page shows a hint instead of crashing, and the rest of the app keeps working.
 
@@ -325,7 +326,11 @@ Members only see the dashboard, transactions, accounts and reports, computed ove
 
 Run section **v19** of `schema.sql` (or simply the whole file again). Then open **Accounts → a wallet → Kantong → + Kantong**: give it a name, an allocation, an optional warning threshold and a period (**monthly**, starting over each month, or **running**). When recording an expense, income or outgoing transfer on that wallet, pick the pocket in the optional **Kantong** field; in the Telegram bot add a tag at the end, e.g. `kopi 25rb #makan`, and use `/kantong` to see what is left. Without v19 the card only shows a hint and transactions save exactly as before.
 
-### 5.8 Optional: import history
+### 5.8 Optional: invoices (v21)
+
+Run section **v21** of `schema.sql` (or simply the whole file again). Open **Invoice → Buat invoice**: enter the customer, the receiving wallet, issue and due dates and one or more items; the total is computed from the items. Save it as a draft or issue it right away; the number (`INV-202610-0001`) is assigned automatically, and you can change the prefix in **Settings → Aplikasi**. **Catat pembayaran** records a full or partial payment and books it as income in category "Invoice" on that wallet; deleting the payment deletes the transaction too. Unpaid invoices past their due date show as **Terlambat**. Without v21 the page only shows a hint.
+
+### 5.9 Optional: import history
 
 **Transactions → Import CSV** accepts a CSV with date, type, amount, category, account, notes, currency. You get a preview; duplicates and invalid rows are skipped.
 
