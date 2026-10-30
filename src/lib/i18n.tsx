@@ -900,8 +900,12 @@ const DICT: Record<string, string> = {
     "AI provider (OpenAI-compatible API) — receives receipt photos or transaction text to read, along with your category names.",
   "Telegram dan n8n — meneruskan pesan bot, ringkasan, dan pengingat antara Anda dan aplikasi.":
     "Telegram and n8n — relay bot messages, summaries and reminders between you and the app.",
-  "Resend — mengirim email pengingat ke alamat yang diatur pemilik instance.":
-    "Resend — sends reminder emails to the address set by the instance owner.",
+  "Resend — mengirim email pengingat ke alamat yang diatur pemilik instance, serta email invoice, konfirmasi pembayaran, dan pengingat jatuh tempo ke email pelanggan invoice.":
+    "Resend — sends reminder emails to the address set by the instance owner, plus invoices, payment confirmations and due-date reminders to invoice customers' email.",
+  "Midtrans (payment gateway) — bila pembayaran online diaktifkan, menerima nomor invoice, jumlah tagihan, serta nama, email, dan telepon pelanggan untuk memproses pembayaran. Data kartu atau e-wallet diisi langsung di halaman Midtrans dan tidak pernah melewati aplikasi ini.":
+    "Midtrans (payment gateway) — when online payment is enabled, receives the invoice number, amount due and the customer's name, email and phone to process the payment. Card or e-wallet details are entered on Midtrans' own page and never pass through this app.",
+  "Bila fitur invoice dipakai, data pelanggan yang diisi pemilik instance (nama, email, telepon) dan bukti transfer yang diunggah pelanggan juga disimpan di sana. Untuk membatasi penyalahgunaan unggahan, alamat IP pengunggah hanya disimpan dalam bentuk hash.":
+    "When invoices are used, the customer details the owner enters (name, email, phone) and transfer proofs uploaded by customers are stored there too. To limit upload abuse, the uploader's IP address is stored only as a hash.",
   "Sentry — menerima laporan error teknis (pesan error dan konteks permintaan), bukan isi data keuangan Anda.":
     "Sentry — receives technical error reports (error message and request context), not your financial records.",
   "Google Drive — menyimpan file backup bila backup terjadwal diaktifkan.":
@@ -924,8 +928,8 @@ const DICT: Record<string, string> = {
   "Tanggung jawab Anda": "Your responsibilities",
   "Pemilik instance bertanggung jawab atas deployment, keamanan server, kunci API, kata sandi, dan backup-nya sendiri.":
     "The instance owner is responsible for their own deployment, server security, API keys, passwords and backups.",
-  "Pemilik instance wajib mematuhi ketentuan layanan pihak ketiga yang dipakai (Supabase, Vercel, penyedia AI, Telegram, dan lainnya).":
-    "The instance owner must follow the terms of the third-party services they use (Supabase, Vercel, AI providers, Telegram and others).",
+  "Pemilik instance wajib mematuhi ketentuan layanan pihak ketiga yang dipakai (Supabase, Vercel, penyedia AI, Telegram, Midtrans, dan lainnya).":
+    "The instance owner must follow the terms of the third-party services they use (Supabase, Vercel, AI providers, Telegram, Midtrans and others).",
   "Penggunaan yang wajar": "Acceptable use",
   "Jangan memakai aplikasi ini untuk aktivitas yang melanggar hukum, untuk mengakses data orang lain tanpa izin, atau untuk mengganggu layanan pihak ketiga yang terhubung.":
     "Do not use the app for unlawful activity, to access other people's data without permission, or to disrupt the connected third-party services.",
