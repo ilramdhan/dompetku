@@ -91,10 +91,13 @@ async function missing(err: { message?: string; code?: string } | null | undefin
   return (await fin()).isMissingTable(err);
 }
 
-/** v25 present? (cheap head count; any error = not ready). */
+/**
+ * v25 present? (any error = not ready). A plain one-row select, not `head: true`: a HEAD request
+ * to a missing table gets an empty 404 body, which postgrest-js reports as `error: null`.
+ */
 export async function gatewayReady(): Promise<boolean> {
   try {
-    const res = await table().select("id", { count: "exact", head: true }).limit(1);
+    const res = await table().select("id").limit(1);
     return !res.error;
   } catch {
     return false;
