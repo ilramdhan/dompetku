@@ -704,3 +704,96 @@ revoke all on public.invoice_shares from anon, authenticated;
 grant all on public.invoice_shares to service_role;
 alter table public.invoice_shares enable row level security;
 notify pgrst, 'reload schema';
+
+-- ============ v24: invoice — rekening bank/QRIS, unggah bukti transfer & antrean verifikasi (aman dijalankan ulang) ============
+-- Opsional, butuh v21 (dan v23 untuk halaman publik). Tanpa bagian ini kartu "Metode pembayaran" di Pengaturan
+-- dan antrean verifikasi hanya menampilkan petunjuk, halaman publik tidak menampilkan cara bayar, dan unggah
+-- bukti selalu ditolak.
+-- payment_methods: rekening bank (nama bank, nomor, atas nama) atau QRIS statis (gambar data URL PNG/JPEG/WebP
+-- ≤200 KB, sama seperti logo). account_id hanya untuk admin (dompet tujuan) dan TIDAK pernah tampil ke pelanggan.
+create table if not exists public.payment_methods (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('bank','qris')),
+  label text not null check (length(trim(label)) between 1 and 60),
+  bank_name text check (bank_name is null or length(bank_name) <= 60),
+  account_number text check (account_number is null or length(account_number) <= 40),
+  account_holder text check (account_holder is null or length(account_holder) <= 80),
+  qris_image text check (qris_image is null or (qris_image like 'data:image/%' and length(qris_image) <= 280000)),
+  account_id uuid references public.accounts(id) on delete set null,
+  active boolean not null default true,
+  position int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists payment_methods_active_idx on public.payment_methods (active, position);
+revoke all on public.payment_methods from anon, authenticated;
+grant all on public.payment_methods to service_role;
+alter table public.payment_methods enable row level security;
+
+-- Pilihan metode per invoice. Tidak ada baris = semua metode aktif ditampilkan.
+create table if not exists public.invoice_payment_methods (
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  method_id uuid not null references public.payment_methods(id) on delete cascade,
+  primary key (invoice_id, method_id)
+);
+create index if not exists invoice_payment_methods_method_idx on public.invoice_payment_methods (method_id);
+revoke all on public.invoice_payment_methods from anon, authenticated;
+grant all on public.invoice_payment_methods to service_role;
+alter table public.invoice_payment_methods enable row level security;
+
+-- Bukti transfer dari pelanggan. File ada di bucket privat 'receipts' dengan path inv/<invoice id>/<acak>.<ext>;
+-- pelanggan tidak pernah mendapat URL file, admin melihatnya lewat signed URL berumur pendek.
+-- ip_hash: HMAC-SHA256 alamat IP dengan rahasia server (bukan IP mentah). Approve = satu invoice_payments
+-- (payment_id) + pemasukan kategori "Invoice"; reject wajib alasan.
+create table if not exists public.invoice_proofs (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  method_id uuid references public.payment_methods(id) on delete set null,
+  file_path text not null check (file_path ~ '^inv/[0-9a-f-]{36}/[0-9a-f-]{36}\.(jpg|png|webp)$'),
+  claimed_amount numeric(18,2) not null check (claimed_amount > 0),
+  payer_name text check (payer_name is null or length(payer_name) <= 80),
+  note text check (note is null or length(note) <= 500),
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  reject_reason text check (reject_reason is null or length(reject_reason) <= 300),
+  ip_hash text check (ip_hash is null or ip_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  payment_id uuid references public.invoice_payments(id) on delete set null
+);
+create index if not exists invoice_proofs_invoice_idx on public.invoice_proofs (invoice_id, status);
+create index if not exists invoice_proofs_status_idx on public.invoice_proofs (status, created_at desc);
+revoke all on public.invoice_proofs from anon, authenticated;
+grant all on public.invoice_proofs to service_role;
+alter table public.invoice_proofs enable row level security;
+
+-- Rate limit persisten (umum, dipakai unggah bukti publik): satu baris per kunci + jendela waktu tetap.
+-- Kunci berisi hash (mis. 'proof:ip:<hmac>'), tidak pernah IP/token mentah. Tidak ikut dicadangkan.
+-- dk_rate_hit menaikkan hitungan secara atomik dan mengembalikan nilai barunya; baris lama dibersihkan sesekali.
+create table if not exists public.rate_limits (
+  key text not null check (length(key) between 1 and 200),
+  window_start timestamptz not null,
+  count int not null default 0,
+  primary key (key, window_start)
+);
+create index if not exists rate_limits_window_idx on public.rate_limits (window_start);
+revoke all on public.rate_limits from anon, authenticated;
+grant all on public.rate_limits to service_role;
+alter table public.rate_limits enable row level security;
+
+create or replace function public.dk_rate_hit(p_key text, p_window timestamptz)
+returns int
+language plpgsql volatile security invoker set search_path = public as $$
+declare n int;
+begin
+  insert into public.rate_limits as r (key, window_start, count) values (p_key, p_window, 1)
+  on conflict (key, window_start) do update set count = r.count + 1
+  returning r.count into n;
+  if random() < 0.02 then
+    delete from public.rate_limits where window_start < now() - interval '2 days';
+  end if;
+  return n;
+end;
+$$;
+revoke all on function public.dk_rate_hit(text, timestamptz) from public, anon, authenticated;
+grant execute on function public.dk_rate_hit(text, timestamptz) to service_role;
+notify pgrst, 'reload schema';

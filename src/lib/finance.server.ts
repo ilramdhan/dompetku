@@ -1904,6 +1904,9 @@ export async function exportBackup() {
     "invoices",
     "invoice_items",
     "invoice_payments",
+    "payment_methods",
+    "invoice_payment_methods",
+    "invoice_proofs",
   ] as const;
   const { stripSecrets } = await import("./backup");
   const data: Record<string, any[]> = {};
@@ -1912,6 +1915,7 @@ export async function exportBackup() {
     fx_rates: ["rate_date", "base", "quote"],
     gold_prices: ["price_date", "source"],
     account_permissions: ["user_id", "account_id"],
+    invoice_payment_methods: ["invoice_id", "method_id"],
   };
   const results = await Promise.all(
     tables.map((t) =>

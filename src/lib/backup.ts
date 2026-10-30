@@ -22,6 +22,10 @@ import { z } from "zod";
  * pockets (v19) sit between accounts and transactions (transactions.pocket_id → pockets);
  * pocket_alerts come last. Older backups without them restore unchanged (pocket_id stays null).
  * invoices (v21) reference accounts; invoice_items / invoice_payments (→ invoices, transactions) follow.
+ * v24: payment_methods (→ accounts) before invoice_payment_methods (→ invoices, payment_methods) and
+ * invoice_proofs (→ invoices, payment_methods, invoice_payments). Proof images stay in the private
+ * `receipts` storage bucket like receipt photos (only the path is backed up). rate_limits is never
+ * backed up (ephemeral counters).
  */
 export const RESTORE_TABLES = [
   "accounts",
@@ -48,6 +52,9 @@ export const RESTORE_TABLES = [
   "invoices",
   "invoice_items",
   "invoice_payments",
+  "payment_methods",
+  "invoice_payment_methods",
+  "invoice_proofs",
 ] as const;
 export type RestoreTable = (typeof RESTORE_TABLES)[number];
 
@@ -87,6 +94,9 @@ export const CONFLICT_KEYS: Record<RestoreTable, string[]> = {
   invoices: ["id"],
   invoice_items: ["id"],
   invoice_payments: ["id"],
+  payment_methods: ["id"],
+  invoice_payment_methods: ["invoice_id", "method_id"],
+  invoice_proofs: ["id"],
 };
 
 /**
@@ -119,6 +129,8 @@ export const FK_COLUMNS: Record<string, RestoreTable> = {
   user_id: "app_users",
   pocket_id: "pockets",
   invoice_id: "invoices",
+  method_id: "payment_methods",
+  payment_id: "invoice_payments",
 };
 
 /**
@@ -177,7 +189,7 @@ const backupSchema = z.object({
 export type ParsedBackup = {
   exportedAt: string | null;
   tables: { table: RestoreTable; rows: Row[] }[];
-  /** Tables in the file that are not restored (unknown, bot_drafts, activity_log, ai_usage, integration_settings, invoice_shares). */
+  /** Tables in the file that are not restored (unknown, bot_drafts, activity_log, ai_usage, integration_settings, invoice_shares, rate_limits). */
   ignored: string[];
   total: number;
 };
