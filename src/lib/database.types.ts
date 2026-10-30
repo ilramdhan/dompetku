@@ -1324,6 +1324,8 @@ export type Database = {
           note: string | null;
           transaction_id: string | null;
           created_at: string;
+          /** v25 (optional): refunded part of this payment. */
+          refunded?: number;
         };
         Insert: {
           id?: string;
@@ -1335,6 +1337,7 @@ export type Database = {
           note?: string | null;
           transaction_id?: string | null;
           created_at?: string;
+          refunded?: number;
         };
         Update: {
           id?: string;
@@ -1346,6 +1349,7 @@ export type Database = {
           note?: string | null;
           transaction_id?: string | null;
           created_at?: string;
+          refunded?: number;
         };
         Relationships: [
           {
@@ -1565,6 +1569,85 @@ export type Database = {
           },
           {
             foreignKeyName: "invoice_proofs_payment_id_fkey";
+            columns: ["payment_id"];
+            isOneToOne: false;
+            referencedRelation: "invoice_payments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** v25 (optional table): Midtrans orders of invoices (payment gateway, issue #97). */
+      gateway_transactions: {
+        Row: {
+          id: string;
+          invoice_id: string;
+          provider: string;
+          order_id: string;
+          gateway_tx_id: string | null;
+          status: "pending" | "success" | "failed" | "expired" | "refunded" | "partial_refund";
+          gross_amount: number;
+          refunded_amount: number;
+          payment_type: string | null;
+          payment_id: string | null;
+          snap_token: string | null;
+          redirect_url: string | null;
+          expires_at: string | null;
+          claimed_at: string | null;
+          last_error: string | null;
+          raw: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_id: string;
+          provider?: string;
+          order_id: string;
+          gateway_tx_id?: string | null;
+          status?: "pending" | "success" | "failed" | "expired" | "refunded" | "partial_refund";
+          gross_amount: number;
+          refunded_amount?: number;
+          payment_type?: string | null;
+          payment_id?: string | null;
+          snap_token?: string | null;
+          redirect_url?: string | null;
+          expires_at?: string | null;
+          claimed_at?: string | null;
+          last_error?: string | null;
+          raw?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          invoice_id?: string;
+          provider?: string;
+          order_id?: string;
+          gateway_tx_id?: string | null;
+          status?: "pending" | "success" | "failed" | "expired" | "refunded" | "partial_refund";
+          gross_amount?: number;
+          refunded_amount?: number;
+          payment_type?: string | null;
+          payment_id?: string | null;
+          snap_token?: string | null;
+          redirect_url?: string | null;
+          expires_at?: string | null;
+          claimed_at?: string | null;
+          last_error?: string | null;
+          raw?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "gateway_transactions_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "gateway_transactions_payment_id_fkey";
             columns: ["payment_id"];
             isOneToOne: false;
             referencedRelation: "invoice_payments";
