@@ -111,11 +111,6 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
   // v23 (#93): customer view by share token; returns only the toPublicInvoice() whitelist.
   // v24 (#94): proof upload by share token; demo-off, rate limited, answers only { ok }.
   "invoice-public.functions.ts": { getPublicInvoice: "public", submitInvoiceProof: "public" },
-  "invoice-report.functions.ts": {
-    getInvoiceReport: "admin",
-    getInvoicePayments: "admin",
-    getOpenInvoices: "admin",
-  },
   "pockets.functions.ts": {
     getAccountPockets: "member",
     getPocketOptions: "member",
