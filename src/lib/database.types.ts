@@ -1173,6 +1173,67 @@ export type Database = {
           },
         ];
       };
+      /** v22 (optional table): per-member Telegram notification target (reports & reminders). */
+      notify_recipients: {
+        Row: {
+          user_id: string;
+          chat_id: string;
+          enabled: boolean;
+          send_report: boolean;
+          send_reminders: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          chat_id: string;
+          enabled?: boolean;
+          send_report?: boolean;
+          send_reminders?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          chat_id?: string;
+          enabled?: boolean;
+          send_report?: boolean;
+          send_reminders?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notify_recipients_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "app_users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** v22 (optional table): optional wallet subset of a notification recipient. */
+      notify_recipient_wallets: {
+        Row: { user_id: string; account_id: string; created_at: string };
+        Insert: { user_id: string; account_id: string; created_at?: string };
+        Update: { user_id?: string; account_id?: string; created_at?: string };
+        Relationships: [
+          {
+            foreignKeyName: "notify_recipient_wallets_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "notify_recipients";
+            referencedColumns: ["user_id"];
+          },
+          {
+            foreignKeyName: "notify_recipient_wallets_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: false;
+            referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       account_balances: {

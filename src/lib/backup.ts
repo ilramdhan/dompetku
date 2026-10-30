@@ -19,6 +19,8 @@ import { z } from "zod";
  * rows have no password hash, so they cannot log in until the admin resets their password.
  * pockets (v19) sit between accounts and transactions (transactions.pocket_id → pockets);
  * pocket_alerts come last. Older backups without them restore unchanged (pocket_id stays null).
+ * notify_recipients / notify_recipient_wallets (v22, per-member Telegram notification chat ids —
+ * personal like the profile, not secrets) come after app_users and accounts.
  */
 export const RESTORE_TABLES = [
   "accounts",
@@ -42,6 +44,8 @@ export const RESTORE_TABLES = [
   "app_users",
   "account_permissions",
   "pocket_alerts",
+  "notify_recipients",
+  "notify_recipient_wallets",
 ] as const;
 export type RestoreTable = (typeof RESTORE_TABLES)[number];
 
@@ -78,6 +82,8 @@ export const CONFLICT_KEYS: Record<RestoreTable, string[]> = {
   account_permissions: ["user_id", "account_id"],
   pockets: ["id"],
   pocket_alerts: ["id"],
+  notify_recipients: ["user_id"],
+  notify_recipient_wallets: ["user_id", "account_id"],
 };
 
 /**
