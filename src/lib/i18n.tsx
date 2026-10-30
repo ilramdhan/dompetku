@@ -902,8 +902,12 @@ const DICT: Record<string, string> = {
     "AI provider (OpenAI-compatible API) — receives receipt photos or transaction text to read, along with your category names.",
   "Telegram dan n8n — meneruskan pesan bot, ringkasan, dan pengingat antara Anda dan aplikasi.":
     "Telegram and n8n — relay bot messages, summaries and reminders between you and the app.",
-  "Resend — mengirim email pengingat ke alamat yang diatur pemilik instance.":
-    "Resend — sends reminder emails to the address set by the instance owner.",
+  "Resend — mengirim email pengingat ke alamat yang diatur pemilik instance, serta email invoice, konfirmasi pembayaran, dan pengingat jatuh tempo ke email pelanggan invoice.":
+    "Resend — sends reminder emails to the address set by the instance owner, plus invoices, payment confirmations and due-date reminders to invoice customers' email.",
+  "Midtrans (payment gateway) — bila pembayaran online diaktifkan, menerima nomor invoice, jumlah tagihan, serta nama, email, dan telepon pelanggan untuk memproses pembayaran. Data kartu atau e-wallet diisi langsung di halaman Midtrans dan tidak pernah melewati aplikasi ini.":
+    "Midtrans (payment gateway) — when online payment is enabled, receives the invoice number, amount due and the customer's name, email and phone to process the payment. Card or e-wallet details are entered on Midtrans' own page and never pass through this app.",
+  "Bila fitur invoice dipakai, data pelanggan yang diisi pemilik instance (nama, email, telepon) dan bukti transfer yang diunggah pelanggan juga disimpan di sana. Untuk membatasi penyalahgunaan unggahan, alamat IP pengunggah hanya disimpan dalam bentuk hash.":
+    "When invoices are used, the customer details the owner enters (name, email, phone) and transfer proofs uploaded by customers are stored there too. To limit upload abuse, the uploader's IP address is stored only as a hash.",
   "Sentry — menerima laporan error teknis (pesan error dan konteks permintaan), bukan isi data keuangan Anda.":
     "Sentry — receives technical error reports (error message and request context), not your financial records.",
   "Google Drive — menyimpan file backup bila backup terjadwal diaktifkan.":
@@ -926,8 +930,8 @@ const DICT: Record<string, string> = {
   "Tanggung jawab Anda": "Your responsibilities",
   "Pemilik instance bertanggung jawab atas deployment, keamanan server, kunci API, kata sandi, dan backup-nya sendiri.":
     "The instance owner is responsible for their own deployment, server security, API keys, passwords and backups.",
-  "Pemilik instance wajib mematuhi ketentuan layanan pihak ketiga yang dipakai (Supabase, Vercel, penyedia AI, Telegram, dan lainnya).":
-    "The instance owner must follow the terms of the third-party services they use (Supabase, Vercel, AI providers, Telegram and others).",
+  "Pemilik instance wajib mematuhi ketentuan layanan pihak ketiga yang dipakai (Supabase, Vercel, penyedia AI, Telegram, Midtrans, dan lainnya).":
+    "The instance owner must follow the terms of the third-party services they use (Supabase, Vercel, AI providers, Telegram, Midtrans and others).",
   "Penggunaan yang wajar": "Acceptable use",
   "Jangan memakai aplikasi ini untuk aktivitas yang melanggar hukum, untuk mengakses data orang lain tanpa izin, atau untuk mengganggu layanan pihak ketiga yang terhubung.":
     "Do not use the app for unlawful activity, to access other people's data without permission, or to disrupt the connected third-party services.",
@@ -1527,6 +1531,92 @@ const DICT: Record<string, string> = {
     "What data this Dompetku instance stores, where it is stored, and which third-party services may be used.",
   "Ketentuan penggunaan Dompetku: lisensi MIT, tanpa jaminan, bukan nasihat keuangan.":
     "Terms of use for Dompetku: MIT license, no warranty, not financial advice.",
+  // v25 payment gateway (#97)
+  "Aktifkan Midtrans": "Enable Midtrans",
+  'true = tombol "Bayar sekarang" di halaman invoice publik (butuh skema v25 dan server key).':
+    'true = "Pay now" button on the public invoice page (needs schema v25 and a server key).',
+  "Isi true atau false": "Enter true or false",
+  "Server key Midtrans": "Midtrans server key",
+  "Dashboard Midtrans → Settings → Access Keys. Sandbox diawali SB-Mid-server-. Tidak pernah dikirim ke browser.":
+    "Midtrans dashboard → Settings → Access Keys. Sandbox keys start with SB-Mid-server-. Never sent to the browser.",
+  "Format key Midtrans tidak valid": "Invalid Midtrans key format",
+  "Client key Midtrans": "Midtrans client key",
+  "Publik, dipakai Snap JS di browser pelanggan.":
+    "Public, used by Snap JS in the customer's browser.",
+  "Mode production Midtrans": "Midtrans production mode",
+  "false = sandbox (uji coba, default). true = transaksi uang sungguhan; pakai key production.":
+    "false = sandbox (testing, default). true = real money; use production keys.",
+  "Payment gateway (Midtrans)": "Payment gateway (Midtrans)",
+  "Butuh skema v25. Pasang Payment Notification URL di dashboard Midtrans ke":
+    "Needs schema v25. Set the Payment Notification URL in the Midtrans dashboard to",
+  "Mulai dengan sandbox. Panduan: docs/PAYMENT-GATEWAY.md.":
+    "Start with sandbox. Guide: docs/PAYMENT-GATEWAY.md.",
+  "Bayar online": "Pay online",
+  "Kartu, e-wallet, QRIS, atau virtual account lewat Midtrans.":
+    "Card, e-wallet, QRIS or virtual account via Midtrans.",
+  "Bayar sekarang": "Pay now",
+  "Pembayaran sedang diproses. Status invoice diperbarui otomatis setelah Midtrans mengonfirmasi.":
+    "Payment is being processed. The invoice status updates automatically once Midtrans confirms it.",
+  "Muat ulang": "Reload",
+  "Pembayaran online tidak tersedia untuk invoice ini.":
+    "Online payment is not available for this invoice.",
+  "Terlalu banyak percobaan, coba lagi nanti.": "Too many attempts, try again later.",
+  "Pembayaran online gagal dibuat, coba lagi.": "Could not start the online payment, try again.",
+  "Transaksi Midtrans": "Midtrans transactions",
+  "Menunggu pembayaran": "Awaiting payment",
+  Berhasil: "Succeeded",
+  Gagal: "Failed",
+  "Lewat batas waktu": "Expired",
+  Dikembalikan: "Refunded",
+  "Dikembalikan sebagian": "Partially refunded",
+  "Cek status": "Check status",
+  "Status diperbarui": "Status updated",
+  Refund: "Refund",
+  refund: "refund",
+  "Refund Midtrans": "Midtrans refund",
+  "Sisa yang bisa dikembalikan": "Refundable remainder",
+  "Alasan (opsional)": "Reason (optional)",
+  "Jumlah refund tidak valid": "Invalid refund amount",
+  "Kirim refund ke Midtrans?": "Send the refund to Midtrans?",
+  "Dana dikembalikan ke pelanggan dan tidak bisa dibatalkan. Pengeluaran pembalik dicatat di kategori Invoice.":
+    "The money goes back to the customer and cannot be undone. A reversing expense is recorded in the Invoice category.",
+  "Refund dikirim": "Refund sent",
+  "Metode ini hanya mendukung refund penuh": "This method only supports full refunds",
+  "Hanya pembayaran berhasil yang bisa dikembalikan": "Only successful payments can be refunded",
+  "Pembayaran belum settlement; coba lagi nanti": "Payment is not settled yet; try again later",
+  "Metode ini tidak bisa direfund lewat Midtrans (mis. transfer bank/VA); kembalikan dana secara manual":
+    "This method cannot be refunded through Midtrans (e.g. bank transfer/VA); return the money manually",
+  "Jumlah refund harus bilangan bulat": "Refund amount must be a whole number",
+  "Jumlah melebihi sisa yang bisa dikembalikan": "Amount exceeds the refundable remainder",
+  "Jumlah dari Midtrans tidak cocok dengan pesanan":
+    "Amount from Midtrans does not match the order",
+  "Payment gateway belum aktif: jalankan bagian v25 di supabase/schema.sql.":
+    "Payment gateway is not active: run section v25 in supabase/schema.sql.",
+  "Midtrans belum diaktifkan di Pengaturan → Integrasi":
+    "Midtrans is not enabled in Settings → Integrations",
+  "Transaksi tidak ditemukan di Midtrans": "Transaction not found at Midtrans",
+  "Pembayaran belum tercatat; cek status dulu": "Payment not recorded yet; check the status first",
+  "Transaksi gateway tidak ditemukan": "Gateway transaction not found",
+  "Invoice punya transaksi Midtrans yang tertunda atau berhasil; tidak bisa dihapus (batalkan saja)":
+    "This invoice has a pending or successful Midtrans transaction and cannot be deleted (cancel it instead)",
+  "Pembayaran dari Midtrans tidak bisa dihapus; gunakan refund":
+    "Midtrans payments cannot be deleted; use a refund",
+  "Pembayaran Midtrans dibuat": "Midtrans payment created",
+  "Pembayaran Midtrans diterima": "Midtrans payment received",
+  "Refund Midtrans dicatat": "Midtrans refund recorded",
+  "Key Midtrans tidak cocok dengan mode: key sandbox diawali SB- dan hanya untuk MIDTRANS_PRODUCTION=false. Gateway nonaktif sampai key dan mode cocok.":
+    "Midtrans key does not match the mode: sandbox keys start with SB- and only work with MIDTRANS_PRODUCTION=false. The gateway stays off until key and mode match.",
+  "Refund dengan kunci ini sudah ada dengan jumlah berbeda; cek status lalu coba lagi":
+    "A refund with this key already exists with a different amount; check the status and try again",
+  "Chargeback dari Midtrans, cek manual": "Chargeback from Midtrans, check manually",
+  "Tagih ulang invoice ini?": "Bill this invoice again?",
+  "Tombol Bayar sekarang dan pengingat jatuh tempo aktif lagi untuk sisa tagihan. Pilih Batalkan invoice bila pelanggan tidak perlu membayar lagi.":
+    "The Pay now button and due reminders come back for the amount due. Cancel the invoice instead if the customer does not need to pay again.",
+  "Tagih ulang": "Bill again",
+  "Invoice ditagih ulang": "Invoice billed again",
+  "Ada refund Midtrans: tombol Bayar sekarang dan pengingat jatuh tempo dihentikan. Batalkan invoice bila tidak ditagih lagi, atau tagih ulang sisanya.":
+    "There is a Midtrans refund: the Pay now button and due reminders are paused. Cancel the invoice if it will not be billed again, or bill the remainder again.",
+  "Invoice ditagih ulang setelah refund": "Invoice billed again after a refund",
 };
 
 const LangContext = createContext<{

@@ -28,6 +28,18 @@ export const PROOF_RATE_RULES = {
   ],
 } as const satisfies Record<string, readonly RateRule[]>;
 
+/**
+ * v25 (#97) "Bayar sekarang": creating a Midtrans order per share token and per IP. Pending orders
+ * are reused, so legitimate customers need only a few hits.
+ */
+export const GATEWAY_RATE_RULES = {
+  token: [{ name: "pay:token", limit: 20, windowMs: HOUR }],
+  ip: [
+    { name: "pay:ip", limit: 20, windowMs: HOUR },
+    { name: "pay:ip:day", limit: 60, windowMs: 24 * HOUR },
+  ],
+} as const satisfies Record<string, readonly RateRule[]>;
+
 /** Start of the fixed window containing `nowMs` (ISO string, aligned to the epoch). */
 export function windowStart(nowMs: number, windowMs: number): string {
   const w = Math.max(1000, Math.floor(windowMs));

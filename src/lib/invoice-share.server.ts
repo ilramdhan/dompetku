@@ -159,7 +159,8 @@ export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoiceV
         .select("description, qty, unit_price, position")
         .eq("invoice_id", id)
         .order("position"),
-      db().from("invoice_payments").select("paid_at, amount").eq("invoice_id", id).order("paid_at"),
+      // "*" so v25 `refunded` is netted out (works before v25 too); only paid_at/amount leave.
+      db().from("invoice_payments").select("*").eq("invoice_id", id).order("paid_at"),
       fin(),
       import("./invoice-payments.server"),
       import("./demo.server"),
@@ -173,7 +174,12 @@ export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoiceV
       f.today(),
       payment.pending,
     );
-    return pub ? { ...pub, payment } : null;
+    if (!pub) return null;
+    // v25: Midtrans "Bayar sekarang" (false before v25, unconfigured, in demo or when not open).
+    const gw = await (
+      await import("./gateway/payments.server")
+    ).publicGatewayFor(id, inv.data.status, pub.remaining, demo.isDemo());
+    return { ...pub, payment: { ...payment, gateway: gw.available } };
   } catch (e) {
     try {
       (await import("./monitoring.server")).logError("public:invoice", e);

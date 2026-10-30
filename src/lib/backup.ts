@@ -28,6 +28,11 @@ import { z } from "zod";
  * invoice_proofs (→ invoices, payment_methods, invoice_payments). Proof images stay in the private
  * `receipts` storage bucket like receipt photos (only the path is backed up). rate_limits is never
  * backed up (ephemeral counters).
+ * v25: gateway_transactions (→ invoices, invoice_payments) IS backed up: it is payment history
+ * (order ids, Midtrans transaction ids, refunds) that explains booked income/refund transactions.
+ * Its snap_token / redirect_url (live payment-page credentials, 24 h) are SECRET_COLUMNS: stripped
+ * on export and restore. invoice_payments.refunded (v25) travels with its row; older instances drop
+ * the unknown column on restore (missing-column retry).
  */
 export const RESTORE_TABLES = [
   "accounts",
@@ -59,6 +64,7 @@ export const RESTORE_TABLES = [
   "payment_methods",
   "invoice_payment_methods",
   "invoice_proofs",
+  "gateway_transactions",
 ] as const;
 export type RestoreTable = (typeof RESTORE_TABLES)[number];
 
@@ -103,6 +109,7 @@ export const CONFLICT_KEYS: Record<RestoreTable, string[]> = {
   payment_methods: ["id"],
   invoice_payment_methods: ["invoice_id", "method_id"],
   invoice_proofs: ["id"],
+  gateway_transactions: ["id"],
 };
 
 /**
@@ -120,6 +127,7 @@ export const NATURAL_KEYS: Partial<Record<RestoreTable, string[]>> = {
   pockets: ["account_id", "name"],
   pocket_alerts: ["pocket_id", "period", "level"],
   invoices: ["number"],
+  gateway_transactions: ["order_id"],
 };
 
 /** FK column → referenced table, used to rewrite ids remapped by natural keys. */
@@ -153,6 +161,7 @@ export const GENERATED_COLUMNS: Partial<Record<RestoreTable, string[]>> = {
  */
 export const SECRET_COLUMNS: Partial<Record<RestoreTable, string[]>> = {
   app_users: ["password_hash", "session_version"],
+  gateway_transactions: ["snap_token", "redirect_url"],
 };
 
 /** Tables whose rows are kept in "replace" mode (deleting them would reset the password to env). */

@@ -262,7 +262,15 @@ export async function pendingDueMails(
   }
   const mails: DueMail[] = [];
   const skipped: Skipped[] = [];
+  // v25: invoices on refund hold (customer was just refunded) get no reminders until re-billed.
+  const held = await (
+    await import("./gateway/payments.server")
+  ).refundHeldInvoices(((res.data ?? []) as { id: string }[]).map((r) => r.id));
   for (const row of (res.data ?? []) as unknown as InvoiceRow[]) {
+    if (held.has(row.id)) {
+      skipped.push({ number: row.number, reason: "refunded" });
+      continue;
+    }
     const inv = { ...row, total: Number(row.total), paid: Number(row.paid) };
     const remaining = Math.max(0, inv.total - inv.paid);
     const kind = reminderStage({ ...inv, remaining }, today, lead);

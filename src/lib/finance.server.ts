@@ -1921,6 +1921,7 @@ export async function exportBackup() {
     "payment_methods",
     "invoice_payment_methods",
     "invoice_proofs",
+    "gateway_transactions",
   ] as const;
   const { stripSecrets } = await import("./backup");
   const data: Record<string, any[]> = {};

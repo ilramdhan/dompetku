@@ -98,6 +98,11 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     getProofUrlFn: "admin",
     approveProofFn: "admin",
     rejectProofFn: "admin",
+    // v25 (#97): Midtrans orders, status re-check and refunds.
+    getGatewayTransactionsFn: "admin",
+    syncGatewayFn: "admin",
+    refundGatewayFn: "admin",
+    releaseRefundHoldFn: "admin",
   },
   "invoice-report.functions.ts": {
     getInvoiceReport: "admin",
@@ -111,7 +116,13 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
   },
   // v23 (#93): customer view by share token; returns only the toPublicInvoice() whitelist.
   // v24 (#94): proof upload by share token; demo-off, rate limited, answers only { ok }.
-  "invoice-public.functions.ts": { getPublicInvoice: "public", submitInvoiceProof: "public" },
+  // v25 (#97): "Bayar sekarang" by share token; demo-off, rate limited, server-computed amount,
+  // answers only the Snap token/redirect URL + public client key.
+  "invoice-public.functions.ts": {
+    getPublicInvoice: "public",
+    submitInvoiceProof: "public",
+    createGatewayPayment: "public",
+  },
   "pockets.functions.ts": {
     getAccountPockets: "member",
     getPocketOptions: "member",

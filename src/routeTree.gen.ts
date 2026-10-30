@@ -50,6 +50,7 @@ import { Route as ApiPublicN8nRemindersSendEmailRouteImport } from './routes/api
 import { Route as ApiPublicN8nReportRouteImport } from './routes/api/public/n8n/report'
 import { Route as ApiPublicN8nSummaryRouteImport } from './routes/api/public/n8n/summary'
 import { Route as ApiPublicN8nTransactionsRouteImport } from './routes/api/public/n8n/transactions'
+import { Route as ApiPublicPaymentsMidtransRouteImport } from './routes/api/public/payments/midtrans'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -261,6 +262,12 @@ const ApiPublicN8nTransactionsRoute =
     path: '/api/public/n8n/transactions',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPaymentsMidtransRoute =
+  ApiPublicPaymentsMidtransRouteImport.update({
+    id: '/api/public/payments/midtrans',
+    path: '/api/public/payments/midtrans',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicTelegramWebhookRoute =
   ApiPublicTelegramWebhookRouteImport.update({
     id: '/api/public/telegram/webhook',
@@ -309,6 +316,7 @@ export interface FileRoutesByFullPath {
   '/api/public/n8n/report': typeof ApiPublicN8nReportRoute
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
+  '/api/public/payments/midtrans': typeof ApiPublicPaymentsMidtransRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -352,6 +360,7 @@ export interface FileRoutesByTo {
   '/api/public/n8n/report': typeof ApiPublicN8nReportRoute
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
+  '/api/public/payments/midtrans': typeof ApiPublicPaymentsMidtransRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesById {
@@ -397,6 +406,7 @@ export interface FileRoutesById {
   '/api/public/n8n/report': typeof ApiPublicN8nReportRoute
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
+  '/api/public/payments/midtrans': typeof ApiPublicPaymentsMidtransRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRouteTypes {
@@ -442,6 +452,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/report'
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
+    | '/api/public/payments/midtrans'
     | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -485,6 +496,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/report'
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
+    | '/api/public/payments/midtrans'
     | '/api/public/telegram/webhook'
   id:
     | '__root__'
@@ -529,6 +541,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/report'
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
+    | '/api/public/payments/midtrans'
     | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -556,6 +569,7 @@ export interface RootRouteChildren {
   ApiPublicN8nReportRoute: typeof ApiPublicN8nReportRoute
   ApiPublicN8nSummaryRoute: typeof ApiPublicN8nSummaryRoute
   ApiPublicN8nTransactionsRoute: typeof ApiPublicN8nTransactionsRoute
+  ApiPublicPaymentsMidtransRoute: typeof ApiPublicPaymentsMidtransRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
 
@@ -848,6 +862,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicN8nTransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/midtrans': {
+      id: '/api/public/payments/midtrans'
+      path: '/api/public/payments/midtrans'
+      fullPath: '/api/public/payments/midtrans'
+      preLoaderRoute: typeof ApiPublicPaymentsMidtransRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/telegram/webhook': {
       id: '/api/public/telegram/webhook'
       path: '/api/public/telegram/webhook'
@@ -926,6 +947,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicN8nReportRoute: ApiPublicN8nReportRoute,
   ApiPublicN8nSummaryRoute: ApiPublicN8nSummaryRoute,
   ApiPublicN8nTransactionsRoute: ApiPublicN8nTransactionsRoute,
+  ApiPublicPaymentsMidtransRoute: ApiPublicPaymentsMidtransRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport

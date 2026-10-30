@@ -342,6 +342,7 @@ export async function invoiceAction(inv: InvoiceRow, action: InvoiceAction) {
     .maybeSingle();
   if (res.error) throw new Error(res.error.message);
   if (!res.data) throw new Error("Invoice berubah, muat ulang halaman");
+  await retireGatewayOrders(num(res.data));
   await (
     await fin()
   ).logActivity("invoices.update", "invoices", {
@@ -361,6 +362,8 @@ export async function deleteInvoice(inv: InvoiceRow) {
   if (pays.error) throw new Error(pays.error.message);
   const txIds = (pays.data ?? []).map((p) => p.transaction_id).filter((x): x is string => !!x);
   const extIds = (pays.data ?? []).map((p) => paymentExternalId(p.id));
+  // v25: refuse while a Midtrans order is pending/paid (history must not vanish); drop dead ones.
+  await (await import("./gateway/payments.server")).releaseInvoiceGateway(inv.id);
   // v24: proof images live in Storage; the rows go with the invoice (cascade).
   await (await import("./invoice-payments.server")).removeInvoiceProofFiles(inv.id);
   const del = await db().from("invoices").delete().eq("id", inv.id);
@@ -398,7 +401,8 @@ async function removePaymentTransactions(txIds: readonly string[], extIds: reado
 export async function syncInvoice(id: string): Promise<InvoiceRow> {
   const inv = await loadInvoice(id);
   if (!inv) throw new Error("Invoice tidak ditemukan");
-  const pays = await db().from("invoice_payments").select("amount").eq("invoice_id", id);
+  // "*" so v25 `refunded` is included when present (paid = amount − refunded).
+  const pays = await db().from("invoice_payments").select("*").eq("invoice_id", id);
   if (pays.error) throw new Error(pays.error.message);
   const paid = paidSum(pays.data ?? []);
   const status = derivedStatus(inv.status, inv.total, paid);
@@ -410,7 +414,22 @@ export async function syncInvoice(id: string): Promise<InvoiceRow> {
     .select()
     .single();
   if (res.error) throw new Error(res.error.message);
-  return num(res.data);
+  const out = num(res.data);
+  await retireGatewayOrders(out);
+  return out;
+}
+
+/**
+ * v25: once the remaining amount or status changes, pending Midtrans orders for another amount (or
+ * for an invoice that is no longer open) are expired so the customer cannot overpay. Never throws.
+ */
+async function retireGatewayOrders(inv: InvoiceRow) {
+  const open = inv.status === "unpaid" || inv.status === "partial";
+  const { gatewayAmount } = await import("./gateway/types");
+  const { retirePendingOrders } = await import("./gateway/payments.server");
+  await retirePendingOrders(inv.id, {
+    amount: open ? (gatewayAmount(remainingOf(inv.total, inv.paid)) ?? -1) : -1,
+  });
 }
 
 /**
@@ -446,7 +465,7 @@ export async function bookPayment(
   if (ins.error) throw new Error(ins.error.message);
   const pay = ins.data;
   // Re-check against concurrent payments; roll back this one when it overshoots.
-  const after = await db().from("invoice_payments").select("amount").eq("invoice_id", inv.id);
+  const after = await db().from("invoice_payments").select("*").eq("invoice_id", inv.id);
   if (!after.error && paidSum(after.data ?? []) > inv.total + 0.005) {
     await db().from("invoice_payments").delete().eq("id", pay.id);
     throw new Error("Pembayaran melebihi sisa tagihan");
