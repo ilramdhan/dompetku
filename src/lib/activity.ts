@@ -56,6 +56,8 @@ const SPECIAL: Record<string, string> = {
   "user.delete": "Anggota dihapus",
   "user.password_reset": "Password anggota direset",
   "permission.update": "Akses dompet diubah",
+  "invoice_shares.create": "Tautan publik invoice dibuat",
+  "invoice_shares.delete": "Tautan publik invoice dicabut",
 };
 
 export function activityLabel(action: string, t: (s: string) => string = (s) => s): string {

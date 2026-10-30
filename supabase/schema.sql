@@ -685,3 +685,22 @@ revoke all on public.invoice_payments from anon, authenticated;
 grant all on public.invoice_payments to service_role;
 alter table public.invoice_payments enable row level security;
 notify pgrst, 'reload schema';
+
+-- ============ v23: tautan publik invoice bertoken — lihat & cetak/simpan PDF oleh pelanggan (aman dijalankan ulang) ============
+-- Opsional, butuh v21. (v22 dipakai bagian lain.) Tanpa bagian ini tombol "Bagikan" hanya menampilkan petunjuk
+-- dan tautan /i/<token> selalu "tidak ditemukan".
+-- Satu tautan per invoice. Token acak 256-bit (base64url) hanya ditampilkan sekali ke admin; yang disimpan
+-- hanya hash SHA-256 (hex) di token_hash. Buat ulang = hash baru (tautan lama mati), cabut = revoked_at.
+-- Tautan hanya berlaku untuk invoice berstatus unpaid/partial/paid, belum dicabut dan belum kedaluwarsa;
+-- selain itu pengunjung selalu mendapat 404 yang sama. Tabel ini tidak ikut dicadangkan (seperti kunci API).
+create table if not exists public.invoice_shares (
+  invoice_id uuid primary key references public.invoices(id) on delete cascade,
+  token_hash text not null unique check (token_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now(),
+  expires_at timestamptz,
+  revoked_at timestamptz
+);
+revoke all on public.invoice_shares from anon, authenticated;
+grant all on public.invoice_shares to service_role;
+alter table public.invoice_shares enable row level security;
+notify pgrst, 'reload schema';

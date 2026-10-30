@@ -16,6 +16,8 @@ export const LANG_STORAGE_KEY = "dk-lang";
 
 /** Pages that honour `?lang=` (and get hreflang alternates). */
 export const LANG_PATHS = ["/", "/privacy", "/terms"] as const;
+/** Path prefixes that honour `?lang=` without being indexable (public invoice links, #93). */
+export const LANG_PREFIXES = ["/i/"] as const;
 
 /** "en"/"id" (any case, surrounding spaces ignored) → Lang; anything else → undefined. */
 export function parseLang(v: unknown): Lang | undefined {
@@ -40,7 +42,11 @@ function cleanPath(pathname: string): string {
 
 /** True for public pages where `?lang=` is honoured. */
 export function isLangPath(pathname: string): boolean {
-  return (LANG_PATHS as ReadonlyArray<string>).includes(cleanPath(pathname));
+  const p = cleanPath(pathname);
+  return (
+    (LANG_PATHS as ReadonlyArray<string>).includes(p) ||
+    LANG_PREFIXES.some((pre) => p.startsWith(pre) && p.length > pre.length)
+  );
 }
 
 /** The language requested by the URL, only on public pages (the app ignores `?lang=`). */

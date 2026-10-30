@@ -1240,6 +1240,39 @@ export type Database = {
           },
         ];
       };
+      /** v23 (optional table): public invoice link — SHA-256 hash of the token only, never backed up. */
+      invoice_shares: {
+        Row: {
+          invoice_id: string;
+          token_hash: string;
+          created_at: string;
+          expires_at: string | null;
+          revoked_at: string | null;
+        };
+        Insert: {
+          invoice_id: string;
+          token_hash: string;
+          created_at?: string;
+          expires_at?: string | null;
+          revoked_at?: string | null;
+        };
+        Update: {
+          invoice_id?: string;
+          token_hash?: string;
+          created_at?: string;
+          expires_at?: string | null;
+          revoked_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invoice_shares_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: true;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       /** v21 (optional table): invoice line items. */
       invoice_items: {
         Row: {

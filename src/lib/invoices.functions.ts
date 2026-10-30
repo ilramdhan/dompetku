@@ -160,3 +160,47 @@ export const deleteInvoicePaymentFn = createServerFn({ method: "POST" })
     const { inv } = await manageable(context, pay.invoice_id);
     return (await s.deletePayment(inv, pay)) as any;
   });
+
+/* ---------------- v23 public link (issue #93) ---------------- */
+
+/** Link status (active/expired/revoked/none); the raw token is never readable again. */
+export const getInvoiceShareFn = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ id }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { inv } = await manageable(context, data.id);
+    const share = await import("./invoice-share.server");
+    return share.shareStatus(inv.id);
+  });
+
+/**
+ * Creates or rotates the public link and returns the raw token once. Demo: capped by row count
+ * and every link expires within DEMO_SHARE_MAX_DAYS (see invoice-share.ts).
+ */
+export const createInvoiceShareFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        id,
+        expires_days: z.number().int().min(0).max(3650).nullable().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { inv } = await manageable(context, data.id);
+    const demo = await import("./demo.server");
+    await demo.assertDemoCapacity("invoice_shares");
+    const share = await import("./invoice-share.server");
+    return share.createShare(inv, data.expires_days ?? null, demo.isDemo());
+  });
+
+/** Revokes the public link (the page then answers 404). */
+export const revokeInvoiceShareFn = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => z.object({ id }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { inv } = await manageable(context, data.id);
+    const share = await import("./invoice-share.server");
+    return share.revokeShare(inv);
+  });

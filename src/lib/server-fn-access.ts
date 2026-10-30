@@ -86,7 +86,12 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     deleteInvoiceFn: "admin",
     recordInvoicePaymentFn: "admin",
     deleteInvoicePaymentFn: "admin",
+    getInvoiceShareFn: "admin",
+    createInvoiceShareFn: "admin",
+    revokeInvoiceShareFn: "admin",
   },
+  // v23 (#93): customer view by share token; returns only the toPublicInvoice() whitelist.
+  "invoice-public.functions.ts": { getPublicInvoice: "public" },
   "invoice-report.functions.ts": {
     getInvoiceReport: "admin",
     getInvoicePayments: "admin",
