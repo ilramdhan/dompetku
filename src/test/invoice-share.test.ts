@@ -190,7 +190,10 @@ describe("wiring", () => {
     expect((RESTORE_TABLES as readonly string[]).includes("invoice_shares")).toBe(false);
   });
   it("classifies the public fn as public and admin fns as admin", () => {
-    expect(SERVER_FN_ACCESS["invoice-public.functions.ts"]).toEqual({ getPublicInvoice: "public" });
+    expect(SERVER_FN_ACCESS["invoice-public.functions.ts"]).toEqual({
+      getPublicInvoice: "public",
+      submitInvoiceProof: "public",
+    });
     const inv = SERVER_FN_ACCESS["invoices.functions.ts"]!;
     expect(inv["createInvoiceShareFn"]).toBe("admin");
     expect(inv["revokeInvoiceShareFn"]).toBe("admin");

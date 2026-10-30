@@ -4,7 +4,7 @@ import { AppLogo, useBranding } from "@/components/app-logo";
 import { InvoicePaymentInstructions } from "@/components/invoice/payment-instructions";
 import { Button } from "@/components/ui/button";
 import { getPublicInvoice } from "@/lib/invoice-public.functions";
-import type { PublicInvoice } from "@/lib/invoice-share";
+import type { PublicInvoiceView } from "@/lib/invoice-share";
 import { STATUS_LABEL, type DisplayStatus } from "@/lib/invoices";
 import { dateLabel } from "@/lib/dates";
 import { money } from "@/lib/format";
@@ -54,13 +54,15 @@ const STATUS_CLASS: Record<DisplayStatus, string> = {
   paid: "bg-income/15 text-income",
   cancelled: "bg-muted text-muted-foreground",
   overdue: "bg-expense/15 text-expense",
+  verifying: "bg-primary/15 text-primary",
 };
 
 /** Customer document: never masked by the viewer's privacy mode. */
 const amount = (v: number, cur: string) => money(v, cur, { reveal: true });
 
 function PublicInvoicePage() {
-  const inv = Route.useLoaderData() as PublicInvoice;
+  const inv = Route.useLoaderData() as PublicInvoiceView;
+  const { token } = Route.useParams();
   const { t, lang } = useI18n();
   const b = useBranding();
   const router = useRouter();
@@ -191,7 +193,7 @@ function PublicInvoicePage() {
           </dl>
         </div>
 
-        {open ? <InvoicePaymentInstructions invoice={inv} /> : null}
+        {open ? <InvoicePaymentInstructions invoice={inv} token={token} /> : null}
 
         {inv.payments.length ? (
           <section className="mt-8" aria-labelledby="invoice-payments">

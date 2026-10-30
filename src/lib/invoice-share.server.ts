@@ -21,7 +21,7 @@ import {
   shareState,
   toBase64Url,
   toPublicInvoice,
-  type PublicInvoice,
+  type PublicInvoiceView,
   type ShareState,
 } from "./invoice-share";
 import type { InvoiceRow } from "./invoices.server";
@@ -122,28 +122,38 @@ export async function revokeShare(inv: InvoiceRow) {
 }
 
 /**
- * The customer view of the invoice behind `token`, or null (uniform "not found") for every
- * failure. Selects only the columns the public payload needs.
+ * Invoice id behind an active (not revoked/expired) share token, or null. Used by the public page
+ * and the v24 proof upload; every failure is null.
  */
-export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoice | null> {
+export async function activeShareInvoiceId(raw: unknown): Promise<string | null> {
   const token = normalizeShareToken(raw);
   if (!token) return null;
+  const share = await db()
+    .from("invoice_shares")
+    .select("invoice_id, created_at, expires_at, revoked_at")
+    .eq("token_hash", hashShareToken(token))
+    .maybeSingle();
+  if (share.error || !share.data) return null;
+  if (shareState(share.data, new Date()) !== "active") return null;
+  return share.data.invoice_id;
+}
+
+/**
+ * The customer view of the invoice behind `token`, or null (uniform "not found") for every
+ * failure. Selects only the columns the public payload needs. The v24 payment block degrades to
+ * "no methods, no upload" when v24 is missing.
+ */
+export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoiceView | null> {
   try {
-    const share = await db()
-      .from("invoice_shares")
-      .select("invoice_id, created_at, expires_at, revoked_at")
-      .eq("token_hash", hashShareToken(token))
-      .maybeSingle();
-    if (share.error || !share.data) return null;
-    if (shareState(share.data, new Date()) !== "active") return null;
-    const id = share.data.invoice_id;
+    const id = await activeShareInvoiceId(raw);
+    if (!id) return null;
     const inv = await db()
       .from("invoices")
       .select("number, issue_date, due_date, customer_name, currency, status, total, paid")
       .eq("id", id)
       .maybeSingle();
     if (inv.error || !inv.data || !isPublicStatus(inv.data.status)) return null;
-    const [items, pays, f] = await Promise.all([
+    const [items, pays, f, pm, demo] = await Promise.all([
       db()
         .from("invoice_items")
         .select("description, qty, unit_price, position")
@@ -151,9 +161,19 @@ export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoice 
         .order("position"),
       db().from("invoice_payments").select("paid_at, amount").eq("invoice_id", id).order("paid_at"),
       fin(),
+      import("./invoice-payments.server"),
+      import("./demo.server"),
     ]);
     if (items.error || pays.error) return null;
-    return toPublicInvoice(inv.data, items.data ?? [], pays.data ?? [], f.today());
+    const payment = await pm.publicPaymentFor(id, inv.data.status, demo.isDemo());
+    const pub = toPublicInvoice(
+      inv.data,
+      items.data ?? [],
+      pays.data ?? [],
+      f.today(),
+      payment.pending,
+    );
+    return pub ? { ...pub, payment } : null;
   } catch (e) {
     try {
       (await import("./monitoring.server")).logError("public:invoice", e);

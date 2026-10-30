@@ -27,7 +27,13 @@ import { getRecurring } from "./recurring.functions";
 import { getAccountReport, getReconcileTransactions } from "./account-report.functions";
 import { getProfile } from "./profile.functions";
 import { getAccountPockets, getPocketOptions, getPocketWarnings } from "./pockets.functions";
-import { getInvoiceFn, getInvoiceShareFn, getInvoices } from "./invoices.functions";
+import {
+  getInvoiceFn,
+  getInvoiceProofsFn,
+  getInvoiceShareFn,
+  getInvoices,
+  getPaymentMethodsFn,
+} from "./invoices.functions";
 import { getInvoicePayments, getInvoiceReport, getOpenInvoices } from "./invoice-report.functions";
 import type { PaymentSort } from "./invoice-report";
 import type { InvoiceFilter, InvoiceSort } from "./invoices";
@@ -241,6 +247,21 @@ export const openInvoicesQuery = () =>
     queryFn: () => getOpenInvoices(),
     staleTime: FRESH,
   });
+/** v24 payment methods (Settings card + invoice form). */
+export const paymentMethodsQuery = () =>
+  queryOptions({
+    queryKey: ["payment-methods"],
+    queryFn: () => getPaymentMethodsFn(),
+  });
+
+export type ProofFilter = "pending" | "approved" | "rejected" | "all";
+/** v24 proof verification queue. */
+export const invoiceProofsQuery = (status: ProofFilter, offset = 0, limit = 20) =>
+  queryOptions({
+    queryKey: ["invoice-proofs", status, offset, limit],
+    queryFn: () => getInvoiceProofsFn({ data: { status, offset, limit } }),
+  });
+
 /** v23 public link status of one invoice (invalidated with the "invoices" key). */
 export const invoiceShareQuery = (id: string) =>
   queryOptions({
@@ -303,6 +324,10 @@ const AFFECTS: Record<string, string[]> = {
   // v23 public link: share status lives under the "invoices" key.
   invoice_shares: ["invoices", "activity"],
   invoice_payments: [...MONEY, "invoices"],
+  // v24: methods feed Settings, the invoice form and the public page; proofs drive the queue and
+  // the "Menunggu verifikasi" status; approving books a payment (money).
+  payment_methods: ["payment-methods", "invoices", "activity"],
+  invoice_proofs: [...MONEY, "invoices", "invoice-proofs"],
 };
 
 export function invalidateFor(qc: QueryClient, table: string) {

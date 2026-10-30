@@ -7,9 +7,10 @@
  * Status model
  * - Stored: draft, unpaid, partial, paid, cancelled. `draft` and `cancelled` are manual; the
  *   other three are derived from the sum of payments after every payment change.
- * - Display-only: `overdue` (unpaid/partial with due_date < today in the app time zone).
- *   Later sub-issues add more display states (e.g. pending verification from #94) on top of
- *   `displayStatus()` without new stored values.
+ * - Display-only: `overdue` (unpaid/partial with due_date < today in the app time zone) and
+ *   `verifying` (v24, #94: unpaid/partial with at least one pending transfer proof; wins over
+ *   overdue because the customer says they paid). Both come from `displayStatus()`; the stored
+ *   status never changes until the admin approves a proof.
  */
 import { DEFAULT_INVOICE_PREFIX, normalizeInvoicePrefix } from "./app-settings";
 import { parseAccountParam } from "./report-filter";
@@ -21,7 +22,7 @@ export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 /** List filter values: every stored status plus the computed "overdue". */
 export const INVOICE_FILTERS = [...INVOICE_STATUSES, "overdue"] as const;
 export type InvoiceFilter = (typeof INVOICE_FILTERS)[number];
-export type DisplayStatus = InvoiceStatus | "overdue";
+export type DisplayStatus = InvoiceStatus | "overdue" | "verifying";
 
 export const INVOICE_SORTS = ["issue_date", "due_date", "total", "number"] as const;
 export type InvoiceSort = (typeof INVOICE_SORTS)[number];
@@ -38,6 +39,7 @@ export const STATUS_LABEL: Record<DisplayStatus, string> = {
   paid: "Lunas",
   cancelled: "Dibatalkan",
   overdue: "Terlambat",
+  verifying: "Menunggu verifikasi",
 };
 export const METHOD_LABEL: Record<PaymentMethod, string> = {
   transfer: "Transfer bank",
@@ -159,10 +161,17 @@ export function isOverdue(
   return !!due && due < today;
 }
 
+/**
+ * What the UI shows: `verifying` while an open invoice has pending proofs (v24), else `overdue`
+ * when past due, else the stored status. `pendingProofs` defaults to 0 (no v24 / not loaded).
+ */
 export function displayStatus(
   inv: { status: InvoiceStatus; due_date?: string | null },
   today: string,
+  pendingProofs = 0,
 ): DisplayStatus {
+  if ((inv.status === "unpaid" || inv.status === "partial") && Number(pendingProofs) > 0)
+    return "verifying";
   return isOverdue(inv, today) ? "overdue" : inv.status;
 }
 

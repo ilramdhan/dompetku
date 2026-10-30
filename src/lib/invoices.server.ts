@@ -136,10 +136,18 @@ export async function listInvoices(o: ListOptions, scope: Scope) {
       return { ready: false as const };
     throw new Error((list.error ?? open.error)!.message);
   }
-  const items = ((list.data ?? []) as any[]).map(num).map((r) => ({
+  const rows = ((list.data ?? []) as any[]).map(num);
+  // v24: "Menunggu verifikasi" while proofs are pending (empty map without v24).
+  const pending = await (
+    await import("./invoice-payments.server")
+  ).pendingProofCounts(
+    rows.filter((r) => r.status === "unpaid" || r.status === "partial").map((r) => r.id),
+  );
+  const items = rows.map((r) => ({
     ...r,
     remaining: remainingOf(r.total, r.paid),
-    display_status: displayStatus(r, today),
+    pending_proofs: pending.get(r.id) ?? 0,
+    display_status: displayStatus(r, today, pending.get(r.id) ?? 0),
   }));
   return {
     ready: true as const,
@@ -161,7 +169,8 @@ export async function loadInvoice(id: string): Promise<InvoiceRow | null> {
 
 /** One invoice with its items and payments (detail view / edit form). */
 export async function getInvoice(inv: InvoiceRow) {
-  const [items, pays, today] = await Promise.all([
+  const ip = await import("./invoice-payments.server");
+  const [items, pays, today, pending, methodIds] = await Promise.all([
     db().from("invoice_items").select("*").eq("invoice_id", inv.id).order("position"),
     db()
       .from("invoice_payments")
@@ -170,13 +179,18 @@ export async function getInvoice(inv: InvoiceRow) {
       .order("paid_at")
       .order("created_at"),
     fin().then((f) => f.today()),
+    ip.pendingProofCounts([inv.id]),
+    ip.invoiceMethodIds(inv.id),
   ]);
   if (items.error) throw new Error(items.error.message);
   if (pays.error) throw new Error(pays.error.message);
   return {
     ...inv,
     remaining: remainingOf(inv.total, inv.paid),
-    display_status: displayStatus(inv, today),
+    pending_proofs: pending.get(inv.id) ?? 0,
+    display_status: displayStatus(inv, today, pending.get(inv.id) ?? 0),
+    /** v24 payment methods picked for this invoice ([] = all active). */
+    method_ids: methodIds,
     items: (items.data ?? []).map((i: any) => ({
       ...i,
       qty: Number(i.qty),
@@ -347,6 +361,8 @@ export async function deleteInvoice(inv: InvoiceRow) {
   if (pays.error) throw new Error(pays.error.message);
   const txIds = (pays.data ?? []).map((p) => p.transaction_id).filter((x): x is string => !!x);
   const extIds = (pays.data ?? []).map((p) => paymentExternalId(p.id));
+  // v24: proof images live in Storage; the rows go with the invoice (cascade).
+  await (await import("./invoice-payments.server")).removeInvoiceProofFiles(inv.id);
   const del = await db().from("invoices").delete().eq("id", inv.id);
   if (del.error) throw new Error(del.error.message);
   await removePaymentTransactions(txIds, extIds);
@@ -402,6 +418,14 @@ export async function syncInvoice(id: string): Promise<InvoiceRow> {
  * (idempotent per payment id) and recomputes paid/status. Never exceeds the remaining amount.
  */
 export async function recordPayment(inv: InvoiceRow, p: PaymentInput) {
+  return (await bookPayment(inv, p)).invoice;
+}
+
+/** `recordPayment` that also returns the new payment id (v24 proof approval links it). */
+export async function bookPayment(
+  inv: InvoiceRow,
+  p: PaymentInput,
+): Promise<{ invoice: InvoiceRow; paymentId: string }> {
   const problem = paymentProblem(inv, p.amount);
   if (problem) throw new Error(problem);
   if (!inv.account_id) throw new Error("Pilih dompet penerima");
@@ -461,7 +485,7 @@ export async function recordPayment(inv: InvoiceRow, p: PaymentInput) {
     amount: p.amount,
     currency: "IDR",
   });
-  return updated;
+  return { invoice: updated, paymentId: pay.id as string };
 }
 
 export async function loadPayment(id: string) {

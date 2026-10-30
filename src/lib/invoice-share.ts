@@ -17,6 +17,7 @@ import {
   type DisplayStatus,
   type InvoiceStatus,
 } from "./invoices";
+import type { PublicPayment } from "./invoice-payments";
 
 /** Random bytes per token (256 bit, well above the 128-bit minimum). */
 export const SHARE_TOKEN_BYTES = 32;
@@ -127,6 +128,9 @@ export type PublicInvoice = {
   payments: PublicInvoicePayment[];
 };
 
+/** Public page payload: the invoice whitelist plus the v24 payment block (also a whitelist). */
+export type PublicInvoiceView = PublicInvoice & { payment: PublicPayment };
+
 /** Every key a visitor can receive (tests assert nothing else leaks). */
 export const PUBLIC_INVOICE_KEYS = [
   "number",
@@ -159,7 +163,8 @@ const day = (d: string | null | undefined) => (d ? String(d).slice(0, 10) : null
 
 /**
  * Whitelists the customer-facing fields of an invoice (built field by field, never spread), or
- * null when the status is not public. `today` (YYYY-MM-DD, app zone) drives "overdue".
+ * null when the status is not public. `today` (YYYY-MM-DD, app zone) drives "overdue";
+ * `pendingProofs` (v24) turns an open invoice into "verifying".
  */
 export function toPublicInvoice(
   inv: InvoiceLike,
@@ -171,6 +176,7 @@ export function toPublicInvoice(
   }[],
   payments: readonly { paid_at: string; amount: number | string }[],
   today: string,
+  pendingProofs = 0,
 ): PublicInvoice | null {
   if (!isPublicStatus(inv.status)) return null;
   const total = Number(inv.total) || 0;
@@ -181,7 +187,11 @@ export function toPublicInvoice(
     due_date: day(inv.due_date),
     customer_name: String(inv.customer_name),
     currency: inv.currency || "IDR",
-    status: displayStatus({ status: inv.status, due_date: inv.due_date ?? null }, today),
+    status: displayStatus(
+      { status: inv.status, due_date: inv.due_date ?? null },
+      today,
+      pendingProofs,
+    ),
     items: [...items]
       .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0))
       .map((i) => ({
