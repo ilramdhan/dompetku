@@ -33,6 +33,7 @@ import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSubscriptionsRouteImport } from './routes/_app/subscriptions'
 import { Route as AppTransactionsRouteImport } from './routes/_app/transactions'
+import { Route as ITokenRouteImport } from './routes/i.$token'
 import { Route as AppAccountsIdRouteImport } from './routes/_app/accounts_.$id'
 import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-icon'
 import { Route as ApiPublicN8nBackupRouteImport } from './routes/api/public/n8n/backup'
@@ -167,6 +168,11 @@ const AppTransactionsRoute = AppTransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => AppRoute,
 } as any)
+const ITokenRoute = ITokenRouteImport.update({
+  id: '/i/$token',
+  path: '/i/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppAccountsIdRoute = AppAccountsIdRouteImport.update({
   id: '/accounts_/$id',
   path: '/accounts/$id',
@@ -266,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/subscriptions': typeof AppSubscriptionsRoute
   '/transactions': typeof AppTransactionsRoute
+  '/i/$token': typeof ITokenRoute
   '/accounts/$id': typeof AppAccountsIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
@@ -305,6 +312,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/subscriptions': typeof AppSubscriptionsRoute
   '/transactions': typeof AppTransactionsRoute
+  '/i/$token': typeof ITokenRoute
   '/accounts/$id': typeof AppAccountsIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
@@ -346,6 +354,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/subscriptions': typeof AppSubscriptionsRoute
   '/_app/transactions': typeof AppTransactionsRoute
+  '/i/$token': typeof ITokenRoute
   '/_app/accounts_/$id': typeof AppAccountsIdRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
@@ -387,6 +396,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscriptions'
     | '/transactions'
+    | '/i/$token'
     | '/accounts/$id'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
@@ -426,6 +436,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscriptions'
     | '/transactions'
+    | '/i/$token'
     | '/accounts/$id'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/subscriptions'
     | '/_app/transactions'
+    | '/i/$token'
     | '/_app/accounts_/$id'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
@@ -491,6 +503,7 @@ export interface RootRouteChildren {
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
+  ITokenRoute: typeof ITokenRoute
   ApiPublicAppIconRoute: typeof ApiPublicAppIconRoute
   ApiPublicN8nBackupRoute: typeof ApiPublicN8nBackupRoute
   ApiPublicN8nBotRoute: typeof ApiPublicN8nBotRoute
@@ -676,6 +689,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTransactionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/i/$token': {
+      id: '/i/$token'
+      path: '/i/$token'
+      fullPath: '/i/$token'
+      preLoaderRoute: typeof ITokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/accounts_/$id': {
       id: '/_app/accounts_/$id'
       path: '/accounts/$id'
@@ -828,6 +848,7 @@ const rootRouteChildren: RootRouteChildren = {
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
+  ITokenRoute: ITokenRoute,
   ApiPublicAppIconRoute: ApiPublicAppIconRoute,
   ApiPublicN8nBackupRoute: ApiPublicN8nBackupRoute,
   ApiPublicN8nBotRoute: ApiPublicN8nBotRoute,
