@@ -9,7 +9,7 @@
  * they must exist before the database can be read, or they guard access to the settings themselves.
  */
 
-export type IntegrationGroup = "telegram" | "ai" | "email" | "n8n";
+export type IntegrationGroup = "telegram" | "ai" | "email" | "n8n" | "payment";
 export type IntegrationSource = "db" | "env" | "default" | "none";
 
 export type IntegrationDef = {
@@ -31,6 +31,8 @@ const MAX_LEN = 2000;
 const CHAT_ID = /^-?\d{1,20}$/;
 const NO_SPACE = /^\S+$/;
 const EMAIL = /^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/;
+const BOOL = /^(true|false)$/i;
+const MIDTRANS_KEY = /^[A-Za-z0-9_:.-]{10,200}$/;
 
 /** "a,b , c" → ["a","b","c"] (empty pieces dropped). */
 export function splitList(raw: string | null | undefined): string[] {
@@ -197,6 +199,43 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
         ? null
         : "Minimal 24 karakter tanpa spasi",
   },
+  // v25 (#97): Midtrans Snap payment gateway for invoices. Off unless MIDTRANS_ENABLED=true.
+  {
+    key: "MIDTRANS_ENABLED",
+    group: "payment",
+    secret: false,
+    label: "Aktifkan Midtrans",
+    help: 'true = tombol "Bayar sekarang" di halaman invoice publik (butuh skema v25 dan server key).',
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
+  {
+    key: "MIDTRANS_SERVER_KEY",
+    group: "payment",
+    secret: true,
+    label: "Server key Midtrans",
+    help: "Dashboard Midtrans → Settings → Access Keys. Sandbox diawali SB-Mid-server-. Tidak pernah dikirim ke browser.",
+    placeholder: "SB-Mid-server-…",
+    validate: (v) => (MIDTRANS_KEY.test(v) ? null : "Format key Midtrans tidak valid"),
+  },
+  {
+    key: "MIDTRANS_CLIENT_KEY",
+    group: "payment",
+    secret: false,
+    label: "Client key Midtrans",
+    help: "Publik, dipakai Snap JS di browser pelanggan.",
+    placeholder: "SB-Mid-client-…",
+    validate: (v) => (MIDTRANS_KEY.test(v) ? null : "Format key Midtrans tidak valid"),
+  },
+  {
+    key: "MIDTRANS_PRODUCTION",
+    group: "payment",
+    secret: false,
+    label: "Mode production Midtrans",
+    help: "false = sandbox (uji coba, default). true = transaksi uang sungguhan; pakai key production.",
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
 ] as const;
 
 export type IntegrationKey =
@@ -212,10 +251,20 @@ export type IntegrationKey =
   | "RESEND_API_KEY"
   | "EMAIL_FROM"
   | "EMAIL_TO"
-  | "N8N_API_KEY";
+  | "N8N_API_KEY"
+  | "MIDTRANS_ENABLED"
+  | "MIDTRANS_SERVER_KEY"
+  | "MIDTRANS_CLIENT_KEY"
+  | "MIDTRANS_PRODUCTION";
 
 export const INTEGRATION_KEYS = INTEGRATIONS.map((d) => d.key) as IntegrationKey[];
-export const INTEGRATION_GROUPS: readonly IntegrationGroup[] = ["telegram", "ai", "email", "n8n"];
+export const INTEGRATION_GROUPS: readonly IntegrationGroup[] = [
+  "telegram",
+  "ai",
+  "email",
+  "n8n",
+  "payment",
+];
 
 /** Never manageable from the UI (bootstrap / security values). */
 export const FORBIDDEN_KEYS = [
@@ -252,7 +301,8 @@ export function validateIntegration(
   // Lists are stored normalised ("a, b" → "a,b"); BOT_TEXT_AI is case-insensitive.
   if (key === "BOT_ALLOWED_CHAT_IDS" || key === "EMAIL_TO")
     return { ok: true, value: splitList(value).join(",") };
-  if (key === "BOT_TEXT_AI") return { ok: true, value: value.toLowerCase() };
+  if (key === "BOT_TEXT_AI" || key === "MIDTRANS_ENABLED" || key === "MIDTRANS_PRODUCTION")
+    return { ok: true, value: value.toLowerCase() };
   return { ok: true, value };
 }
 

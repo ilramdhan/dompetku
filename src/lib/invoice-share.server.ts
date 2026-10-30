@@ -173,7 +173,12 @@ export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoiceV
       f.today(),
       payment.pending,
     );
-    return pub ? { ...pub, payment } : null;
+    if (!pub) return null;
+    // v25: Midtrans "Bayar sekarang" (false before v25, unconfigured, in demo or when not open).
+    const gw = await (
+      await import("./gateway/payments.server")
+    ).publicGatewayFor(inv.data.status, pub.remaining, demo.isDemo());
+    return { ...pub, payment: { ...payment, gateway: gw.available } };
   } catch (e) {
     try {
       (await import("./monitoring.server")).logError("public:invoice", e);

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   Bot,
+  CreditCard,
   Link2,
   Link2Off,
   Mail,
@@ -42,6 +43,7 @@ const GROUP: Record<IntegrationGroup, { title: string; icon: typeof Bot }> = {
   ai: { title: "AI (OCR & parsing chat)", icon: Sparkles },
   email: { title: "Email (Resend)", icon: Mail },
   n8n: { title: "n8n", icon: Workflow },
+  payment: { title: "Payment gateway (Midtrans)", icon: CreditCard },
 };
 
 const QK = ["integration-settings"] as const;
@@ -381,6 +383,13 @@ export function IntegrationsCard() {
                     />
                   ))}
                 </div>
+                {g === "payment" ? (
+                  <p className="text-xs break-words text-muted-foreground">
+                    {t("Butuh skema v25. Pasang Payment Notification URL di dashboard Midtrans ke")}{" "}
+                    <code className="break-all">/api/public/payments/midtrans</code>.{" "}
+                    {t("Mulai dengan sandbox. Panduan: docs/PAYMENT-GATEWAY.md.")}
+                  </p>
+                ) : null}
                 {g === "telegram" ? (
                   <>
                     <p className="text-xs text-muted-foreground">

@@ -65,6 +65,9 @@ const SPECIAL: Record<string, string> = {
   "invoice_proofs.create": "Bukti transfer diterima",
   "invoice_proofs.approve": "Bukti transfer disetujui",
   "invoice_proofs.reject": "Bukti transfer ditolak",
+  "invoices.gateway_create": "Pembayaran Midtrans dibuat",
+  "invoices.gateway": "Pembayaran Midtrans diterima",
+  "invoices.gateway_refund": "Refund Midtrans dicatat",
 };
 
 export function activityLabel(action: string, t: (s: string) => string = (s) => s): string {
