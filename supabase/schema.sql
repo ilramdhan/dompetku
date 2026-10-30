@@ -616,3 +616,72 @@ notify pgrst, 'reload schema';
 -- Sama seperti pola transaksi berulang (recurring_transactions.interval).
 alter table public.subscriptions add column if not exists "interval" int not null default 1 check ("interval" > 0);
 notify pgrst, 'reload schema';
+
+-- ============ v21: invoice — draft, nomor otomatis, item, status & pembayaran manual (aman dijalankan ulang) ============
+-- Opsional: tanpa bagian ini halaman Invoice hanya menampilkan petunjuk untuk menjalankan v21.
+-- Butuh v14 (app_settings) untuk prefix nomor; tanpa kolom invoice_prefix prefix-nya 'INV'.
+-- Nomor: <PREFIX>-YYYYMM-#### (urut per bulan terbit, unik). Total = jumlah (qty × harga satuan) item,
+-- selalu dihitung ulang di server. paid = jumlah invoice_payments (ditulis ulang server setiap ada perubahan).
+-- Status tersimpan: draft, unpaid, partial, paid, cancelled. "Terlambat" (due_date < hari ini di zona waktu
+-- aplikasi) dihitung, tidak disimpan. Hanya IDR untuk tahap ini.
+-- Setiap pembayaran = satu transaksi pemasukan kategori "Invoice" di dompet invoice dengan
+-- external_id 'invoice_pay:<id pembayaran>' (idempoten); menghapus pembayaran/invoice ikut menghapus transaksinya.
+alter table public.app_settings add column if not exists invoice_prefix text default 'INV'
+  check (invoice_prefix is null or invoice_prefix ~ '^[A-Z0-9]{1,10}$');
+
+create table if not exists public.invoices (
+  id uuid primary key default gen_random_uuid(),
+  number text not null unique check (length(number) between 1 and 40),
+  customer_name text not null check (length(trim(customer_name)) between 1 and 120),
+  customer_email text check (customer_email is null or length(customer_email) <= 200),
+  customer_phone text check (customer_phone is null or length(customer_phone) <= 30),
+  account_id uuid references public.accounts(id) on delete set null,
+  issue_date date not null default current_date,
+  due_date date,
+  notes text check (notes is null or length(notes) <= 2000),
+  status text not null default 'draft' check (status in ('draft','unpaid','partial','paid','cancelled')),
+  currency text not null default 'IDR' check (currency in ('IDR')),
+  total numeric(18,2) not null default 0 check (total >= 0),
+  paid numeric(18,2) not null default 0 check (paid >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists invoices_status_due_idx on public.invoices (status, due_date);
+create index if not exists invoices_account_idx on public.invoices (account_id);
+create index if not exists invoices_issue_idx on public.invoices (issue_date desc, created_at desc);
+revoke all on public.invoices from anon, authenticated;
+grant all on public.invoices to service_role;
+alter table public.invoices enable row level security;
+
+create table if not exists public.invoice_items (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  description text not null check (length(trim(description)) between 1 and 300),
+  qty numeric(12,3) not null default 1 check (qty > 0),
+  unit_price numeric(18,2) not null default 0 check (unit_price >= 0),
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists invoice_items_invoice_idx on public.invoice_items (invoice_id, position);
+revoke all on public.invoice_items from anon, authenticated;
+grant all on public.invoice_items to service_role;
+alter table public.invoice_items enable row level security;
+
+-- method: cara bayar ('transfer','cash','qris','ewallet','other'); bagian berikutnya (rekening, gateway,
+-- notifikasi bank) menambah nilai baru. reference: nomor referensi bank/gateway (opsional).
+create table if not exists public.invoice_payments (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  amount numeric(18,2) not null check (amount > 0),
+  paid_at date not null default current_date,
+  method text not null default 'transfer' check (length(method) between 1 and 40),
+  reference text check (reference is null or length(reference) <= 120),
+  note text check (note is null or length(note) <= 500),
+  transaction_id uuid references public.transactions(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists invoice_payments_invoice_idx on public.invoice_payments (invoice_id, paid_at);
+revoke all on public.invoice_payments from anon, authenticated;
+grant all on public.invoice_payments to service_role;
+alter table public.invoice_payments enable row level security;
+notify pgrst, 'reload schema';

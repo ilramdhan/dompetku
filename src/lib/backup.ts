@@ -19,6 +19,7 @@ import { z } from "zod";
  * rows have no password hash, so they cannot log in until the admin resets their password.
  * pockets (v19) sit between accounts and transactions (transactions.pocket_id → pockets);
  * pocket_alerts come last. Older backups without them restore unchanged (pocket_id stays null).
+ * invoices (v21) reference accounts; invoice_items / invoice_payments (→ invoices, transactions) follow.
  */
 export const RESTORE_TABLES = [
   "accounts",
@@ -42,6 +43,9 @@ export const RESTORE_TABLES = [
   "app_users",
   "account_permissions",
   "pocket_alerts",
+  "invoices",
+  "invoice_items",
+  "invoice_payments",
 ] as const;
 export type RestoreTable = (typeof RESTORE_TABLES)[number];
 
@@ -78,6 +82,9 @@ export const CONFLICT_KEYS: Record<RestoreTable, string[]> = {
   account_permissions: ["user_id", "account_id"],
   pockets: ["id"],
   pocket_alerts: ["id"],
+  invoices: ["id"],
+  invoice_items: ["id"],
+  invoice_payments: ["id"],
 };
 
 /**
@@ -94,6 +101,7 @@ export const NATURAL_KEYS: Partial<Record<RestoreTable, string[]>> = {
   app_users: ["username"],
   pockets: ["account_id", "name"],
   pocket_alerts: ["pocket_id", "period", "level"],
+  invoices: ["number"],
 };
 
 /** FK column → referenced table, used to rewrite ids remapped by natural keys. */
@@ -108,6 +116,7 @@ export const FK_COLUMNS: Record<string, RestoreTable> = {
   bot_default_account_id: "accounts",
   user_id: "app_users",
   pocket_id: "pockets",
+  invoice_id: "invoices",
 };
 
 /**
