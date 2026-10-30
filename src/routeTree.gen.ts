@@ -38,6 +38,7 @@ import { Route as ApiPublicN8nBackupRouteImport } from './routes/api/public/n8n/
 import { Route as ApiPublicN8nBotRouteImport } from './routes/api/public/n8n/bot'
 import { Route as ApiPublicN8nCommandRouteImport } from './routes/api/public/n8n/command'
 import { Route as ApiPublicN8nMessageRouteImport } from './routes/api/public/n8n/message'
+import { Route as ApiPublicN8nNotificationsRouteImport } from './routes/api/public/n8n/notifications'
 import { Route as ApiPublicN8nOcrRouteImport } from './routes/api/public/n8n/ocr'
 import { Route as ApiPublicN8nRemindersRouteImport } from './routes/api/public/n8n/reminders'
 import { Route as ApiPublicN8nRemindersEmailRouteImport } from './routes/api/public/n8n/reminders-email'
@@ -191,6 +192,12 @@ const ApiPublicN8nMessageRoute = ApiPublicN8nMessageRouteImport.update({
   path: '/api/public/n8n/message',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicN8nNotificationsRoute =
+  ApiPublicN8nNotificationsRouteImport.update({
+    id: '/api/public/n8n/notifications',
+    path: '/api/public/n8n/notifications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicN8nOcrRoute = ApiPublicN8nOcrRouteImport.update({
   id: '/api/public/n8n/ocr',
   path: '/api/public/n8n/ocr',
@@ -265,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
   '/api/public/n8n/command': typeof ApiPublicN8nCommandRoute
   '/api/public/n8n/message': typeof ApiPublicN8nMessageRoute
+  '/api/public/n8n/notifications': typeof ApiPublicN8nNotificationsRoute
   '/api/public/n8n/ocr': typeof ApiPublicN8nOcrRoute
   '/api/public/n8n/reminders': typeof ApiPublicN8nRemindersRoute
   '/api/public/n8n/reminders-email': typeof ApiPublicN8nRemindersEmailRoute
@@ -303,6 +311,7 @@ export interface FileRoutesByTo {
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
   '/api/public/n8n/command': typeof ApiPublicN8nCommandRoute
   '/api/public/n8n/message': typeof ApiPublicN8nMessageRoute
+  '/api/public/n8n/notifications': typeof ApiPublicN8nNotificationsRoute
   '/api/public/n8n/ocr': typeof ApiPublicN8nOcrRoute
   '/api/public/n8n/reminders': typeof ApiPublicN8nRemindersRoute
   '/api/public/n8n/reminders-email': typeof ApiPublicN8nRemindersEmailRoute
@@ -343,6 +352,7 @@ export interface FileRoutesById {
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
   '/api/public/n8n/command': typeof ApiPublicN8nCommandRoute
   '/api/public/n8n/message': typeof ApiPublicN8nMessageRoute
+  '/api/public/n8n/notifications': typeof ApiPublicN8nNotificationsRoute
   '/api/public/n8n/ocr': typeof ApiPublicN8nOcrRoute
   '/api/public/n8n/reminders': typeof ApiPublicN8nRemindersRoute
   '/api/public/n8n/reminders-email': typeof ApiPublicN8nRemindersEmailRoute
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/bot'
     | '/api/public/n8n/command'
     | '/api/public/n8n/message'
+    | '/api/public/n8n/notifications'
     | '/api/public/n8n/ocr'
     | '/api/public/n8n/reminders'
     | '/api/public/n8n/reminders-email'
@@ -421,6 +432,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/bot'
     | '/api/public/n8n/command'
     | '/api/public/n8n/message'
+    | '/api/public/n8n/notifications'
     | '/api/public/n8n/ocr'
     | '/api/public/n8n/reminders'
     | '/api/public/n8n/reminders-email'
@@ -460,6 +472,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/bot'
     | '/api/public/n8n/command'
     | '/api/public/n8n/message'
+    | '/api/public/n8n/notifications'
     | '/api/public/n8n/ocr'
     | '/api/public/n8n/reminders'
     | '/api/public/n8n/reminders-email'
@@ -484,6 +497,7 @@ export interface RootRouteChildren {
   ApiPublicN8nBotRoute: typeof ApiPublicN8nBotRoute
   ApiPublicN8nCommandRoute: typeof ApiPublicN8nCommandRoute
   ApiPublicN8nMessageRoute: typeof ApiPublicN8nMessageRoute
+  ApiPublicN8nNotificationsRoute: typeof ApiPublicN8nNotificationsRoute
   ApiPublicN8nOcrRoute: typeof ApiPublicN8nOcrRoute
   ApiPublicN8nRemindersRoute: typeof ApiPublicN8nRemindersRoute
   ApiPublicN8nRemindersEmailRoute: typeof ApiPublicN8nRemindersEmailRoute
@@ -699,6 +713,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicN8nMessageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/n8n/notifications': {
+      id: '/api/public/n8n/notifications'
+      path: '/api/public/n8n/notifications'
+      fullPath: '/api/public/n8n/notifications'
+      preLoaderRoute: typeof ApiPublicN8nNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/n8n/ocr': {
       id: '/api/public/n8n/ocr'
       path: '/api/public/n8n/ocr'
@@ -812,6 +833,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicN8nBotRoute: ApiPublicN8nBotRoute,
   ApiPublicN8nCommandRoute: ApiPublicN8nCommandRoute,
   ApiPublicN8nMessageRoute: ApiPublicN8nMessageRoute,
+  ApiPublicN8nNotificationsRoute: ApiPublicN8nNotificationsRoute,
   ApiPublicN8nOcrRoute: ApiPublicN8nOcrRoute,
   ApiPublicN8nRemindersRoute: ApiPublicN8nRemindersRoute,
   ApiPublicN8nRemindersEmailRoute: ApiPublicN8nRemindersEmailRoute,
