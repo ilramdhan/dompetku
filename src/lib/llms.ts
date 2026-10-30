@@ -22,7 +22,7 @@ export const LLMS_FEATURES: ReadonlyArray<string> = [
   "Telegram bot for logging transactions in chat (quick text parsing, AI only when ambiguous) and receipt OCR through any OpenAI-compatible endpoint",
   "Budgets with rollover and 80%/100% alerts, pockets (envelopes) inside a wallet, savings goals and recurring transactions",
   "Debts and installments, subscriptions, receivables and gold holdings (live world/Antam prices) counted in net worth",
-  "Invoices with automatic numbers, line items and manual (partial) payments booked as income",
+  "Invoices with automatic numbers, line items and manual (partial) payments booked as income; public invoice links with bank/QRIS transfer proofs and optional Midtrans online payment",
   "Reports, yearly recap, account reconciliation, CSV import/export and full JSON backup/restore",
   "Family members with per-wallet permissions, optional TOTP 2FA, privacy mode and an Indonesian/English UI",
   "Installable PWA; free to run on the free tiers of Vercel and Supabase",
@@ -41,6 +41,11 @@ const DOCS: ReadonlyArray<{ file: string; title: string; desc: string }> = [
     desc: "every setting, which are optional and what each one does",
   },
   { file: "docs/N8N.md", title: "Telegram bot & n8n", desc: "bot setup and automation endpoints" },
+  {
+    file: "docs/PAYMENT-GATEWAY.md",
+    title: "Payment gateway",
+    desc: "optional Midtrans online payment for invoices",
+  },
   { file: "docs/ARCHITECTURE.md", title: "Architecture", desc: "how the app is built" },
   { file: "docs/FAQ.md", title: "FAQ", desc: "common questions" },
 ];

@@ -27,6 +27,7 @@ After running the **v16** section of `supabase/schema.sql`, **Settings → Integ
 | `AI_API_URL`, `AI_API_KEY`\*, `AI_MODEL`, `AI_MODEL_TEXT`                                              | `SESSION_SECRET`, `SETTINGS_ENCRYPTION_KEY`, `APP_USERNAME`, `APP_PASSWORD`, `APP_TOTP_SECRET` (guard access to the settings themselves) |
 | `RESEND_API_KEY`\*, `EMAIL_FROM`, `EMAIL_TO`                                                           | `DEMO_MODE`, `SENTRY_DSN`, `APP_TIMEZONE`/`BOT_DEFAULT_ACCOUNT` (those two are in Settings → Aplikasi, v14), `FALLBACK_USD_IDR`, …       |
 | `TELEGRAM_BOT_TOKEN`\* (optional, [Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n))     |                                                                                                                                          |
+| `MIDTRANS_ENABLED`, `MIDTRANS_SERVER_KEY`\*, `MIDTRANS_CLIENT_KEY`, `MIDTRANS_PRODUCTION` (v25)        | `MIDTRANS_API_BASE`, `MIDTRANS_SNAP_BASE` (test-only overrides)                                                                          |
 
 \* **Secrets** are write-only, like Vercel: they are encrypted at rest (AES-256-GCM, random IV per value) and the server never sends them back to the browser — Settings only shows the source (Database / Env / Belum diatur) and the last 4 characters. The `integration_settings` table is **not** included in JSON backups, so re-enter secrets after restoring onto a new instance.
 
@@ -110,6 +111,25 @@ All three are needed for `POST /api/public/n8n/reminders-send-email`. Not needed
 | `RESEND_API_KEY` | `re_…`                                | Resend API key. **Secret.**                                              | <https://resend.com> → API Keys.                               |
 | `EMAIL_FROM`     | `Dompetku <noreply@mail.example.com>` | Sender; the domain must be verified in Resend.                           | Resend → Domains → add DNS records your domain provider shows. |
 | `EMAIL_TO`       | `you@example.com`                     | Default recipient(s), comma-separated. A request body `to` overrides it. | —                                                              |
+
+## Payment gateway: Midtrans (optional)
+
+Online invoice payments ("Bayar sekarang" on the public invoice page), schema **v25**. Step-by-step
+guide (ID + EN): **[PAYMENT-GATEWAY.md](PAYMENT-GATEWAY.md)**. All four can also be set in
+Settings → Integrasi (wins over env). Off unless `MIDTRANS_ENABLED=true` and a server key is set.
+
+| Name                  | Example                 | What it does                                                                                                      | How to obtain                                |
+| --------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `MIDTRANS_ENABLED`    | `true`                  | Turns the gateway on (default `false`).                                                                           | —                                            |
+| `MIDTRANS_SERVER_KEY` | `SB-Mid-server-…`       | Server key for Snap, status and refund calls and the webhook signature. **Secret**, never sent to the browser.    | Midtrans dashboard → Settings → Access Keys. |
+| `MIDTRANS_CLIENT_KEY` | `SB-Mid-client-…`       | Public client key for Snap JS. Without it the customer is redirected to the Midtrans page instead of a popup.     | Same page.                                   |
+| `MIDTRANS_PRODUCTION` | `false`                 | `false` = sandbox hosts (default), `true` = production hosts (real money). Must match the keys.                   | —                                            |
+| `MIDTRANS_API_BASE`   | `http://127.0.0.1:4010` | **Test only**, env only: Core API base (status/refund) for a local mock. Ignored when `MIDTRANS_PRODUCTION=true`. | Leave empty.                                 |
+| `MIDTRANS_SNAP_BASE`  | `http://127.0.0.1:4010` | **Test only**, env only: Snap base (create). Ignored in production; the browser then uses `redirect_url`.         | Leave empty.                                 |
+
+Set **Payment Notification URL** in the Midtrans dashboard to
+`https://<your-domain>/api/public/payments/midtrans` and set `PUBLIC_SITE_URL` so the return link
+uses your public domain.
 
 ## Monitoring (optional)
 

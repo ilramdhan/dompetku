@@ -298,6 +298,7 @@ public/          PWA manifest, icons and self-hosted fonts
 | -------------------------------------------- | ---------------------------------------------------------------------------------- |
 | [Self-hosting guide](docs/SELF-HOSTING.md)   | Step-by-step install: Supabase, Vercel, first login, optional features, updates    |
 | [Environment variables](docs/ENVIRONMENT.md) | Reference for every setting                                                        |
+| [Payment gateway](docs/PAYMENT-GATEWAY.md)   | Online invoice payments with Midtrans (ID + EN): setup, sandbox, refunds           |
 | [n8n, Telegram & email](docs/N8N.md)         | Telegram bot, reminders, reports, weekly backup, Google Drive, Gmail SMTP, Resend  |
 | [Architecture](docs/ARCHITECTURE.md)         | Tech stack, directory layout, data flows, contributor rules                        |
 | [FAQ](docs/FAQ.md)                           | Common questions and troubleshooting                                               |
