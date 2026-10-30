@@ -55,7 +55,8 @@ export async function invoiceReport(month: string, scope: Scope, account?: strin
   const pays = await fetchAll((from, to) =>
     db()
       .from("invoice_payments")
-      .select("invoice_id, amount, paid_at")
+      // "*" keeps v25 `refunded` when present (reports count net payments) and works before v25.
+      .select("*")
       .lt("paid_at", end)
       .order("id")
       .range(from, to),
@@ -90,10 +91,7 @@ export async function listInvoicePayments(o: PaymentListOptions, scope: Scope) {
   if (empty(o.account)) return { ready: true as const, items: [], total: 0 };
   let q: any = db()
     .from("invoice_payments")
-    .select(
-      "id, invoice_id, amount, paid_at, method, reference, created_at, invoices!inner(number, customer_name, account_id)",
-      { count: "exact" },
-    );
+    .select("*, invoices!inner(number, customer_name, account_id)", { count: "exact" });
   if (scope) q = q.in("invoices.account_id", scopeIds(scope));
   if (o.account) q = q.eq("invoices.account_id", o.account);
   if (o.month && isMonth(o.month)) {
@@ -113,6 +111,8 @@ export async function listInvoicePayments(o: PaymentListOptions, scope: Scope) {
     id: r.id as string,
     invoice_id: r.invoice_id as string,
     amount: Number(r.amount),
+    /** v25: refunded part (0 before v25). */
+    refunded: Number(r.refunded ?? 0),
     paid_at: r.paid_at as string,
     method: r.method as string,
     reference: (r.reference ?? null) as string | null,

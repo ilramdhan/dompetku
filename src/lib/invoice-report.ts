@@ -84,7 +84,19 @@ export type ReportInvoice = {
   issue_date: string;
   account_id: string | null;
 };
-export type ReportPayment = { invoice_id: string; amount: number | string; paid_at: string };
+export type ReportPayment = {
+  invoice_id: string;
+  amount: number | string;
+  paid_at: string;
+  /** v25: part of the payment refunded through the gateway (missing before v25 = 0). */
+  refunded?: number | string | null;
+};
+
+/** Net amount of one payment (amount − refunded), never negative. */
+export const netPaymentAmount = (p: {
+  amount: number | string;
+  refunded?: number | string | null;
+}) => Math.max(0, (Number(p.amount) || 0) - (Number(p.refunded) || 0));
 export type WalletRow = {
   account_id: string | null;
   issued: number;
@@ -129,7 +141,7 @@ export function periodSummary(
     const i = inv.get(p.invoice_id);
     if (!i) continue;
     const d = String(p.paid_at).slice(0, 10);
-    const amt = Number(p.amount) || 0;
+    const amt = netPaymentAmount(p);
     if (d < end) paidBeforeEnd.set(i.id, (paidBeforeEnd.get(i.id) ?? 0) + amt);
     if (d >= start && d < end) {
       received += amt;
