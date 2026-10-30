@@ -260,7 +260,7 @@ export type SyncResult = {
   note: string | null;
 };
 
-/** Business reasons a verified payment cannot be booked now: kept in last_error for the admin; the next sync retries safely. */
+/** Business reasons a verified payment cannot be booked now: shown in last_error; the next sync retries. */
 const KEEP_ERRORS = new Set([
   "Invoice ini tidak bisa menerima pembayaran",
   "Pembayaran melebihi sisa tagihan",
@@ -273,11 +273,21 @@ export async function applyState(row: GatewayRow, state: GatewayState): Promise<
     const note = "Jumlah dari Midtrans tidak cocok dengan pesanan";
     await table()
       .update({ last_error: note, updated_at: new Date().toISOString() })
-      .eq("id", row.id);
+      .eq("id", row.id)
+      .is("payment_id", null);
     (await import("../monitoring.server")).logError(
       "gateway:amount-mismatch",
       new Error(`order ${row.order_id}`),
     );
+    return { row: { ...row, last_error: note }, booked: false, refunded: 0, note };
+  }
+  // A chargeback without refund entries cannot be booked as a reversing expense: keep the status
+  // (so the ledger and the invoice still agree) and flag it for a manual check.
+  if (/chargeback/.test(state.providerStatus) && !state.refunds.length) {
+    const note = "Chargeback dari Midtrans, cek manual";
+    await table()
+      .update({ last_error: note, raw: state.raw, updated_at: new Date().toISOString() })
+      .eq("id", row.id);
     return { row: { ...row, last_error: note }, booked: false, refunded: 0, note };
   }
   const next = nextStatus(row.status, state.status);
@@ -318,20 +328,31 @@ export async function applyState(row: GatewayRow, state: GatewayState): Promise<
   return { row: current, booked, refunded, note: current.last_error };
 }
 
+/**
+ * Books a paid row exactly once.
+ *
+ * Claim protocol (all conditional updates, so concurrent webhooks / "Cek status" race safely):
+ * 1. Only a STALE claim (older than STALE_CLAIM_MS, i.e. a crash mid-booking) is released, and
+ *    only by the request that still sees that exact `claimed_at` value.
+ * 2. The claim itself is one atomic update `claimed_at = now, last_error = null` where
+ *    `payment_id is null and claimed_at is null`; whoever does not get the row returns.
+ * 3. On any booking failure the claim is released at the end of THIS attempt (conditional on our
+ *    own `claimed_at`), so a business error (invoice paid/cancelled meanwhile) never parks the
+ *    claim; the next sync retries safely because bookPayment re-checks the remaining amount.
+ * 4. `last_error` is only written while `payment_id is null`, and the final link only when
+ *    `payment_id is null` too.
+ */
 async function bookOnce(row: GatewayRow, state: GatewayState) {
   const now = Date.now();
-  // A claim is released race-safely (only the request that still sees the old claimed_at value
-  // resets it) when it was abandoned (crash mid-booking) or parked by a business error (e.g. the
-  // invoice was paid by hand meanwhile): retrying is safe because bookPayment re-checks the
-  // remaining amount before inserting anything.
-  if (row.claimed_at && (row.last_error || now - Date.parse(row.claimed_at) > STALE_CLAIM_MS))
+  if (row.claimed_at && now - Date.parse(row.claimed_at) > STALE_CLAIM_MS)
     await table()
       .update({ claimed_at: null })
       .eq("id", row.id)
       .eq("claimed_at", row.claimed_at)
       .is("payment_id", null);
+  const mine = new Date(now).toISOString();
   const claim = await table()
-    .update({ claimed_at: new Date(now).toISOString() })
+    .update({ claimed_at: mine, last_error: null })
     .eq("id", row.id)
     .is("payment_id", null)
     .is("claimed_at", null)
@@ -340,15 +361,28 @@ async function bookOnce(row: GatewayRow, state: GatewayState) {
   if (claim.error) throw new Error(claim.error.message);
   if (!claim.data) return { booked: false, row: (await loadGatewayRow({ id: row.id })) ?? row };
 
+  const release = (patch: Record<string, unknown> = {}) =>
+    table()
+      .update({ claimed_at: null, ...patch })
+      .eq("id", row.id)
+      .eq("claimed_at", mine)
+      .is("payment_id", null);
+
   const s = await import("../invoices.server");
   const txRef = (state.gatewayTxId ?? row.order_id).slice(0, 120);
-  // Crash recovery: a payment already booked under this reference is linked, not re-booked.
+  // Crash recovery: a payment already booked for this order (under the Midtrans transaction id or,
+  // when that was unknown at the time, the order id) is linked, not re-booked.
+  const refs = [...new Set([txRef, row.order_id, row.gateway_tx_id].filter(Boolean))] as string[];
   const prior = await db()
     .from("invoice_payments")
     .select("id")
     .eq("invoice_id", row.invoice_id)
-    .eq("reference", txRef)
+    .in("reference", refs)
     .limit(1);
+  if (prior.error) {
+    await release();
+    throw new Error(prior.error.message);
+  }
   let paymentId: string | null = prior.data?.[0]?.id ?? null;
   let booked = false;
   if (!paymentId) {
@@ -376,21 +410,22 @@ async function bookOnce(row: GatewayRow, state: GatewayState) {
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "error";
-      if (KEEP_ERRORS.has(msg)) {
-        // Money arrived but cannot be booked (invoice paid/cancelled meanwhile): keep the claim,
-        // show it to the admin (refund or record by hand).
-        await table()
-          .update({ last_error: msg.slice(0, 300), updated_at: new Date().toISOString() })
-          .eq("id", row.id);
+      // Money arrived but cannot be booked now (e.g. invoice paid/cancelled meanwhile): show it to
+      // the admin (refund or record by hand) and release the claim so a later sync may retry.
+      await release(
+        KEEP_ERRORS.has(msg)
+          ? { last_error: msg.slice(0, 300), updated_at: new Date().toISOString() }
+          : {},
+      );
+      if (KEEP_ERRORS.has(msg))
         return { booked: false, row: (await loadGatewayRow({ id: row.id })) ?? row };
-      }
-      await table().update({ claimed_at: null }).eq("id", row.id).is("payment_id", null);
       throw e;
     }
   }
   await table()
     .update({ payment_id: paymentId, last_error: null, updated_at: new Date().toISOString() })
-    .eq("id", row.id);
+    .eq("id", row.id)
+    .is("payment_id", null);
   return { booked, row: (await loadGatewayRow({ id: row.id })) ?? row };
 }
 
