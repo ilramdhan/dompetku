@@ -1347,6 +1347,29 @@ const DICT: Record<string, string> = {
     "Issue the invoice first to create a public link.",
   "Terbitkan invoice dulu; draft dan invoice batal tidak bisa dibagikan":
     "Issue the invoice first; drafts and cancelled invoices cannot be shared",
+  /* Invoice reports (issue #98) */
+  "Laporan invoice": "Invoice report",
+  "Ringkasan tagihan, umur piutang (aging), dan riwayat pembayaran.":
+    "Billing summary, receivables aging and payment history.",
+  Diterbitkan: "Issued",
+  Diterima: "Received",
+  pembayaran: "payments",
+  "Outstanding akhir periode": "Outstanding at period end",
+  Outstanding: "Outstanding",
+  "Umur piutang (aging)": "Receivables aging",
+  "Per hari ini": "As of today",
+  "Tidak ada invoice yang belum lunas.": "No unpaid invoices.",
+  "Belum jatuh tempo": "Not yet due",
+  "1–30 hari": "1–30 days",
+  "31–60 hari": "31–60 days",
+  "61–90 hari": "61–90 days",
+  "> 90 hari": "> 90 days",
+  "Per dompet": "Per wallet",
+  "Pembayaran diterima": "Payments received",
+  "Belum ada pembayaran pada periode ini.": "No payments in this period.",
+  "Invoice belum lunas": "Unpaid invoices",
+  "Laporan & aging": "Report & aging",
+  Dompet: "Wallet",
   /* SEO (document head of public pages, issue #44) */
   "Dompetku — Pencatat Keuangan Open Source & Self-Hosted Expense Tracker":
     "Dompetku — Open Source, Self-Hosted Personal Finance & Expense Tracker",

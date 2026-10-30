@@ -305,6 +305,14 @@ the section is run.
   remaining amount (re-checked after insert against concurrent payments).
 - **RBAC.** `invoices` is an admin module; the server fns still scope by `accountScope()` and
   `assertWalletManage` so the module can be granted to members later.
+- **Reports (#98).** `/invoices/report` (admin): month picker + `?account=` (intersected with
+  `accountScope()` via `reportScope()`) show issued (issue date in the month, draft/cancelled
+  excluded), received (payments dated in the month) and outstanding at month end, per wallet, plus
+  an aging view of open invoices as of today (not yet due, 1–30, 31–60, 61–90, > 90 days past due)
+  and a paginated, sortable list of payments across invoices. Pure math in `invoice-report.ts`
+  (tested), DB in `invoice-report.server.ts`. The dashboard shows an admin-only "Invoice belum
+  lunas" card. **Net worth does not include outstanding invoices**: income is booked only when a
+  payment is recorded, so counting open invoices would be accrual and double count after payment.
 
 ### Public invoice link (v23)
 
