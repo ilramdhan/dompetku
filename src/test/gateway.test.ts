@@ -184,6 +184,18 @@ describe("refund rules", () => {
     expect(
       refundProblem({ ...row, status: "partial_refund", refunded_amount: 40000 }, 60000),
     ).toBeNull();
+    // A second partial refund: Midtrans now reports transaction_status "partial_refund".
+    expect(
+      refundProblem(
+        {
+          ...row,
+          status: "partial_refund",
+          refunded_amount: 40000,
+          provider_status: "partial_refund",
+        },
+        60000,
+      ),
+    ).toBeNull();
   });
   it("refuses everything else", () => {
     expect(refundProblem({ ...row, status: "pending" }, 1000)).toMatch(/berhasil/);

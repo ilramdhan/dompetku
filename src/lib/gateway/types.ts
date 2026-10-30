@@ -245,7 +245,13 @@ export function refundProblem(
 ): string | null {
   if (row.status !== "success" && row.status !== "partial_refund")
     return "Hanya pembayaran berhasil yang bisa dikembalikan";
-  if (row.provider_status && row.provider_status !== "settlement")
+  // After a partial refund Midtrans reports transaction_status "partial_refund" (the money was
+  // settled); only capture/authorize etc. are "not yet settled".
+  if (
+    row.provider_status &&
+    row.provider_status !== "settlement" &&
+    row.provider_status !== "partial_refund"
+  )
     return "Pembayaran belum settlement; coba lagi nanti";
   const type = row.payment_type ?? "";
   if (!(REFUNDABLE_TYPES as readonly string[]).includes(type))
