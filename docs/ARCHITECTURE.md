@@ -208,7 +208,7 @@ File-name suffixes tell you where code may run:
 | `i18n.tsx`                                                                    | `LanguageProvider` / `useI18n`, ID→EN dictionary.                                                                      |
 | `dates.ts`, `head.ts`, `utils.ts`                                             | Date helpers, page `<head>` helper, `cn()` class merge.                                                                |
 
-## Database schema sections (v1–v21)
+## Database schema sections (v1–v23)
 
 `supabase/schema.sql` is one file, organised in sections that are **safe to re-run** (`if not
 exists` everywhere). A fresh install runs the whole file once. Existing installs run any newer
@@ -238,6 +238,7 @@ the section is run.
 | v19     | Kantong: `pockets` (account_id cascade, name unique per wallet, allocated, min_balance, period `monthly`/`none`), optional `transactions.pocket_id` (on delete set null), `pocket_alerts` (pocket, month, level `low`/`empty`).                                       |
 | v20     | Subscription flexible interval: `subscriptions."interval"` (default 1, check ≥ 1) enables custom intervals like every 3 months, 6 months, 3 years.                                                                                                                    |
 | v21     | Invoice core: `invoices` (number unique, customer, wallet, issue/due date, status `draft`/`unpaid`/`partial`/`paid`/`cancelled`, total, paid), `invoice_items` (cascade), `invoice_payments` (amount, date, method, `transaction_id`), `app_settings.invoice_prefix`. |
+| v23     | Public invoice link: `invoice_shares` (invoice_id PK cascade, `token_hash` unique SHA-256 hex, created_at, expires_at, revoked_at). Not backed up. (v22 is reserved for another section.)                                                                             |
 
 ## Key flows
 
@@ -304,6 +305,28 @@ the section is run.
   remaining amount (re-checked after insert against concurrent payments).
 - **RBAC.** `invoices` is an admin module; the server fns still scope by `accountScope()` and
   `assertWalletManage` so the module can be granted to members later.
+
+### Public invoice link (v23)
+
+- **Token.** Invoice detail → **Bagikan** creates a link `/i/<token>`: 32 random bytes (node
+  `randomBytes`) as base64url. Only `sha256(token)` is stored in `invoice_shares.token_hash`
+  (unique), so the raw link is shown once; "Buat ulang tautan" rotates it (old link dies),
+  "Cabut" sets `revoked_at`, an optional expiry sets `expires_at`. Token hashes are never backed up.
+- **Lookup.** `getPublicInvoice` is the only `public` fn that reads financial data. It rejects a
+  malformed token before any DB access, then looks up by hash equality. Unknown/revoked/expired
+  tokens, draft/cancelled invoices, missing v21/v23 tables and DB errors all return `null` → the
+  router's 404, so the response does not reveal which case applied.
+- **Payload.** `toPublicInvoice()` (pure, tested) builds a whitelist: number, issue/due date,
+  customer name, currency, display status (incl. overdue), items, total, paid, remaining and
+  payments as date + amount. The wallet, `notes` (private), email/phone, ids, payment
+  method/reference and transaction ids never leave the server.
+- **Page.** `/i/$token` sits outside `_app`: `noindex, nofollow` (root head + `X-Robots-Tag`),
+  `Cache-Control: private, no-store`, `Referrer-Policy: no-referrer`, not in the sitemap. It
+  follows `?lang=` (`LANG_PREFIXES` in `lang.ts`), uses public branding (name + logo endpoint) and
+  never masks amounts. "Cetak / simpan PDF" is `window.print()` with print CSS forced to black on
+  white. `InvoicePaymentInstructions` is an empty slot filled by #94.
+- **Demo.** The page works; creating links is capped like other inserts (`assertDemoCapacity`)
+  and every demo link expires within `DEMO_SHARE_MAX_DAYS` (1 day).
 
 ### Users and wallet-level access (RBAC, v18)
 

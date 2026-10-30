@@ -46,6 +46,7 @@ This is a hobby project maintained by one person, so these are good-faith target
 - Authentication and sessions (login, TOTP two-step login, session cookie, login throttling)
 - Authorization of server functions (`requireAuth`) and of the public automation routes under `/api/public/n8n/*` (`N8N_API_KEY`)
 - The Telegram bot endpoint and its chat allow-list (`BOT_ALLOWED_CHAT_IDS`)
+- Public invoice links (`/i/<token>`, schema v23): token guessing, leaking fields beyond the customer view (wallet, notes, ids, payment references), or distinguishing revoked/expired/draft invoices from unknown tokens
 - Data exposure: anything that lets the browser or a third party read the database, receipt photos or backups without authorization
 - Injection, XSS, CSRF, SSRF, path traversal, unsafe file uploads (receipt photos), backup/restore abuse
 - The n8n workflow templates in `n8n/` and the SQL in `supabase/schema.sql`
@@ -92,3 +93,4 @@ Dompetku is a **single-user** app: whoever knows the login can see all your fina
 - [ ] **Never set `DEMO_MODE=true` on an instance with real data.** Demo mode publishes the login credentials on the login page and disables 2FA. Run a public demo only as a separate deployment with its own empty Supabase project (see [docs/DEMO.md](docs/DEMO.md)).
 - [ ] Rotate any key you suspect was exposed: Supabase service-role key (Supabase dashboard → Project Settings → API), `AI_API_KEY`, `RESEND_API_KEY`, `N8N_API_KEY`, `SESSION_SECRET`.
 - [ ] When sharing logs or screenshots in issues, redact keys, chat IDs, domains and amounts.
+- [ ] Public invoice links (`/i/…`) are bearer links: anyone holding one sees that invoice. Share them only with the customer, set an expiry when possible and **Cabut** (revoke) or rotate a link that went to the wrong person. Only a hash is stored, so a database or backup leak does not reveal working links.
