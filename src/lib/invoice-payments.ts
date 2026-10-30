@@ -185,6 +185,8 @@ export type PublicPayment = {
   upload: boolean;
   /** Why upload is off (i18n key) or null. */
   upload_off: string | null;
+  /** v25: "Bayar sekarang" (Midtrans) available. */
+  gateway?: boolean;
 };
 export const PUBLIC_PAYMENT_KEYS = ["methods", "pending", "upload", "upload_off"] as const;
 

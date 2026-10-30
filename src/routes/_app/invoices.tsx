@@ -27,6 +27,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { WalletFilter } from "@/components/wallet-filter";
 import { InvoiceSharePanel } from "@/components/invoice/invoice-share-panel";
 import { ProofQueue } from "@/components/invoice/proof-queue";
+import { GatewayPanel } from "@/components/invoice/gateway-panel";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -600,6 +601,11 @@ function InvoiceDetail({
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="num">{money(p.amount)}</span>
+                  {Number(p.refunded) > 0 ? (
+                    <span className="num text-xs text-warning">
+                      −{money(Number(p.refunded))} {t("refund")}
+                    </span>
+                  ) : null}
                   <Button
                     size="icon"
                     variant="ghost"
@@ -617,6 +623,7 @@ function InvoiceDetail({
           <p className="text-muted-foreground">{t("Belum ada pembayaran.")}</p>
         )}
       </div>
+      <GatewayPanel invoiceId={d.id} locale={locale} />
       <InvoiceSharePanel invoice={d} locale={locale} />
     </div>
   );

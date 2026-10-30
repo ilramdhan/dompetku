@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   Bot,
+  CreditCard,
   Link2,
   Link2Off,
   Mail,
@@ -33,6 +34,7 @@ import {
   type IntegrationGroup,
   type IntegrationStatus,
 } from "@/lib/integrations";
+import { keyModeMismatch } from "@/lib/gateway/midtrans";
 import { errMsg } from "@/lib/queries";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,7 @@ const GROUP: Record<IntegrationGroup, { title: string; icon: typeof Bot }> = {
   ai: { title: "AI (OCR & parsing chat)", icon: Sparkles },
   email: { title: "Email (Resend)", icon: Mail },
   n8n: { title: "n8n", icon: Workflow },
+  payment: { title: "Payment gateway (Midtrans)", icon: CreditCard },
 };
 
 const QK = ["integration-settings"] as const;
@@ -319,6 +322,25 @@ function TelegramDirect({ disabled, configured }: { disabled: boolean; configure
   );
 }
 
+/**
+ * v25: warns when the (public) client key's environment does not match MIDTRANS_PRODUCTION. The
+ * server additionally treats a mismatched server key as "gateway off" (`midtransConfig`).
+ */
+function MidtransModeWarning({ items }: { items: IntegrationStatus[] }) {
+  const { t } = useI18n();
+  const client = items.find((i) => i.key === "MIDTRANS_CLIENT_KEY")?.value ?? null;
+  const prod = items.find((i) => i.key === "MIDTRANS_PRODUCTION")?.value ?? "false";
+  if (!client || !keyModeMismatch(client, prod.toLowerCase() === "true")) return null;
+  return (
+    <p className="flex items-start gap-1.5 text-xs font-medium text-expense">
+      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+      {t(
+        "Key Midtrans tidak cocok dengan mode: key sandbox diawali SB- dan hanya untuk MIDTRANS_PRODUCTION=false. Gateway nonaktif sampai key dan mode cocok.",
+      )}
+    </p>
+  );
+}
+
 /** Settings card "Integrasi" (v16): bot, AI, email and n8n values stored in the DB over env. */
 export function IntegrationsCard() {
   const { t } = useI18n();
@@ -381,6 +403,14 @@ export function IntegrationsCard() {
                     />
                   ))}
                 </div>
+                {g === "payment" ? <MidtransModeWarning items={data.items} /> : null}
+                {g === "payment" ? (
+                  <p className="text-xs break-words text-muted-foreground">
+                    {t("Butuh skema v25. Pasang Payment Notification URL di dashboard Midtrans ke")}{" "}
+                    <code className="break-all">/api/public/payments/midtrans</code>.{" "}
+                    {t("Mulai dengan sandbox. Panduan: docs/PAYMENT-GATEWAY.md.")}
+                  </p>
+                ) : null}
                 {g === "telegram" ? (
                   <>
                     <p className="text-xs text-muted-foreground">

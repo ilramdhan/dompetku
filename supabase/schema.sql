@@ -833,3 +833,56 @@ $$;
 revoke all on function public.dk_rate_hit(text, timestamptz) from public, anon, authenticated;
 grant execute on function public.dk_rate_hit(text, timestamptz) to service_role;
 notify pgrst, 'reload schema';
+
+-- ============ v25: invoice — payment gateway Midtrans (Snap) + webhook & refund (aman dijalankan ulang) ============
+-- Opsional, butuh v21 + v23 + v24 (rate_limits). Tanpa bagian ini tombol "Bayar sekarang" tidak muncul, webhook
+-- /api/public/payments/midtrans menjawab 503, dan detail invoice tidak menampilkan transaksi gateway.
+-- gateway_transactions: satu baris per order Midtrans. Status internal: pending, success, failed, expired,
+-- refunded, partial_refund (mesin transisi di src/lib/gateway/types.ts: event terlambat tidak menurunkan
+-- status final). Status SELALU dicek ulang ke Midtrans Get Status API; payload webhook tidak dipercaya.
+-- invoice_id ON DELETE RESTRICT: riwayat pembayaran gateway tidak boleh hilang diam-diam. Aplikasi hanya
+-- menghapus invoice bila semua transaksi gatewaynya gagal/kedaluwarsa (baris itu dihapus dulu); selain itu
+-- penghapusan ditolak dengan pesan yang jelas.
+-- payment_id: pembayaran invoice (income kategori "Invoice") yang dibuat saat status menjadi success.
+-- claimed_at: klaim pencatatan atomik (update bersyarat) agar dua webhook bersamaan tidak mencatat dua kali;
+-- hanya klaim kedaluwarsa (>10 menit, crash) yang dilepas, percobaan gagal melepas klaimnya sendiri.
+-- raw: respons status Midtrans yang sudah disaring (whitelist kolom, tanpa signature/kunci).
+-- snap_token/redirect_url: token pembayaran Snap (kedaluwarsa ±24 jam), tidak ikut dicadangkan.
+create table if not exists public.gateway_transactions (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete restrict,
+  provider text not null default 'midtrans' check (provider in ('midtrans')),
+  order_id text not null unique check (order_id ~ '^[A-Za-z0-9._~-]{1,50}$'),
+  gateway_tx_id text unique check (gateway_tx_id is null or length(gateway_tx_id) <= 100),
+  status text not null default 'pending'
+    check (status in ('pending','success','failed','expired','refunded','partial_refund')),
+  gross_amount numeric(18,2) not null check (gross_amount > 0),
+  refunded_amount numeric(18,2) not null default 0 check (refunded_amount >= 0),
+  payment_type text check (payment_type is null or length(payment_type) <= 60),
+  payment_id uuid references public.invoice_payments(id) on delete set null,
+  snap_token text check (snap_token is null or length(snap_token) <= 200),
+  redirect_url text check (redirect_url is null or length(redirect_url) <= 500),
+  expires_at timestamptz,
+  claimed_at timestamptz,
+  last_error text check (last_error is null or length(last_error) <= 300),
+  raw jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists gateway_transactions_invoice_idx on public.gateway_transactions (invoice_id, created_at desc);
+create index if not exists gateway_transactions_payment_idx on public.gateway_transactions (payment_id);
+revoke all on public.gateway_transactions from anon, authenticated;
+grant all on public.gateway_transactions to service_role;
+alter table public.gateway_transactions enable row level security;
+
+-- Setelah refund gateway, invoice "ditahan": tombol "Bayar sekarang" dan pengingat jatuh tempo dimatikan
+-- sampai admin menekan "Tagih ulang" (refund_hold = false). Baris lain tidak terpengaruh.
+alter table public.gateway_transactions add column if not exists refund_hold boolean not null default false;
+
+-- Refund mengurangi "sudah dibayar" tanpa menghapus pembayaran: paid = jumlah (amount - refunded).
+alter table public.invoice_payments add column if not exists refunded numeric(18,2) not null default 0;
+do $$ begin
+  alter table public.invoice_payments add constraint invoice_payments_refunded_check
+    check (refunded >= 0 and refunded <= amount);
+exception when duplicate_object then null; end $$;
+notify pgrst, 'reload schema';

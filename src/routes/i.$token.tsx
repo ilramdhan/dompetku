@@ -2,6 +2,7 @@ import { createFileRoute, notFound, useRouter, useRouterState } from "@tanstack/
 import { Languages, Printer } from "lucide-react";
 import { AppLogo, useBranding } from "@/components/app-logo";
 import { InvoicePaymentInstructions } from "@/components/invoice/payment-instructions";
+import { PayNowButton } from "@/components/invoice/pay-now";
 import { Button } from "@/components/ui/button";
 import { getPublicInvoice } from "@/lib/invoice-public.functions";
 import type { PublicInvoiceView } from "@/lib/invoice-share";
@@ -11,7 +12,14 @@ import { money } from "@/lib/format";
 import { FONT_MONO, fontPreloads } from "@/lib/fonts";
 import { pageHead } from "@/lib/head";
 import { translate, useI18n } from "@/lib/i18n";
-import { DEFAULT_LANG, langHref, otherLang, parseLang, validateLangSearch } from "@/lib/lang";
+import {
+  DEFAULT_LANG,
+  langHref,
+  otherLang,
+  parseLang,
+  validateLangSearch,
+  type LangSearch,
+} from "@/lib/lang";
 import { cn } from "@/lib/utils";
 
 /*
@@ -22,8 +30,15 @@ import { cn } from "@/lib/utils";
  * token does not leak through the Referer header. Amounts are never masked here: privacy mode is
  * the admin's screen preference, this page is the customer's document (like exports).
  */
+/** `?lang=` plus `?gw=1` (back from Midtrans Snap; only shows a neutral "processing" note). */
+function validateInvoiceSearch(search: Record<string, unknown>): LangSearch & { gw?: 1 } {
+  const base = validateLangSearch(search);
+  // Midtrans may append "?order_id=…" to the finish URL, so "1?order_id=…" also counts.
+  return String(search["gw"] ?? "").startsWith("1") ? { ...base, gw: 1 } : base;
+}
+
 export const Route = createFileRoute("/i/$token")({
-  validateSearch: validateLangSearch,
+  validateSearch: validateInvoiceSearch,
   loader: async ({ params }) => {
     const invoice = await getPublicInvoice({ data: { token: params.token } });
     if (!invoice) throw notFound();
@@ -63,6 +78,7 @@ const amount = (v: number, cur: string) => money(v, cur, { reveal: true });
 function PublicInvoicePage() {
   const inv = Route.useLoaderData() as PublicInvoiceView;
   const { token } = Route.useParams();
+  const returned = Route.useSearch({ select: (s) => s.gw === 1 });
   const { t, lang } = useI18n();
   const b = useBranding();
   const router = useRouter();
@@ -193,6 +209,9 @@ function PublicInvoicePage() {
           </dl>
         </div>
 
+        {open && inv.payment?.gateway ? (
+          <PayNowButton token={token} amount={inv.remaining} currency={cur} returned={returned} />
+        ) : null}
         {open ? <InvoicePaymentInstructions invoice={inv} token={token} /> : null}
 
         {inv.payments.length ? (

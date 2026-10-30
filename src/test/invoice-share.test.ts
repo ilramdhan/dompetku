@@ -193,6 +193,8 @@ describe("wiring", () => {
     expect(SERVER_FN_ACCESS["invoice-public.functions.ts"]).toEqual({
       getPublicInvoice: "public",
       submitInvoiceProof: "public",
+      // v25 (#97): "Bayar sekarang" (token-gated, rate limited, server-computed amount).
+      createGatewayPayment: "public",
     });
     const inv = SERVER_FN_ACCESS["invoices.functions.ts"]!;
     expect(inv["createInvoiceShareFn"]).toBe("admin");

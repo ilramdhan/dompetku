@@ -174,7 +174,11 @@ export function toPublicInvoice(
     unit_price: number | string;
     position?: number | null;
   }[],
-  payments: readonly { paid_at: string; amount: number | string }[],
+  payments: readonly {
+    paid_at: string;
+    amount: number | string;
+    refunded?: number | string | null;
+  }[],
   today: string,
   pendingProofs = 0,
 ): PublicInvoice | null {
@@ -204,7 +208,12 @@ export function toPublicInvoice(
     paid,
     remaining: remainingOf(total, paid),
     payments: [...payments]
-      .map((p) => ({ paid_at: day(p.paid_at) ?? "", amount: Number(p.amount) || 0 }))
+      // v25: net of gateway refunds; fully refunded payments are not listed.
+      .map((p) => ({
+        paid_at: day(p.paid_at) ?? "",
+        amount: Math.max(0, (Number(p.amount) || 0) - (Number(p.refunded) || 0)),
+      }))
+      .filter((p) => p.amount > 0)
       .sort((a, b) => a.paid_at.localeCompare(b.paid_at)),
   };
 }

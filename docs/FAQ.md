@@ -188,6 +188,29 @@ The eye icon (or **Shift + H**) hides every amount, balance, chart value and gol
 
 </details>
 
+## Invoices and payments
+
+<details>
+<summary><strong>Can customers pay my invoices online?</strong></summary>
+
+Yes, optionally. Share the invoice's public link; the customer sees your bank/QRIS instructions and can upload a transfer proof for you to approve (schema v24). With **Midtrans** enabled (schema v25, Settings → Integrasi) the page also shows **Bayar sekarang** for QRIS, e-wallets, cards and virtual accounts, and the invoice is marked paid automatically after Midtrans confirms it. Step by step (ID + EN): [PAYMENT-GATEWAY.md](PAYMENT-GATEWAY.md).
+
+</details>
+
+<details>
+<summary><strong>Is the payment gateway safe? Does Dompetku store card data?</strong></summary>
+
+Dompetku never sees card or e-wallet details — the customer pays on Midtrans' own page. Your Midtrans Server Key is stored encrypted and never shown again or sent to the browser. Every notification is signature-checked and its status is re-read from the Midtrans API before anything is booked, and a payment can't be booked twice. Midtrans' fee (MDR) is not booked automatically.
+
+</details>
+
+<details>
+<summary><strong>Can I refund a Midtrans payment?</strong></summary>
+
+Yes, from the invoice's gateway panel (partial refunds where the payment method allows it, e.g. QRIS/GoPay/cards). A refund adds a reversing expense instead of deleting history, and the invoice stops asking for payment until you choose **Tagih ulang** or cancel it. Bank transfer / virtual account payments can't be refunded through the API — return the money manually. Details: [PAYMENT-GATEWAY.md §8](PAYMENT-GATEWAY.md#8-refund).
+
+</details>
+
 ## Bot and AI
 
 <details>

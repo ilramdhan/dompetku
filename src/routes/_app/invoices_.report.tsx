@@ -310,7 +310,14 @@ function InvoiceReportPage() {
                       {p.reference ? ` · ${p.reference}` : ""} · {accName(p.account_id)}
                     </p>
                   </div>
-                  <p className="num font-semibold text-income">{money(p.amount)}</p>
+                  <div className="shrink-0 text-right">
+                    <p className="num font-semibold text-income">{money(p.amount)}</p>
+                    {Number(p.refunded) > 0 ? (
+                      <p className="num text-xs text-warning">
+                        −{money(Number(p.refunded))} {t("refund")}
+                      </p>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>

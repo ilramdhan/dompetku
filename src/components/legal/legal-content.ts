@@ -1,6 +1,6 @@
 /** Privacy policy and terms content. Strings are Indonesian DICT keys (English in i18n.tsx). */
 /** Last content change of the privacy policy and terms (ISO date, rendered per language). */
-export const LEGAL_UPDATED = "2026-10-04";
+export const LEGAL_UPDATED = "2026-10-31";
 
 export type LegalSection = {
   id: string;
@@ -31,6 +31,7 @@ export const PRIVACY: LegalSection[] = [
     body: [
       "Data keuangan yang Anda masukkan — akun, transaksi, budget, hutang, piutang, emas, target, foto struk, dan pengaturan — disimpan di proyek Supabase (PostgreSQL dan Storage) milik pemilik instance.",
       "Database hanya diakses oleh server aplikasi ini; browser tidak pernah terhubung langsung ke database. Pembuat Dompetku tidak memiliki akses ke instance ini.",
+      "Bila fitur invoice dipakai, data pelanggan yang diisi pemilik instance (nama, email, telepon) dan bukti transfer yang diunggah pelanggan juga disimpan di sana. Untuk membatasi penyalahgunaan unggahan, alamat IP pengunggah hanya disimpan dalam bentuk hash.",
     ],
   },
   {
@@ -58,7 +59,8 @@ export const PRIVACY: LegalSection[] = [
       "Vercel atau penyedia hosting lain — menjalankan server dan menerima permintaan HTTP beserta log standar.",
       "Penyedia AI (API yang kompatibel dengan OpenAI) — menerima foto struk atau teks transaksi untuk dibaca, beserta daftar nama kategori.",
       "Telegram dan n8n — meneruskan pesan bot, ringkasan, dan pengingat antara Anda dan aplikasi.",
-      "Resend — mengirim email pengingat ke alamat yang diatur pemilik instance.",
+      "Resend — mengirim email pengingat ke alamat yang diatur pemilik instance, serta email invoice, konfirmasi pembayaran, dan pengingat jatuh tempo ke email pelanggan invoice.",
+      "Midtrans (payment gateway) — bila pembayaran online diaktifkan, menerima nomor invoice, jumlah tagihan, serta nama, email, dan telepon pelanggan untuk memproses pembayaran. Data kartu atau e-wallet diisi langsung di halaman Midtrans dan tidak pernah melewati aplikasi ini.",
       "Sentry — menerima laporan error teknis (pesan error dan konteks permintaan), bukan isi data keuangan Anda.",
       "Google Drive — menyimpan file backup bila backup terjadwal diaktifkan.",
     ],
@@ -109,7 +111,7 @@ export const TERMS: LegalSection[] = [
     title: "Tanggung jawab Anda",
     items: [
       "Pemilik instance bertanggung jawab atas deployment, keamanan server, kunci API, kata sandi, dan backup-nya sendiri.",
-      "Pemilik instance wajib mematuhi ketentuan layanan pihak ketiga yang dipakai (Supabase, Vercel, penyedia AI, Telegram, dan lainnya).",
+      "Pemilik instance wajib mematuhi ketentuan layanan pihak ketiga yang dipakai (Supabase, Vercel, penyedia AI, Telegram, Midtrans, dan lainnya).",
     ],
   },
   {
