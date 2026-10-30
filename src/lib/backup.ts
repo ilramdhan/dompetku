@@ -13,6 +13,8 @@ import { z } from "zod";
  * account_reconciliations) come last: their parents (accounts/categories/budgets) are earlier.
  * bot_drafts, activity_log and ai_usage (v15 logs) are never exported or restored, nor is
  * integration_settings (v16): it holds encrypted API keys that must never leave the server in a file.
+ * invoice_shares (v23) is not backed up either: public link token hashes are credentials; after a
+ * restore the admin simply creates new links.
  * app_users (v17) is exported with profile fields only: SECRET_COLUMNS (password_hash,
  * session_version) are stripped on export and on restore, and replace mode never deletes it.
  * account_permissions (v18) comes after both of its parents (accounts, app_users); restored member
@@ -175,7 +177,7 @@ const backupSchema = z.object({
 export type ParsedBackup = {
   exportedAt: string | null;
   tables: { table: RestoreTable; rows: Row[] }[];
-  /** Tables in the file that are not restored (unknown, bot_drafts, activity_log, ai_usage, integration_settings). */
+  /** Tables in the file that are not restored (unknown, bot_drafts, activity_log, ai_usage, integration_settings, invoice_shares). */
   ignored: string[];
   total: number;
 };
