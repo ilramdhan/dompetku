@@ -118,6 +118,11 @@ export function MyNotifyCard() {
               )}
             </p>
             {problem ? <p className="text-xs text-expense">{t(problem)}</p> : null}
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "Isi hanya chat ID Anda sendiri atau grup yang setuju menerima laporan. Chat ID belum diverifikasi; admin melihatnya sebagai “diatur anggota”.",
+              )}
+            </p>
           </div>
           <div className="space-y-2">
             <label className="flex items-center justify-between gap-3 text-sm">

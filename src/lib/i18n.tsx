@@ -1376,6 +1376,13 @@ const DICT: Record<string, string> = {
   "Tidak ada yang dicentang = semua dompet yang boleh Anda lihat.":
     "Nothing checked = every wallet you may view.",
   "Notifikasi Telegram dimatikan": "Telegram notifications turned off",
+  "Diatur anggota": "Set by member",
+  "Chat ID ini diisi sendiri oleh anggota dan belum diverifikasi. Pastikan itu chat pribadinya atau grup yang setuju menerima laporan; matikan Aktif untuk menghentikannya.":
+    "This chat ID was entered by the member and is not verified. Make sure it is their own chat or a group that agreed to receive reports; turn off Active to stop it.",
+  "Isi hanya chat ID Anda sendiri atau grup yang setuju menerima laporan. Chat ID belum diverifikasi; admin melihatnya sebagai “diatur anggota”.":
+    "Enter only your own chat ID or a group that agreed to receive reports. Chat IDs are not verified; the admin sees it as “set by member”.",
+  "Gagal menyimpan daftar dompet — notifikasi dinonaktifkan sampai admin mengaktifkannya lagi.":
+    "Could not save the wallet list — notifications are disabled until the admin turns them back on.",
   "Anggota mengatur notifikasi Telegram sendiri": "Member updated their own Telegram notifications",
   "Anggota berhenti menerima notifikasi Telegram": "Member stopped Telegram notifications",
   "Notifikasi anggota diubah": "Member notifications changed",
