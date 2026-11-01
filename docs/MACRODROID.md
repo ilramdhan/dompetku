@@ -102,7 +102,7 @@ ini berjalan di browser dan tidak mengirim apa pun. Kotak yang sama juga ada di 
 untuk menguji satu format saja.
 
 **Batas regex (demi keamanan server):** maksimal 200 karakter, harus valid, dan tanpa
-backreference/lookbehind. Siapa pun bisa mengirim SMS/chat yang muncul sebagai notifikasi, jadi
+backreference/lookahead/lookbehind. Siapa pun bisa mengirim SMS/chat yang muncul sebagai notifikasi, jadi
 hanya pola yang tidak bisa "macet" yang diterima:
 
 - tidak boleh ada pengulangan di dalam grup yang diulang: `(a+)+`, `(a?){25}`, `(\d{1,30}){1,30}`,
@@ -110,12 +110,13 @@ hanya pola yang tidak bisa "macet" yang diterima:
 - dua pengulangan berdampingan yang bisa mencocokkan karakter yang sama ditolak: `\d*\d*`,
   `\d+.*`, `\w+\d+`. Yang aman: `Rp\.?\s?\d[\d.,]*` atau `Rp ([\d.]+),\d{2}`;
 - maksimal 3 `*`/`+`;
-- maksimal 40 karakter/kelas berbeda;
+- maksimal 40 karakter/kelas berbeda dan maksimal 8 pengulangan variabel (`*`, `+`, `?`, `{n,}`,
+  `{n,m}`);
 - **hanya sintaks ini yang didukung** (selain itu "Regex tidak valid", walau browser menerimanya):
-  grup `(…)`, `(?:…)`, `(?<nama>…)`, lookahead `(?=…)`/`(?!…)`, `|`, `^`, `$`, `\b`, `\B`,
+  grup `(…)`, `(?:…)`, `(?<nama>…)`, `|`, `^`, `$`, `\b`, `\B`,
   `.`, kelas `[…]`/`[^…]` dengan rentang, `\d \D \w \W \s \S \t \n \v \f \r \0`, `\xHH`,
   `\uHHHH`, `\cA`–`\cZ`, tanda baca yang di-escape (`\.`, `\(`, `\{` …), dan kuantor
-  `* + ? {n} {n,} {n,m}` (boleh lazy `?`). Tidak didukung antara lain: modifier `(?i:…)`/`(?s:…)`,
+  `* + ? {n} {n,} {n,m}` (boleh lazy `?`). Tidak didukung antara lain: lookahead/lookbehind `(?=…)` `(?!…)` `(?<=…)` `(?<!…)`, modifier `(?i:…)`/`(?s:…)`,
   `\p{…}`, escape oktal `\012`, `\k`, dan `{`/`}`/`]` tanpa escape.
 
 Regex hanya dijalankan pada 300 karakter pertama notifikasi.
@@ -324,15 +325,16 @@ matched format and the parsed amount right away. This runs in your browser and s
 **Regex limits (to protect the server):**
 
 - at most 200 characters, and the pattern must compile;
-- no backreferences or lookbehind;
+- no backreferences, lookahead or lookbehind;
 - nested or alternating quantified groups like `(a+)+` are rejected;
 - at most 3 `*`/`+`;
-- at most 40 distinct characters/classes;
+- at most 40 distinct characters/classes and at most 8 variable quantifiers (`*`, `+`, `?`,
+  `{n,}`, `{n,m}`);
 - **only this syntax is supported** (anything else is "invalid", even if your browser accepts
-  it): groups `(…)`, `(?:…)`, `(?<name>…)`, lookahead `(?=…)`/`(?!…)`, `|`, `^`, `$`, `\b`, `\B`,
+  it): groups `(…)`, `(?:…)`, `(?<name>…)`, `|`, `^`, `$`, `\b`, `\B`,
   `.`, classes `[…]`/`[^…]` with ranges, `\d \D \w \W \s \S \t \n \v \f \r \0`, `\xHH`,
   `\uHHHH`, `\cA`–`\cZ`, escaped punctuation (`\.`, `\(`, `\{` …) and quantifiers
-  `* + ? {n} {n,} {n,m}` (optionally lazy `?`). Not supported include modifiers
+  `* + ? {n} {n,} {n,m}` (optionally lazy `?`). Not supported include lookarounds `(?=…)` `(?!…)` `(?<=…)` `(?<!…)`, modifiers
   `(?i:…)`/`(?s:…)`, `\p{…}`, octal `\012`, `\k` and unescaped `{`/`}`/`]`;
 - no repetition inside a repeated group: `(a+)+`, `(a?){25}`, `(\d{1,30}){1,30}` are rejected;
 - no two neighbouring repetitions that can match the same character: `\d*\d*`, `\d+.*`,
