@@ -110,6 +110,8 @@ hanya pola yang tidak bisa "macet" yang diterima:
 - dua pengulangan berdampingan yang bisa mencocokkan karakter yang sama ditolak: `\d*\d*`,
   `\d+.*`, `\w+\d+`. Yang aman: `Rp\.?\s?\d[\d.,]*` atau `Rp ([\d.]+),\d{2}`;
 - maksimal 3 `*`/`+`.
+- maksimal 40 karakter/kelas berbeda, dan tanpa `\c` yang tidak diikuti huruf atau `\0`
+  yang diikuti angka (escape oktal).
 
 Regex hanya dijalankan pada 300 karakter pertama notifikasi.
 
@@ -163,6 +165,9 @@ ACTIONS
   Nilai yang tidak tersedia (mis. big text kosong) akan diabaikan oleh Dompetku.
 - Untuk uji cepat saja, Content Body boleh berupa JSON tulisan tangan seperti contoh `curl` di
   bawah, asal teksnya tetap (tanpa magic text).
+- Bila tetap memakai template tulisan tangan, template itu **harus menulis semua key** (`app`,
+  `package`, `title`, `text`, `big_text`, `sub_text`, `posted_at`, `device`). Key yang tidak
+  ditulis bisa disisipkan lewat berita transfer tanpa terdeteksi sebagai key ganda.
 - Simpan makro dan pastikan **izin Notification Access** untuk MacroDroid aktif. Matikan juga
   penghematan baterai untuk MacroDroid.
 
@@ -317,6 +322,8 @@ matched format and the parsed amount right away. This runs in your browser and s
 - no backreferences or lookbehind;
 - nested or alternating quantified groups like `(a+)+` are rejected;
 - at most 3 `*`/`+`;
+- at most 40 distinct characters/classes, no `\c` without a following letter and no `\0`
+  followed by a digit (octal escape);
 - no repetition inside a repeated group: `(a+)+`, `(a?){25}`, `(\d{1,30}){1,30}` are rejected;
 - no two neighbouring repetitions that can match the same character: `\d*\d*`, `\d+.*`,
   `\w+\d+` are rejected (`Rp\.?\s?\d[\d.,]*` is fine);
@@ -342,7 +349,9 @@ breaks in a notification can neither break the body nor inject keys. Do not hand
 magic text inside quotes (`"text":"{notification}"`): a sender-controlled transfer remark such as
 `","text":"Rp 500.123 masuk` would override the amount. Dompetku rejects bodies with a repeated key
 (**400**), but **auto-confirm assumes escaped JSON**. Hand-written JSON is only for fixed test
-bodies such as the `curl` example below.
+bodies such as the `curl` example below. If you still use a hand-written template, it **must list every
+key** (`app`, `package`, `title`, `text`, `big_text`, `sub_text`, `posted_at`, `device`): a key the
+template leaves out can be injected through a transfer remark without being a duplicate.
 
 Grant MacroDroid **Notification Access**, and exclude it from battery optimisation.
 
