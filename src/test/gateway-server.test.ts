@@ -10,6 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 type Row = any;
 const tables: Record<string, Row[]> = {};
 let failSelect: string | null = null;
+/** Fails the next update that sets this column (e.g. "snap_token"). */
+let failUpdateOf: string | null = null;
 
 function query(table: string) {
   const filters: ((r: Row) => boolean)[] = [];
@@ -46,6 +48,10 @@ function query(table: string) {
     maybeSingle: () => ((single = true), api),
     single: () => ((single = true), api),
     then: (res: (v: any) => void) => {
+      if (op === "update" && failUpdateOf && failUpdateOf in patch) {
+        failUpdateOf = null;
+        return res({ data: null, error: { message: "write failed", code: "XX000" } });
+      }
       if (failSelect === table && op === "select")
         return res({ data: null, error: { message: "boom", code: "XX000" } });
       if (op === "insert") {
@@ -188,6 +194,7 @@ beforeEach(() => {
   bookGate = Promise.resolve();
   bookError = null;
   failSelect = null;
+  failUpdateOf = null;
   rateCalls.length = 0;
   external.length = 0;
   fees = null;
@@ -486,5 +493,29 @@ describe("one live pending order per invoice (review L1, #124)", () => {
     // A second pass books nothing more and no longer blocks (the row is not pending).
     expect(await retirePendingOrders("inv", { amount: 50000 })).toBe(0);
     expect(booked).toEqual([150000]);
+  });
+
+  it("never hands out a token the row could not save (review L5)", async () => {
+    tables["gateway_transactions"] = [];
+    failUpdateOf = "snap_token";
+    await expect(startGatewayPayment(TOKEN, "1.1.1.1", null, 50000)).rejects.toThrow(
+      /gagal dibuat/,
+    );
+    expect(created).toHaveLength(1);
+    expect(expired).toEqual(created); // the new Snap order was expired at Midtrans
+    expect(gw()[0]!.status).toBe("expired");
+  });
+
+  it("keeps token and expiry on a pending row when the save and the expire both fail (L5)", async () => {
+    tables["gateway_transactions"] = [];
+    failUpdateOf = "snap_token";
+    expireOk = false;
+    await expect(startGatewayPayment(TOKEN, "1.1.1.1", null, 50000)).rejects.toThrow(
+      /gagal dibuat/,
+    );
+    const row = gw()[0]!;
+    expect(row.status).toBe("pending");
+    expect(row.snap_token).toBe(`snap-${created[0]}`);
+    expect(Date.parse(row.expires_at)).toBeGreaterThan(Date.now());
   });
 });

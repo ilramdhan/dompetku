@@ -262,13 +262,14 @@ export async function startGatewayPayment(
     await table()
       .update({
         status: "failed",
-        last_error: "Superseded by a concurrent order",
+        last_error: "Digantikan order lain yang dibuat bersamaan",
         updated_at: new Date().toISOString(),
       })
       .eq("id", ins.data.id)
       .in("status", ["pending", "expired"]);
     throw new Error(PAY_FAILED);
   }
+  let settled = false;
   try {
     const finishUrl = siteOrigin ? `${siteOrigin}/i/${token}?gw=1` : null;
     const r = await midtrans.createPayment(c, {
@@ -292,10 +293,12 @@ export async function startGatewayPayment(
       .eq("id", ins.data.id)
       .eq("status", "pending")
       .select("id");
-    if (!saved.error && !saved.data?.length) {
-      // Retired by a concurrent request while the Snap order was being created: expire the new
-      // order too; if that fails, put the row back to pending (with its token and expiry, so
-      // `pendingAgedOut` can age it out after the Snap expiry) and the next retire retries it.
+    if (saved.error || !saved.data?.length) {
+      // Retired by a concurrent request while the Snap order was being created, or the token
+      // could not be saved (review L5: never hand out a token the row does not know): expire the
+      // new order; if that fails, put the row back to pending with its token and expiry (so
+      // `pendingAgedOut` only ages it out after the Snap expiry) and the next retire retries it.
+      if (saved.error) (await import("../monitoring.server")).logError("gateway:save", saved.error);
       if (!(await midtrans.expire(c, orderId)))
         await table()
           .update({
@@ -306,7 +309,13 @@ export async function startGatewayPayment(
             updated_at: new Date().toISOString(),
           })
           .eq("id", ins.data.id)
-          .eq("status", "expired");
+          .in("status", ["pending", "expired"]);
+      else
+        await table()
+          .update({ status: "expired", updated_at: new Date().toISOString() })
+          .eq("id", ins.data.id)
+          .eq("status", "pending");
+      settled = true; // the row is already in its final state: the catch must not mark it failed
       throw new Error(PAY_FAILED);
     }
     await (
@@ -318,6 +327,7 @@ export async function startGatewayPayment(
     });
     return answer({ snap_token: r.token, redirect_url: r.redirectUrl });
   } catch (e) {
+    if (settled) throw e;
     await table()
       .update({
         status: "failed",
