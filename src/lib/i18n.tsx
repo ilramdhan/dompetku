@@ -1362,6 +1362,22 @@ const DICT: Record<string, string> = {
     "The owner uses TELEGRAM_ADMIN_CHAT_ID in Settings → Integrations",
   "Notifikasi per anggota belum aktif — jalankan bagian v22 di supabase/schema.sql.":
     "Per-member notifications are not enabled yet — run section v22 of supabase/schema.sql.",
+  /* Members manage their own Telegram chat id (#122) */
+  "Laporan & pengingat terjadwal hanya berisi dompet yang boleh Anda lihat. Chat ID ini tidak memberi akses ke bot.":
+    "Scheduled reports & reminders only include wallets you may view. This chat ID does not grant bot access.",
+  "Notifikasi per anggota belum aktif. Minta admin menjalankan bagian v22.":
+    "Per-member notifications are not enabled yet. Ask the admin to run section v22.",
+  "Admin menonaktifkan notifikasi Anda. Hubungi admin untuk mengaktifkannya lagi.":
+    "The admin has turned off your notifications. Contact the admin to turn them back on.",
+  "Mulai chat dengan bot dulu (atau tambahkan bot ke grup). Kosongkan untuk berhenti menerima notifikasi.":
+    "Start a chat with the bot first (or add the bot to a group). Leave empty to stop receiving notifications.",
+  "Anda belum punya akses dompet, jadi belum ada notifikasi yang dikirim.":
+    "You have no wallet access yet, so no notifications are sent.",
+  "Tidak ada yang dicentang = semua dompet yang boleh Anda lihat.":
+    "Nothing checked = every wallet you may view.",
+  "Notifikasi Telegram dimatikan": "Telegram notifications turned off",
+  "Anggota mengatur notifikasi Telegram sendiri": "Member updated their own Telegram notifications",
+  "Anggota berhenti menerima notifikasi Telegram": "Member stopped Telegram notifications",
   "Notifikasi anggota diubah": "Member notifications changed",
   "Notifikasi anggota dihapus": "Member notifications removed",
   "Chat ID admin (notifikasi)": "Admin chat ID (notifications)",
