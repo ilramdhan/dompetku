@@ -535,10 +535,14 @@ port 3000 publicly (e.g. `127.0.0.1:3000:3000` in `docker-compose.yml`).
 
 Behind a reverse proxy every request reaches the container from the proxy's address, so the
 per-IP rate limits (invoice proofs, pay button, gateway webhook, demo writes) would share one
-bucket. Set `TRUSTED_PROXY` to the number of proxies in front of the app (`1` for a single Caddy or
-Nginx, `2` for Cloudflare → Caddy) or to their addresses (`loopback`, `private`, `172.16.0.0/12`)
-so the client address is read from `X-Forwarded-For`. Leave it empty when the container is
-reachable directly: the header is then ignored, because any client can forge it. See
+bucket. Set `TRUSTED_PROXY` to the proxy's address (recommended: `127.0.0.1` for Caddy/Nginx on the
+host, or the Docker network subnet such as `172.18.0.0/16`) or to the number of proxies that append
+to `X-Forwarded-For` (`1` for a single Nginx), so the client address is read from that header. Then
+publish the port on loopback only (`127.0.0.1:3000:3000` in `docker-compose.yml`): anyone who can
+reach port 3000 directly could otherwise forge the header. Caddy replaces `X-Forwarded-For` unless
+it trusts the hop before it, so Cloudflare → Caddy needs `trusted_proxies` in Caddy (a plain `2` is
+wrong). Avoid `private` while the port is published: Docker's gateway (`172.17.0.1`) is in that
+range. Leave it empty when the container is reachable directly. See
 [ENVIRONMENT.md](ENVIRONMENT.md#network-optional).
 
 The **Telegram bot** needs a public HTTPS address too: Telegram only delivers webhooks to `https://`
