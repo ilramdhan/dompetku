@@ -24,6 +24,7 @@ import {
   invoiceTotal,
   nextInvoiceNumber,
   paidSum,
+  paymentOvershoots,
   paymentExternalId,
   paymentProblem,
   remainingOf,
@@ -464,9 +465,10 @@ export async function bookPayment(
     .single();
   if (ins.error) throw new Error(ins.error.message);
   const pay = ins.data;
-  // Re-check against concurrent payments; roll back this one when it overshoots.
+  // Re-check against concurrent payments: roll back this one only when it is the one that
+  // overshoots in (created_at, id) order, so the earliest of two racing payments is kept.
   const after = await db().from("invoice_payments").select("*").eq("invoice_id", inv.id);
-  if (!after.error && paidSum(after.data ?? []) > inv.total + 0.005) {
+  if (!after.error && paymentOvershoots(after.data ?? [], inv.total, pay.id)) {
     await db().from("invoice_payments").delete().eq("id", pay.id);
     throw new Error("Pembayaran melebihi sisa tagihan");
   }

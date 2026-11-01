@@ -18,6 +18,7 @@ import {
   paidSum,
   parseInvoiceNumber,
   paymentExternalId,
+  paymentOvershoots,
   paymentProblem,
   remainingOf,
   validateInvoice,
@@ -287,5 +288,33 @@ describe("invoice prefix setting (v21 app_settings.invoice_prefix)", () => {
     ).toBe("SHOP1");
     expect(appSettingsInputSchema.parse({ ...base, invoice_prefix: "" }).invoice_prefix).toBeNull();
     expect(() => appSettingsInputSchema.parse({ ...base, invoice_prefix: "IN-V" })).toThrow();
+  });
+});
+
+describe("concurrent payment overshoot (review L2, #124)", () => {
+  const p = (id: string, amount: number, at: string, refunded = 0) => ({
+    id,
+    amount,
+    refunded,
+    created_at: `2026-11-01T10:00:${at}Z`,
+  });
+
+  it("keeps the earliest of two racing payments and rolls back only the later one", () => {
+    const rows = [p("b", 60000, "02"), p("a", 60000, "01")];
+    expect(paymentOvershoots(rows, 100000, "a")).toBe(false);
+    expect(paymentOvershoots(rows, 100000, "b")).toBe(true);
+  });
+
+  it("breaks created_at ties by id and ignores payments that fit", () => {
+    const rows = [p("y", 60000, "01"), p("x", 60000, "01")];
+    expect(paymentOvershoots(rows, 100000, "x")).toBe(false);
+    expect(paymentOvershoots(rows, 100000, "y")).toBe(true);
+    expect(paymentOvershoots([p("a", 40000, "01"), p("b", 60000, "02")], 100000, "b")).toBe(false);
+  });
+
+  it("nets refunds out and treats an unknown id as no overshoot", () => {
+    const rows = [p("a", 100000, "01", 50000), p("b", 50000, "02")];
+    expect(paymentOvershoots(rows, 100000, "b")).toBe(false);
+    expect(paymentOvershoots(rows, 100000, "zz")).toBe(false);
   });
 });

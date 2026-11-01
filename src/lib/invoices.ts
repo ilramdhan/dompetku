@@ -84,6 +84,27 @@ export function paidSum(payments: readonly InvoicePaymentLike[]): number {
   return r2(payments.reduce((s, p) => s + (Number(p.amount) || 0) - (Number(p.refunded) || 0), 0));
 }
 
+/**
+ * Overshoot re-check after inserting payment `ownId` (concurrent bookings, review L2 of #124):
+ * payments are ordered by `created_at, id` and only a payment whose running net sum exceeds the
+ * total overshoots, so of two concurrent payments that together exceed the total the earliest is
+ * kept and only the later one rolls back (previously both could). Missing `ownId` = no overshoot.
+ */
+export function paymentOvershoots(
+  payments: readonly (InvoicePaymentLike & { id: string; created_at?: string | null })[],
+  total: number | string,
+  ownId: string,
+): boolean {
+  const sorted = [...payments].sort((a, b) => {
+    const ta = Date.parse(a.created_at ?? "") || 0;
+    const tb = Date.parse(b.created_at ?? "") || 0;
+    return ta !== tb ? ta - tb : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  const i = sorted.findIndex((p) => p.id === ownId);
+  if (i < 0) return false;
+  return paidSum(sorted.slice(0, i + 1)) > Number(total) + EPS;
+}
+
 /** Amount still to pay (never negative). */
 export function remainingOf(total: number | string, paid: number | string): number {
   return Math.max(0, r2(Number(total) - Number(paid)));
