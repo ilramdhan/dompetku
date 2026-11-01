@@ -104,6 +104,15 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     refundGatewayFn: "admin",
     releaseRefundHoldFn: "admin",
   },
+  // v26 (#96): MacroDroid notification formats (Settings) and the bank-notification review queue.
+  "payment-signals.functions.ts": {
+    getNotifyFormatsFn: "admin",
+    saveNotifyFormatFn: "admin",
+    deleteNotifyFormatFn: "admin",
+    getPaymentSignalsFn: "admin",
+    confirmSignalFn: "admin",
+    ignoreSignalFn: "admin",
+  },
   "invoice-report.functions.ts": {
     getInvoiceReport: "admin",
     getInvoicePayments: "admin",

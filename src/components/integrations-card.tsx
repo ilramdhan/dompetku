@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Bot,
   CreditCard,
+  Smartphone,
   Link2,
   Link2Off,
   Mail,
@@ -45,6 +46,7 @@ const GROUP: Record<IntegrationGroup, { title: string; icon: typeof Bot }> = {
   email: { title: "Email (Resend)", icon: Mail },
   n8n: { title: "n8n", icon: Workflow },
   payment: { title: "Payment gateway (Midtrans)", icon: CreditCard },
+  macrodroid: { title: "Notifikasi bank (MacroDroid)", icon: Smartphone },
 };
 
 const QK = ["integration-settings"] as const;
@@ -409,6 +411,15 @@ export function IntegrationsCard() {
                     {t("Butuh skema v25. Pasang Payment Notification URL di dashboard Midtrans ke")}{" "}
                     <code className="break-all">/api/public/payments/midtrans</code>.{" "}
                     {t("Mulai dengan sandbox. Panduan: docs/PAYMENT-GATEWAY.md.")}
+                  </p>
+                ) : null}
+                {g === "macrodroid" ? (
+                  <p className="text-xs break-words text-muted-foreground">
+                    {t("Butuh skema v26. MacroDroid mengirim notifikasi bank ke")}{" "}
+                    <code className="break-all">/api/public/payments/notify</code>.{" "}
+                    {t(
+                      "Atur format notifikasi di kartu Format notifikasi bank. Panduan: docs/MACRODROID.md.",
+                    )}
                   </p>
                 ) : null}
                 {g === "telegram" ? (

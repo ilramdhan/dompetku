@@ -15,6 +15,7 @@ const ENTITY: Record<string, string> = {
   invoices: "Invoice",
   invoice_payments: "Pembayaran invoice",
   payment_methods: "Metode pembayaran",
+  payment_notify_formats: "Format notifikasi",
 };
 
 const VERB: Record<string, string> = {
@@ -69,6 +70,9 @@ const SPECIAL: Record<string, string> = {
   "invoices.gateway": "Pembayaran Midtrans diterima",
   "invoices.gateway_refund": "Refund Midtrans dicatat",
   "invoices.gateway_rebill": "Invoice ditagih ulang setelah refund",
+  "payment_signals.create": "Notifikasi bank diterima",
+  "payment_signals.confirm": "Notifikasi bank dikonfirmasi",
+  "payment_signals.ignore": "Notifikasi bank diabaikan",
 };
 
 export function activityLabel(action: string, t: (s: string) => string = (s) => s): string {

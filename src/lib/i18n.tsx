@@ -908,6 +908,10 @@ const DICT: Record<string, string> = {
     "Midtrans (payment gateway) — when online payment is enabled, receives the invoice number, amount due and the customer's name, email and phone to process the payment. Card or e-wallet details are entered on Midtrans' own page and never pass through this app.",
   "Bila fitur invoice dipakai, data pelanggan yang diisi pemilik instance (nama, email, telepon) dan bukti transfer yang diunggah pelanggan juga disimpan di sana. Untuk membatasi penyalahgunaan unggahan, alamat IP pengunggah hanya disimpan dalam bentuk hash.":
     "When invoices are used, the customer details the owner enters (name, email, phone) and transfer proofs uploaded by customers are stored there too. To limit upload abuse, the uploader's IP address is stored only as a hash.",
+  "Bila notifikasi bank via MacroDroid diaktifkan, HP pemilik instance meneruskan notifikasi dari aplikasi bank/e-wallet yang dipilih ke server ini. Teks notifikasi diproses di server untuk mencocokkan pembayaran invoice; yang disimpan hanya cuplikan singkat (nomor rekening atau referensi panjang disamarkan), nominal, nama aplikasi, waktu, dan status — tidak pernah teks lengkapnya. Notifikasi yang diabaikan atau tidak cocok dihapus otomatis setelah sekitar 90 hari dan tidak ikut backup.":
+    "When bank notifications via MacroDroid are enabled, the instance owner's phone forwards notifications from the selected bank/e-wallet apps to this server. The notification text is processed on the server to match invoice payments; only a short excerpt (long account or reference numbers masked), the amount, app name, time and status are stored — never the full text. Ignored or unmatched notifications are deleted automatically after about 90 days and are not included in backups.",
+  "MacroDroid (aplikasi Android di HP pemilik instance) — membaca notifikasi aplikasi bank/e-wallet yang dipilih pemilik dan mengirimkannya hanya ke server instance ini. Teks notifikasi tidak dikirim ke pihak lain.":
+    "MacroDroid (Android app on the instance owner's phone) — reads notifications of the bank/e-wallet apps the owner selects and sends them only to this instance's server. Notification text is not sent to anyone else.",
   "Sentry — menerima laporan error teknis (pesan error dan konteks permintaan), bukan isi data keuangan Anda.":
     "Sentry — receives technical error reports (error message and request context), not your financial records.",
   "Google Drive — menyimpan file backup bila backup terjadwal diaktifkan.":
@@ -1618,6 +1622,154 @@ const DICT: Record<string, string> = {
   "Ada refund Midtrans: tombol Bayar sekarang dan pengingat jatuh tempo dihentikan. Batalkan invoice bila tidak ditagih lagi, atau tagih ulang sisanya.":
     "There is a Midtrans refund: the Pay now button and due reminders are paused. Cancel the invoice if it will not be billed again, or bill the remainder again.",
   "Invoice ditagih ulang setelah refund": "Invoice billed again after a refund",
+  /* v26 MacroDroid bank notifications (#96) */
+  Abaikan: "Ignore",
+  "Aplikasi atau nama paket (mis. com.bca)": "App or package name (e.g. com.bca)",
+  "Aplikasi atau nama paket": "App or package name",
+  "Aplikasi tidak dikenal": "Unknown app",
+  "Atur format notifikasi di kartu Format notifikasi bank. Panduan: docs/MACRODROID.md.":
+    "Set up notification formats in the Bank notification formats card. Guide: docs/MACRODROID.md.",
+  "Belum ada format notifikasi.": "No notification formats yet.",
+  "Butuh skema v26. MacroDroid mengirim notifikasi bank ke":
+    "Requires schema v26. MacroDroid sends bank notifications to",
+  Cocok: "Match",
+  "Contoh format ditambahkan, sesuaikan dengan notifikasi Anda":
+    "Example format added, adjust it to your notifications",
+  "Contoh format": "Example format",
+  Diabaikan: "Ignored",
+  "dicatat sebagai pemasukan tambahan.": "is recorded as extra income.",
+  Dikonfirmasi: "Confirmed",
+  "Dompet invoice": "Invoice wallet",
+  "Filter notifikasi": "Filter notifications",
+  "Format generik aktif": "Generic format on",
+  "Format notifikasi bank": "Bank notification formats",
+  "Format pertama yang cocok dengan aplikasi, judul dan teks dipakai.":
+    "The first format matching the app, title and text is used.",
+  "Grup bernama (?<amount>…) atau grup pertama berisi nominal. Format Rp 1.250.000,00 / IDR1,250,000.00 / 1.250.000 dikenali.":
+    "A named group (?<amount>…) or the first group holds the amount. Rp 1.250.000,00 / IDR1,250,000.00 / 1.250.000 are recognised.",
+  "Isi MACRODROID_TOKEN di Integrasi → Notifikasi bank (MacroDroid). Panduan: docs/MACRODROID.md.":
+    "Set MACRODROID_TOKEN in Integrations → Bank notifications (MacroDroid). Guide: docs/MACRODROID.md.",
+  "Judul notifikasi": "Notification title",
+  "Jumlah transfer": "Amount to transfer",
+  "Kode unik": "Unique code",
+  "Konfirmasi manual": "Manual confirmation",
+  "Konfirmasi notifikasi": "Confirm notification",
+  "Konfirmasi otomatis: aktif": "Auto-confirm: on",
+  Konfirmasi: "Confirm",
+  "Mengandung teks": "Contains text",
+  "Nama format": "Format name",
+  "Notifikasi bank belum aktif: jalankan bagian v26 di supabase/schema.sql.":
+    "Bank notifications are not active: run the v26 section in supabase/schema.sql.",
+  "Notifikasi bank": "Bank notifications",
+  "Notifikasi diabaikan": "Notification ignored",
+  "Notifikasi uang masuk yang diteruskan MacroDroid dicocokkan dengan invoice terbuka (sisa tagihan + kode unik).":
+    "Incoming-money notifications forwarded by MacroDroid are matched to open invoices (amount due + unique code).",
+  "Pembayaran dicatat": "Payment recorded",
+  "Pencocokan judul/teks": "Title/text matching",
+  "perlu dicek": "to review",
+  "Perlu dicek": "To review",
+  "Pilih contoh format…": "Pick an example format…",
+  "Pilih invoice": "Pick an invoice",
+  "Regex nominal": "Amount regex",
+  Regex: "Regex",
+  "Semua aplikasi": "All apps",
+  "Tambah contoh": "Add example",
+  "Tambah format": "Add format",
+  "Teks notifikasi, mis. Dana masuk Rp 150.123,00 dari BUDI":
+    "Notification text, e.g. Dana masuk Rp 150.123,00 dari BUDI",
+  "Teks notifikasi": "Notification text",
+  "Tempel notifikasi asli (samarkan nama/nomor). Diproses di browser, tidak dikirim.":
+    "Paste a real notification (mask names/numbers). Processed in the browser, never sent.",
+  "Termasuk kode unik": "Includes unique code",
+  "Tidak ada notifikasi.": "No notifications.",
+  "Token perangkat aktif": "Device token set",
+  "Token perangkat belum diatur": "Device token not set",
+  "Transfer tepat sejumlah ini agar pembayaran dikenali otomatis.":
+    "Transfer exactly this amount so the payment is recognised automatically.",
+  "Ubah format": "Edit format",
+  "Uji teks contoh": "Test with sample text",
+  "Notifikasi bank (MacroDroid)": "Bank notifications (MacroDroid)",
+  "Token perangkat MacroDroid": "MacroDroid device token",
+  "Minimal 32 karakter acak; dikirim MacroDroid di header Authorization: Bearer. Kosong = endpoint notifikasi dan kode unik nonaktif.":
+    "At least 32 random characters; MacroDroid sends it in the Authorization: Bearer header. Empty = notification endpoint and unique codes off.",
+  "Minimal 32 karakter (huruf, angka, - atau _)":
+    "At least 32 characters (letters, digits, - or _)",
+  "Konfirmasi otomatis": "Auto-confirm",
+  "Format generik (Rupiah)": "Generic format (Rupiah)",
+  "true = notifikasi yang tidak cocok dengan format mana pun tetap dicoba dengan pola nominal Rupiah umum + kata kunci uang masuk.":
+    "true = notifications matching no format are still tried with a common Rupiah amount pattern + incoming-money keywords.",
+  "Generik (Rupiah)": "Generic (Rupiah)",
+  "BCA (contoh, sesuaikan)": "BCA (example, adjust)",
+  "Livin' by Mandiri (contoh, sesuaikan)": "Livin' by Mandiri (example, adjust)",
+  "BRImo (contoh, sesuaikan)": "BRImo (example, adjust)",
+  "BNI / wondr (contoh, sesuaikan)": "BNI / wondr (example, adjust)",
+  "DANA (contoh, sesuaikan)": "DANA (example, adjust)",
+  "OVO (contoh, sesuaikan)": "OVO (example, adjust)",
+  "GoPay (contoh, sesuaikan)": "GoPay (example, adjust)",
+  "ShopeePay (contoh, sesuaikan)": "ShopeePay (example, adjust)",
+  "Regex tidak boleh kosong": "Regex must not be empty",
+  "Regex terlalu panjang (maks. 200 karakter)": "Regex too long (max. 200 characters)",
+  "Regex tidak valid": "Invalid regex",
+  "Regex tidak boleh memakai backreference": "Regex must not use backreferences",
+  "Regex tidak boleh memakai lookahead/lookbehind": "Regex must not use lookahead/lookbehind",
+  "Regex berisiko lambat (quantifier bersarang), sederhanakan polanya":
+    "Regex may be slow (nested quantifiers), simplify the pattern",
+  "Regex berisiko lambat (terlalu banyak * atau +), sederhanakan polanya":
+    "Regex may be slow (too many * or +), simplify the pattern",
+  "Regex terlalu rumit (terlalu banyak karakter berbeda), sederhanakan polanya":
+    "Regex too complex (too many different characters), simplify the pattern",
+  "Nama format wajib diisi": "Format name is required",
+  "Nama format terlalu panjang": "Format name is too long",
+  "Teks pencocokan terlalu panjang": "Match text is too long",
+  "Daftar kata kunci terlalu panjang": "Keyword list is too long",
+  "Mode pencocokan tidak valid": "Invalid match mode",
+  "Tidak ada format yang cocok": "No format matches",
+  "Mengandung kata yang diabaikan": "Contains an ignored word",
+  "Tidak ada kata kunci uang masuk": "No incoming-money keyword",
+  "Nominal tidak ditemukan": "Amount not found",
+  "Tidak cocok": "No match",
+  Ambigu: "Ambiguous",
+  "Notifikasi ini sudah diproses": "This notification was already processed",
+  "Notifikasi ini sedang atau sudah diproses":
+    "This notification is being or was already processed",
+  "Notifikasi tidak ditemukan": "Notification not found",
+  "Format tidak ditemukan": "Format not found",
+  "Terlalu banyak format (maks. 50)": "Too many formats (max. 50)",
+  "Waktu notifikasi di luar jendela 48 jam": "Notification time outside the 48-hour window",
+  "Tidak ada invoice dengan nominal ini": "No invoice with this amount",
+  "Diabaikan admin": "Ignored by admin",
+  "Opsional. Kosong = judul apa saja.": "Optional. Empty = any title.",
+  "Opsional. Kosong = teks apa saja.": "Optional. Empty = any text.",
+  "Wajib mengandung salah satu": "Must contain one of",
+  "Kata kunci uang masuk, pisahkan dengan koma (mis. masuk, diterima).":
+    "Incoming-money keywords, comma-separated (e.g. masuk, diterima).",
+  "Abaikan bila mengandung": "Ignore if it contains",
+  "Mis. keluar, debit, OTP. Notifikasi ini tidak pernah dicocokkan.":
+    "E.g. keluar, debit, OTP. Such notifications are never matched.",
+  "Format notifikasi": "Notification format",
+  "Notifikasi bank diterima": "Bank notification received",
+  "Notifikasi bank dikonfirmasi": "Bank notification confirmed",
+  "Notifikasi bank diabaikan": "Bank notification ignored",
+  "Nama paket (mis. com.bca, cocok juga com.bca.x) atau kata dari nama aplikasi (mis. BCA), pisahkan dengan koma. Kosong = semua aplikasi. Konfirmasi otomatis hanya untuk nama paket.":
+    "Package name (e.g. com.bca, also matches com.bca.x) or a word of the app name (e.g. BCA), comma-separated. Empty = all apps. Auto-confirm only works with package names.",
+  "false (default) = notifikasi yang cocok hanya ditandai Menunggu verifikasi. true = langsung dicatat, tetapi hanya untuk format dengan nama paket aplikasi persis (bukan format generik atau nama aplikasi saja); notifikasi bisa dipalsukan aplikasi lain di HP, aktifkan dengan hati-hati.":
+    "false (default) = matching notifications are only marked Awaiting verification. true = booked right away, but only for formats with an exact app package name (not the generic format or app names only); other apps on the phone can fake notifications, enable with care.",
+  "Konfirmasi otomatis hanya untuk format yang kolom Aplikasi-nya berisi nama paket persis (mis. com.bca). Format generik dan format dengan nama aplikasi saja tetap menunggu verifikasi.":
+    "Auto-confirm only applies to formats whose App field holds an exact package name (e.g. com.bca). The generic format and formats with app names only still wait for verification.",
+  "Bisa dikonfirmasi otomatis (nama paket cocok).": "Can be auto-confirmed (package name matches).",
+  "Selalu menunggu verifikasi (bukan nama paket persis atau format generik).":
+    "Always waits for verification (no exact package name, or the generic format).",
+  "Regex berisiko lambat (dua pengulangan bisa mencocokkan karakter yang sama), sederhanakan polanya":
+    "Regex may be slow (two repetitions can match the same characters), simplify the pattern",
+  "Invoice ditahan karena refund; klik Tagih ulang dulu":
+    "Invoice is on hold after a refund; click Bill again first",
+  "Tidak dikonfirmasi otomatis: format tanpa nama paket aplikasi atau format generik":
+    "Not auto-confirmed: format without an app package name, or the generic format",
+  "Invoice sudah lunas atau tidak terbuka lagi": "Invoice is already paid or no longer open",
+  "Invoice sedang memproses pembayaran lain, coba lagi":
+    "The invoice is processing another payment, try again",
+  "Nominal tidak lagi sama dengan sisa tagihan + kode unik":
+    "The amount no longer equals the amount due + unique code",
 };
 
 const LangContext = createContext<{

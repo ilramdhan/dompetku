@@ -28,6 +28,7 @@ After running the **v16** section of `supabase/schema.sql`, **Settings → Integ
 | `RESEND_API_KEY`\*, `EMAIL_FROM`, `EMAIL_TO`                                                           | `DEMO_MODE`, `SENTRY_DSN`, `APP_TIMEZONE`/`BOT_DEFAULT_ACCOUNT` (those two are in Settings → Aplikasi, v14), `FALLBACK_USD_IDR`, …       |
 | `TELEGRAM_BOT_TOKEN`\* (optional, [Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n))     |                                                                                                                                          |
 | `MIDTRANS_ENABLED`, `MIDTRANS_SERVER_KEY`\*, `MIDTRANS_CLIENT_KEY`, `MIDTRANS_PRODUCTION` (v25)        | `MIDTRANS_API_BASE`, `MIDTRANS_SNAP_BASE` (test-only overrides)                                                                          |
+| `MACRODROID_TOKEN`\*, `MACRODROID_AUTO_CONFIRM`, `MACRODROID_GENERIC` (v26)                            |                                                                                                                                          |
 
 \* **Secrets** are write-only, like Vercel: they are encrypted at rest (AES-256-GCM, random IV per value) and the server never sends them back to the browser — Settings only shows the source (Database / Env / Belum diatur) and the last 4 characters. The `integration_settings` table is **not** included in JSON backups, so re-enter secrets after restoring onto a new instance.
 
@@ -133,6 +134,19 @@ uses your public domain: without it no per-payment return link is sent (the requ
 never trusted) and Midtrans uses the Finish Redirect URL from its dashboard. A sandbox key (`SB-…`)
 with `MIDTRANS_PRODUCTION=true`, or a production key in sandbox mode, keeps the gateway off. The
 test-only base overrides apply only in sandbox mode with an `SB-` server key.
+
+## Bank notifications: MacroDroid (optional)
+
+Matches incoming-money notifications from bank / e-wallet apps (forwarded by MacroDroid on an
+Android phone) with open invoices, schema **v26**. Step-by-step guide (ID + EN):
+**[MACRODROID.md](MACRODROID.md)**. All three can also be set in Settings → Integrasi (wins over
+env). Notification formats themselves are configured in Settings → Format notifikasi bank (DB).
+
+| Name                      | Example                  | What it does                                                                                                                                                                    |
+| ------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MACRODROID_TOKEN`        | `<openssl rand -hex 24>` | Device token (32–200 chars, `A-Z a-z 0-9 - _`) sent as `Authorization: Bearer`. **Secret.** Empty = `/api/public/payments/notify` answers 503 and no unique codes are assigned. |
+| `MACRODROID_AUTO_CONFIRM` | `false`                  | `false` (default) = a single match only marks the invoice "Menunggu verifikasi" for the admin. `true` = book it right away (notifications can be faked on the phone).           |
+| `MACRODROID_GENERIC`      | `false`                  | `true` = notifications matching no configured format are tried with a generic Rupiah pattern + incoming-money keywords.                                                         |
 
 ## Monitoring (optional)
 

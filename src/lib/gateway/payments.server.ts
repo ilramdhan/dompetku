@@ -124,6 +124,28 @@ export async function refundHeldInvoices(ids: readonly string[]): Promise<Set<st
   }
 }
 
+/**
+ * Strict refund-hold check for booking paths: false only when the invoice is not held or v25 is
+ * not installed (missing table/column); any other DB error throws, so callers can fail closed.
+ */
+export async function refundHoldStrict(invoiceId: string): Promise<boolean> {
+  const res = await table()
+    .select("invoice_id")
+    .eq("refund_hold", true)
+    .eq("invoice_id", invoiceId)
+    .limit(1);
+  if (res.error) {
+    const e = res.error as { message?: string; code?: string };
+    if (
+      (await missing(e)) ||
+      /42703|PGRST204|refund_hold/i.test(`${e.code ?? ""} ${e.message ?? ""}`)
+    )
+      return false;
+    throw new Error(e.message ?? "refund hold check failed");
+  }
+  return ((res.data ?? []) as unknown[]).length > 0;
+}
+
 /** "Tagih ulang": lifts the refund hold of an invoice (pay button and reminders come back). */
 export async function releaseRefundHold(invoiceId: string) {
   const res = await table()

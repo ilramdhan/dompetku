@@ -1,0 +1,903 @@
+import { describe, expect, it } from "vitest";
+import {
+  CLAIM_RETRIES,
+  DEFAULT_AMOUNT_REGEX,
+  REGEX_PROBLEM,
+  UNIQUE_CODE_COOLDOWN_MS,
+  autoConfirmable,
+  claimBackoffMs,
+  packageMatches,
+  GENERIC_FORMAT,
+  MAX_SCAN_CHARS,
+  MAX_VARIABLE,
+  NOTIFY_PRESETS,
+  PARSE_REASON,
+  SIGNAL_MAX_AGE_MS,
+  appMatches,
+  cleanLine,
+  compileRegex,
+  confirmProblem,
+  extractAmount,
+  formatProblems,
+  formatValues,
+  isFresh,
+  isUniqueCode,
+  keywords,
+  matchSignal,
+  hasDuplicateJsonKeys,
+  minimiseText,
+  normalizeNotification,
+  parseNotification,
+  parseRupiah,
+  pickUniqueCode,
+  postedAt,
+  REGEX_SYNTAX,
+  regexProblem,
+  regexSyntaxOk,
+  scanText,
+  splitSignalAmount,
+  transferAmount,
+  type NotifyFormat,
+} from "@/lib/bank-notify";
+import { NOTIFY_RATE_RULES } from "@/lib/rate-limit";
+import { validateIntegration, INTEGRATION_KEYS, integrationDef } from "@/lib/integrations";
+import { RESTORE_TABLES, EPHEMERAL_COLUMNS, stripSecrets } from "@/lib/backup";
+import { SERVER_FN_ACCESS } from "@/lib/server-fn-access";
+import { activityLabel } from "@/lib/activity";
+import { buildInvoiceEmail } from "@/lib/email";
+
+describe("parseRupiah", () => {
+  it.each([
+    ["Rp 1.250.000,00", 1250000],
+    ["Rp1.250.000", 1250000],
+    ["Rp. 25.000", 25000],
+    ["IDR1,250,000.00", 1250000],
+    ["IDR 1,250,000", 1250000],
+    ["1.250.000", 1250000],
+    ["1,250,000", 1250000],
+    ["1250000", 1250000],
+    ["Rp 50.000,-", 50000],
+    ["Rp 150.123,45", 150123.45],
+    ["12,50", 12.5],
+    ["12.5", 12.5],
+    ["Rp 1.000", 1000],
+    ["999", 999],
+    ["1.250.000.", 1250000],
+    ["+Rp 10.000", null],
+    ["Rp\u00a01.250.000", 1250000],
+  ])("%s → %s", (raw, want) => {
+    expect(parseRupiah(raw)).toBe(want);
+  });
+
+  it.each(["", "abc", "Rp", "0", "1.2.3", "1.25.000", "1,250.000,00,1", "-5000", "12.345.67"])(
+    "rejects %s",
+    (raw) => {
+      expect(parseRupiah(raw)).toBeNull();
+    },
+  );
+
+  it("caps absurd values and non-strings", () => {
+    expect(parseRupiah("9".repeat(30))).toBeNull();
+    expect(parseRupiah(null)).toBeNull();
+    expect(parseRupiah(1500)).toBe(1500);
+  });
+});
+
+describe("regex safety", () => {
+  it("accepts the default and simple patterns", () => {
+    expect(regexProblem(DEFAULT_AMOUNT_REGEX)).toBeNull();
+    expect(regexProblem(String.raw`sebesar Rp\s?([\d.,]+)`)).toBeNull();
+    expect(regexProblem("(?:a|b)c")).toBeNull();
+    expect(regexProblem("x(?:ab)?y")).toBeNull();
+    expect(regexProblem("a+?b")).toBeNull();
+  });
+
+  it("rejects invalid, long and dangerous patterns", () => {
+    expect(regexProblem("")).toBe("Regex tidak boleh kosong");
+    expect(regexProblem("(")).toBe("Regex tidak valid");
+    expect(regexProblem("a".repeat(201))).toMatch(/terlalu panjang/);
+    for (const bad of ["(a+)+$", "(a*)*b", "(a|aa)+", "(?:x+y)*", "(a|b){2,}", "((ab)+)+"])
+      expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
+    expect(regexProblem(String.raw`(a)\1`)).toMatch(/backreference/);
+    expect(regexProblem("(?<=Rp)\\d+")).toBe(REGEX_PROBLEM.lookaround);
+    expect(regexProblem("a+b+c+d+e+")).toMatch(/terlalu banyak/);
+  });
+
+  it("does not treat escaped or class characters as quantifiers", () => {
+    expect(regexProblem(String.raw`(\+62)\d+`)).toBeNull();
+    expect(regexProblem("([+*])x")).toBeNull();
+  });
+
+  it("compileRegex returns null for unsafe patterns and is case-insensitive", () => {
+    expect(compileRegex("(a+)+")).toBeNull();
+    expect(compileRegex("masuk")!.test("DANA MASUK")).toBe(true);
+  });
+
+  it("rejects every ReDoS bypass from security review #1", () => {
+    for (const bad of [
+      String.raw`\d*\d*\d*x`,
+      String.raw`(\d{1,30}){1,30}x`,
+      String.raw`(?:\d?){40}\d{40}`,
+      "(a?){25}a{25}",
+      // more of the same families
+      String.raw`\d+.*x`,
+      String.raw`\w+\d+`,
+      String.raw`[\d.]+[\d,]+`,
+      String.raw`\s*\s*$`,
+      "a?a?a?a?a?a?aaaaaa",
+      "(a|a)(a|a)(a|a)(a|a)(a|a)x",
+    ])
+      expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
+  });
+
+  it("keeps the usual amount patterns usable", () => {
+    for (const ok of [
+      String.raw`Rp\.?\s?\d[\d.,]*`,
+      String.raw`Rp ([\d.]+),\d{2}`,
+      String.raw`(?:Rp|Rp\.)\s?\d+`,
+      String.raw`dari\s+\w+`,
+      String.raw`\d?\d+`,
+      String.raw`IDR\s?(?<amount>\d+(?:,\d{3})*)`,
+      "(?:masuk|diterima)",
+      String.raw`(?:Rp|IDR)\.?\s*([\d.,]+)\s*`,
+      String.raw`(\d{2}){3,}`,
+      String.raw`(\d{3})x`,
+    ])
+      expect(regexProblem(ok), ok).toBeNull();
+  });
+
+  it("the accepted shapes stay fast on hostile text", () => {
+    const hostile = [
+      "1".repeat(MAX_SCAN_CHARS),
+      `Rp${"1.".repeat(MAX_SCAN_CHARS / 2)}`,
+      " ".repeat(MAX_SCAN_CHARS),
+      "a".repeat(MAX_SCAN_CHARS),
+    ];
+    for (const src of [DEFAULT_AMOUNT_REGEX, String.raw`Rp\.?\s?\d[\d.,]*!`, String.raw`\d?\d+x`]) {
+      const re = compileRegex(src)!;
+      for (const h of hostile) re.test(`${h}!`); // warm up the JIT
+      const t0 = performance.now();
+      for (const h of hostile) re.test(`${h}!`);
+      // Linear shapes take well under 1 ms here; catastrophic ones take seconds or never finish.
+      expect(performance.now() - t0, src).toBeLessThan(250);
+    }
+  });
+
+  it("parses `[]` / `[^]` as complete classes (security review #2 N1)", () => {
+    for (const bad of [
+      String.raw`[^]*[^]*[^]*x`,
+      String.raw`\d*[^]*\d*x`,
+      String.raw`\s*[^]*\s*Rp`,
+      String.raw`[^]*[^]*[^]*(?:x|y)`,
+      String.raw`[^]{0,99}[^]{0,99}[^]{0,99}[^]{0,99}x`,
+      String.raw`(?:[^]*)[^]*[^]*x`,
+      String.raw`Rp[^]*?(?<amount>\d[\d.,]*)[^]*masuk`,
+      String.raw`[^]*\s*(?<amount>\d+)`,
+      String.raw`.*[^]*Rp`,
+    ])
+      expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
+    expect(regexProblem(String.raw`[]a]*a*a*x`)).not.toBeNull(); // lone `]` → invalid
+    for (const ok of [String.raw`[^]a(b)`, String.raw`[^]|a`, String.raw`(?<n>[^])`, "a[]*b"])
+      expect(regexProblem(ok), ok).toBeNull();
+  });
+
+  it("compares character sets over all of UTF-16, not a probe set (security review #2 N2)", () => {
+    const C = "[^\\0-\\xff–—‘-”•…€一０]";
+    for (const bad of [
+      `${C}*${C}*${C}*x`,
+      `${C}{0,99}${C}{0,99}${C}{0,99}x`,
+      `${C}+${C}+x`,
+      "[ж-я]*[а-ж]*[а-я]*x",
+      String.raw`[\u0400-\u04ff]*[\u0430-\u044f]*\S*x`,
+      String.raw`[^\W]*\w*[^\W]*x`,
+      String.raw`[^a]*[^b]*[^c]*x`,
+      "k{0,99}K{0,99}x",
+      "ſ{0,99}s{0,99}S{0,99}x",
+    ])
+      expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
+    // negated classes that really are disjoint from their neighbour stay usable
+    for (const ok of [
+      String.raw`[^\d]*\d+`,
+      String.raw`Rp[^\d]*(\d[\d.,]*)`,
+      String.raw`dari [^,]+, Rp\s?(\d[\d.,]*)`,
+    ])
+      expect(regexProblem(ok), ok).toBeNull();
+  });
+
+  it("every accepted pattern stays under 50 ms on 300 hostile characters", () => {
+    const accepted = [
+      DEFAULT_AMOUNT_REGEX,
+      String.raw`[^\d]*\d+x`,
+      String.raw`Rp[^\d]*(\d[\d.,]*)x`,
+      String.raw`dari [^,]+, Rp\s?(\d[\d.,]*)x`,
+      String.raw`\d{0,1}\d{0,150}x`,
+      "ſ{0,99}s{0,99}x",
+      String.raw`[^]a(b)`,
+    ];
+    const hostile = ["ж", "1", " ", "a", "s", "Rp", "Rp1", "一", "😀"].map((c) =>
+      c.repeat(MAX_SCAN_CHARS).slice(0, MAX_SCAN_CHARS),
+    );
+    for (const src of accepted) {
+      expect(regexProblem(src), src).toBeNull();
+      const re = compileRegex(src)!;
+      for (const h of hostile) {
+        const t0 = performance.now();
+        re.test(h);
+        expect(performance.now() - t0, `${src} on ${h.slice(0, 4)}`).toBeLessThan(50);
+      }
+    }
+  });
+
+  it("rejects multi-character escapes `\\c` / `\\0N` (security review #3 R1)", () => {
+    const attacks: [string, string][] = [
+      [String.raw`.{0,99}\c.{0,99}\c.{0,99}\c.{0,99}\c.{0,99}x`, "\\c"],
+      [String.raw`\D{0,99}\c\D{0,99}\c\D{0,99}\c\D{0,99}x`, "\\c"],
+      [String.raw`\S{0,99}\c\S{0,99}\c\S{0,99}x`, "\\c"],
+      [String.raw`[^]*\c[^]*\c[^]*x`, "\\c"],
+      [String.raw`[\s\S]*\c[\s\S]*\c[\s\S]*x`, "\\c"],
+      [String.raw`.*\c.*\c.*x`, "\\c"],
+      [String.raw`(?:.{0,99}\c){3}x`, "\\c"],
+      [String.raw`\s{0,299}\012\s{0,299}\012\s{0,299}x`, "\n"],
+      [String.raw`[\x01]{0,299}\01[\x01]{0,299}\01[\x01]{0,299}x`, "\x01"],
+      [String.raw`[^\d]{0,299}\01[^\d]{0,299}\01[^\d]{0,299}x`, "\x01"],
+      [String.raw`\d{0,150}\01\d{0,150}`, "1"],
+    ];
+    for (const [bad] of attacks) expect(regexProblem(bad), bad).not.toBeNull();
+    // the valid one-character forms stay usable
+    for (const ok of [String.raw`\cJ\d+`, String.raw`\0\s?Rp`, String.raw`a\0b`])
+      expect(regexProblem(ok), ok).toBeNull();
+    // and an accepted pattern on the same hostile texts stays fast
+    const re = compileRegex(String.raw`\s{0,99}\0\s{0,99}x`)!;
+    for (const [, unit] of attacks) {
+      const t0 = performance.now();
+      re.test(unit.repeat(MAX_SCAN_CHARS).slice(0, MAX_SCAN_CHARS));
+      expect(performance.now() - t0).toBeLessThan(50);
+    }
+  });
+
+  it("caps distinct atoms and memoises verdicts (security review #3 R2)", () => {
+    const many = Array.from({ length: 100 }, (_, k) => `${String.fromCharCode(0x4e00 + k)}?`).join(
+      "",
+    );
+    expect(regexProblem(many)).toBe(REGEX_PROBLEM.complex);
+    expect(regexProblem(String.raw`(?:Rp\.?|IDR)\s?(?<amount>\d[\d.,]*)`)).toBeNull();
+    // different 40-atom patterns: the second pass is answered from the verdict cache
+    const pats = Array.from({ length: 15 }, (_, f) =>
+      Array.from({ length: 40 }, (_, k) => `${String.fromCharCode(0x5000 + f * 40 + k)}?`).join(""),
+    );
+    for (const p of pats) regexProblem(p);
+    const t0 = performance.now();
+    for (const p of pats) regexProblem(p);
+    expect(performance.now() - t0).toBeLessThan(50);
+  });
+
+  it("rejects inline modifier groups and \\p{} on every runtime (security review #4 R5)", () => {
+    for (const bad of [
+      String.raw`(?s:.*\n.*\n.*)x`,
+      String.raw`(?s:.{0,99}\n.{0,99}\n.{0,99}\n.{0,99})x`,
+      String.raw`(?s:.*\r.*\r.*)x`,
+      "(?i:a)",
+      "(?-i:a)",
+      "(?ims-ims:a)",
+      "(?m:^a)",
+      String.raw`\p{L}`,
+      String.raw`\P{L}+x`,
+      String.raw`[\p{L}]`,
+    ]) {
+      expect(regexProblem(bad), bad).toBe(REGEX_PROBLEM.invalid);
+      // rejected by the allowlist parser itself, not by this Node's RegExp (Node 22 lacks
+      // modifiers; Node 24 / workerd / browsers accept them)
+      expect(regexSyntaxOk(bad), bad).toBe(false);
+    }
+  });
+
+  it("the parser is a strict allowlist (walks REGEX_SYNTAX)", () => {
+    // every allowed escape, outside and inside a class
+    for (const e of REGEX_SYNTAX.escapes) {
+      expect(regexProblem(`a\\${e}`), `\\${e}`).toBeNull();
+      expect(regexProblem(`[\\${e}]`), `[\\${e}]`).toBeNull();
+    }
+    for (const e of REGEX_SYNTAX.assertions) expect(regexProblem(`a\\${e}`), e).toBeNull();
+    expect(regexProblem(String.raw`[\b]`)).toBeNull(); // backspace
+    for (const ok of [String.raw`\x41`, String.raw`\u0041`, String.raw`\cJ`, String.raw`\0`])
+      expect(regexProblem(ok), ok).toBeNull();
+    for (const g of REGEX_SYNTAX.groups) {
+      const src = `${g.replace("name", "n")}a)`;
+      expect(regexProblem(src), src).toBeNull();
+    }
+    for (const q of REGEX_SYNTAX.quantifiers) expect(regexProblem(`a${q}b`), q).toBeNull();
+    // every other letter escape (identity escapes, \p, \k, \a, \e …) is invalid
+    for (let k = 0; k < 26; k++)
+      for (const l of [String.fromCharCode(97 + k), String.fromCharCode(65 + k)]) {
+        if (REGEX_SYNTAX.escapes.includes(l) || "bBxuc".includes(l)) continue;
+        expect(regexProblem(`a\\${l}`), `\\${l}`).not.toBeNull();
+      }
+    // other unmodelled forms
+    for (const bad of [
+      "(?#c)a",
+      "(?>a)",
+      "(?|a)",
+      "(?P<n>a)",
+      String.raw`\k<n>`,
+      String.raw`(?<n>a)\k<n>`,
+      String.raw`\1`,
+      String.raw`\012`,
+      String.raw`\c1`,
+      String.raw`\x1`,
+      String.raw`\u{41}`,
+      String.raw`[\B]`,
+      "a{,9}",
+      "a{",
+      "a}",
+      "]",
+      "^*a",
+      String.raw`\b+a`,
+      "a{5,2}",
+      "[a",
+    ]) {
+      expect(regexProblem(bad), bad).not.toBeNull();
+      if (!/\\[1-9k]/.test(bad)) expect(regexSyntaxOk(bad), bad).toBe(false);
+    }
+  });
+
+  it("rejects every lookaround, incl. nested lookaheads (security review #5 N1)", () => {
+    for (const bad of [
+      String.raw`.*(?=.*(?=.*y))z`,
+      String.raw`.{0,299}(?=.{0,299}(?=.{0,299}y))z`,
+      String.raw`.{0,99}(?=.{0,99}(?=.{0,99}(?=.{0,99}y)))z`,
+      "(?=a+)+b",
+      "(?=a)b",
+      "(?!a)b",
+      "(?<=a)b",
+      "(?<!a)b",
+      "x(?:(?=a))",
+      String.raw`(?<n>(?!\d))`,
+    ]) {
+      expect(regexProblem(bad), bad).toBe(REGEX_PROBLEM.lookaround);
+      expect(regexSyntaxOk(bad), bad).toBe(false); // the parser alone refuses them too
+    }
+    // escaped `(?=` is just text
+    expect(regexProblem(String.raw`\(\?=`)).toBeNull();
+  });
+
+  it("caps variable quantifiers at MAX_VARIABLE (8 ok, 9 rejected)", () => {
+    expect(MAX_VARIABLE).toBe(8);
+    const pattern = (n: number) =>
+      Array.from({ length: n }, (_, k) => `${"abcdefghij"[k]}?x`).join("");
+    expect(regexProblem(pattern(8))).toBeNull();
+    expect(regexProblem(pattern(9))).toBe(REGEX_PROBLEM.complex);
+    // {n,m} with m > n counts, {n} and {n,n} do not
+    expect(regexProblem(`${pattern(7)}y{1,3}`)).toBeNull();
+    expect(regexProblem(`${pattern(8)}y{1,3}`)).toBe(REGEX_PROBLEM.complex);
+    expect(regexProblem(`${pattern(8)}y{3}z{2,2}`)).toBeNull();
+  });
+
+  it("every preset and documented example still parses", () => {
+    const fmts = [...NOTIFY_PRESETS, GENERIC_FORMAT];
+    for (const f of fmts) expect(formatProblems(f), f.name).toEqual([]);
+    for (const ok of [
+      String.raw`Rp\.?\s?\d[\d.,]*`,
+      String.raw`Rp ([\d.]+),\d{2}`,
+      String.raw`sebesar Rp\s?([\d.,]+)`,
+    ])
+      expect(regexProblem(ok), ok).toBeNull();
+  });
+
+  it("grammar table: every shape is rejected or linear on 300-char worst cases", () => {
+    const R = String.raw;
+    const shapes = [
+      // review #6 list
+      R`(?:a{0,99}|b{0,99})a{0,99}x`,
+      R`(?:\d{0,99}|\s{0,99})\d{0,99}x`,
+      R`(a{0,9}){0,9}`,
+      R`(a|b)*x`,
+      R`(?:a|ab)(?:a|ab)(?:a|ab)x`,
+      R`(?:)*`,
+      R`(?:a?){0,8}x`,
+      R`[A-Za-z]{0,99}[a-z]{0,99}x`,
+      R`\w{0,99}\d{0,99}\s{0,99}x`,
+      R`.{0,99}.{0,99}x`,
+      // more shapes of the remaining grammar
+      R`(?:a|b|ab)(?:a|b|ab)(?:a|b|ab)(?:a|b|ab)x`,
+      R`(?:a|a)(?:a|a)(?:a|a)x`,
+      R`a?a?a?aaa`,
+      R`a{0,99}b?a{0,99}b?a{0,99}x`,
+      R`a{0,99}?a{0,99}x`,
+      R`\d+[.,]?\d+[.,]?\d+x`,
+      R`(?:\d{1,3}[.,])*\d+x`,
+      R`a?(?:a|b)a?(?:a|b)a?x`,
+      R`[\s\S]{0,99}x`,
+      R`.{0,99}a.{0,99}x`,
+      R`(?:a{2}){0,50}a{0,99}x`,
+      R`\d{0,1}\d{0,150}x`,
+      R`\w+\s?\w+\s?\w+x`,
+      R`(?:a|b)(?:a|b)?(?:a|b)?(?:a|b)?x`,
+      R`[^\d]*\d+`,
+      R`Rp[^\d]*(\d[\d.,]*)`,
+      R`dari [^,]+, Rp\s?(\d[\d.,]*)`,
+      // presets and documented examples (docs/MACRODROID.md, Settings help)
+      DEFAULT_AMOUNT_REGEX,
+      ...NOTIFY_PRESETS.map((p) => p.amount_regex),
+      GENERIC_FORMAT.amount_regex,
+      R`Rp\.?\s?\d[\d.,]*`,
+      R`Rp ([\d.]+),\d{2}`,
+      R`sebesar Rp\s?([\d.,]+)`,
+      R`(?:Rp|Rp\.)\s?\d+`,
+      R`dari\s+\w+`,
+      R`\d?\d+`,
+      R`IDR\s?(?<amount>\d+(?:,\d{3})*)`,
+      R`(?:masuk|diterima)`,
+      R`(?:Rp|IDR)\.?\s*([\d.,]+)\s*`,
+      R`(\d{2}){3,}`,
+    ];
+    // Repeated units covering every atom above, each with non-matching tails.
+    const units = ["a", "b", "ab", "1", "1.", "1,", " ", "\n", "x", "Rp", "Rp1", "Rp 1.", "IDR"];
+    units.push("dari ", "sebesar Rp ", "masuk", "é", "ж", "😀");
+    const tails = ["", "!", "\u0000", "y"];
+    const mustAccept = new Set([
+      DEFAULT_AMOUNT_REGEX,
+      ...NOTIFY_PRESETS.map((p) => p.amount_regex),
+    ]);
+    for (const src of new Set(shapes)) {
+      if (regexProblem(src)) {
+        expect(mustAccept.has(src), `preset rejected: ${src}`).toBe(false);
+        continue;
+      }
+      const re = compileRegex(src)!;
+      for (const u of units)
+        for (const tail of tails) {
+          const text =
+            u.repeat(Math.ceil(MAX_SCAN_CHARS / u.length)).slice(0, MAX_SCAN_CHARS - tail.length) +
+            tail;
+          const t0 = performance.now();
+          re.test(text);
+          expect(performance.now() - t0, `${src} on ${JSON.stringify(u + tail)}`).toBeLessThan(50);
+        }
+    }
+  });
+
+  it("MAX_SCAN_CHARS is ~300 and the error keys exist", () => {
+    expect(MAX_SCAN_CHARS).toBe(300);
+    expect(REGEX_PROBLEM.overlap).toMatch(/berisiko lambat/);
+  });
+
+  it("runs only on truncated text", () => {
+    const long = `${"x".repeat(MAX_SCAN_CHARS)} Rp 10.000`;
+    expect(extractAmount(DEFAULT_AMOUNT_REGEX, long)).toBeNull();
+    expect(scanText({ title: "t", text: "y".repeat(5000) }).length).toBe(MAX_SCAN_CHARS);
+  });
+});
+
+describe("extractAmount", () => {
+  it("uses the named group, then the first group, then the whole match", () => {
+    expect(extractAmount(String.raw`total (?<amount>[\d.]+) ok`, "total 15.000 ok")).toBe(15000);
+    expect(extractAmount(String.raw`sebesar ([\d.,]+)`, "Dana sebesar 1.000.123,00")).toBe(1000123);
+    expect(extractAmount(String.raw`\d[\d.]*`, "IDR 7.500")).toBe(7500);
+    expect(extractAmount(DEFAULT_AMOUNT_REGEX, "no amount here")).toBeNull();
+  });
+});
+
+const fmt = (o: Partial<NotifyFormat>): NotifyFormat => ({
+  ...GENERIC_FORMAT,
+  name: "X",
+  ...o,
+});
+const note = (title: string, text: string, pkg = "com.bca", app = "BCA mobile") => ({
+  app,
+  package: pkg,
+  title,
+  text,
+});
+
+describe("parseNotification", () => {
+  const bca = fmt({ name: "BCA", app_match: "com.bca" });
+
+  it("matches the app and reads an incoming amount", () => {
+    const r = parseNotification([bca], note("Dana Masuk", "Rp 150.123,00 dari BUDI"));
+    expect(r).toMatchObject({ kind: "amount", amount: 150123, generic: false });
+    if (r.kind === "amount") expect(r.format.name).toBe("BCA");
+  });
+
+  it("ignores outgoing money, OTPs and texts without an incoming keyword", () => {
+    expect(parseNotification([bca], note("Transfer", "Dana keluar Rp 10.000")).kind).toBe(
+      "ignored",
+    );
+    expect(parseNotification([bca], note("OTP", "Kode OTP 123456 dana masuk")).kind).toBe(
+      "ignored",
+    );
+    const r = parseNotification([bca], note("Info", "Saldo Rp 10.000"));
+    expect(r).toMatchObject({ kind: "ignored", reason: PARSE_REASON.noKeyword });
+  });
+
+  it("falls back to the generic format only when enabled", () => {
+    const n = note("Dana masuk", "Rp 20.000", "id.other", "Other");
+    expect(parseNotification([bca], n)).toEqual({ kind: "none", reason: PARSE_REASON.noFormat });
+    expect(parseNotification([bca], n, { generic: true })).toMatchObject({
+      kind: "amount",
+      amount: 20000,
+      generic: true,
+    });
+  });
+
+  it("skips disabled formats and honours title/text filters (contains + regex)", () => {
+    const off = { ...bca, enabled: false };
+    expect(parseNotification([off], note("Dana masuk", "Rp 1.000")).kind).toBe("none");
+    const titled = fmt({ app_match: null, title_match: "mutasi", must_contain: null });
+    expect(parseNotification([titled], note("Info", "Rp 1.000")).kind).toBe("none");
+    expect(parseNotification([titled], note("Mutasi Rekening", "CR Rp 1.000")).kind).toBe("amount");
+    const rx = fmt({
+      app_match: null,
+      match_mode: "regex",
+      text_match: "^CR\\b",
+      must_contain: null,
+    });
+    expect(parseNotification([rx], note("x", "CR Rp 5.000")).kind).toBe("amount");
+    expect(parseNotification([rx], note("x", "DB Rp 5.000")).kind).toBe("none");
+  });
+
+  it("reports a missing amount", () => {
+    expect(parseNotification([bca], note("Dana masuk", "cek aplikasi"))).toMatchObject({
+      kind: "ignored",
+      reason: PARSE_REASON.noAmount,
+    });
+  });
+
+  it("presets are editable examples with valid patterns", () => {
+    expect(NOTIFY_PRESETS.length).toBeGreaterThanOrEqual(8);
+    for (const p of NOTIFY_PRESETS) {
+      expect(p.name).toMatch(/contoh, sesuaikan/);
+      expect(formatProblems(p)).toEqual([]);
+    }
+    const dana = NOTIFY_PRESETS.find((p) => p.key === "dana")!;
+    expect(
+      parseNotification(
+        [dana],
+        note("DANA", "Kamu menerima Rp50.123 dari Budi", "id.dana", "DANA"),
+      ),
+    ).toMatchObject({ kind: "amount", amount: 50123 });
+  });
+
+  it("appMatches checks package and app name", () => {
+    expect(appMatches({ app_match: "bca" }, note("", "", "x.y", "BCA mobile"))).toBe(true);
+    expect(appMatches({ app_match: "dana, ovo" }, note("", "", "ovo.id", "OVO"))).toBe(true);
+    expect(appMatches({ app_match: "dana" }, note("", "", "ovo.id", "OVO"))).toBe(false);
+    expect(appMatches({ app_match: null }, note("", ""))).toBe(true);
+  });
+
+  it("appMatches never matches bare substrings (security review #1 no. 2)", () => {
+    // "bca" ⊂ "com.abcapp" / "ABCApp" must not match
+    expect(appMatches({ app_match: "bca" }, note("", "", "com.abcapp", "ABCApp"))).toBe(false);
+    expect(appMatches({ app_match: "com.bca" }, note("", "", "com.bcafake", "x"))).toBe(false);
+    expect(appMatches({ app_match: "com.bca" }, note("", "", "evil.com.bca", "x"))).toBe(false);
+    expect(appMatches({ app_match: "com.bca" }, note("", "", "com.bca.mobile", "x"))).toBe(true);
+    expect(appMatches({ app_match: "bca" }, note("", "", "com.bca", "m"))).toBe(true);
+    expect(appMatches({ app_match: "livin mandiri" }, note("", "", "x", "Livin' Mandiri"))).toBe(
+      true,
+    );
+    expect(appMatches({ app_match: "mandiri" }, note("", "", "x", "Mandirisyariah"))).toBe(false);
+    expect(appMatches({ app_match: "by mandiri" }, note("", "", "x", "Livin' by Mandiri"))).toBe(
+      true,
+    );
+  });
+
+  it("packageMatches is exact or a dot-segment prefix", () => {
+    expect(packageMatches("com.bca", "com.bca")).toBe(true);
+    expect(packageMatches("COM.BCA", "com.bca.x")).toBe(true);
+    expect(packageMatches("com.bca", "com.bcax")).toBe(false);
+    expect(packageMatches("", "com.bca")).toBe(false);
+    expect(packageMatches("com.bca", "")).toBe(false);
+  });
+
+  it("auto-confirm only trusts a saved format pinned to the notifying package", () => {
+    const pkg = { package: "com.bca" };
+    expect(autoConfirmable({ app_match: "com.bca, BCA" }, false, pkg)).toBe(true);
+    expect(autoConfirmable({ app_match: "BCA" }, false, pkg)).toBe(false);
+    expect(autoConfirmable({ app_match: null }, false, pkg)).toBe(false);
+    expect(autoConfirmable({ app_match: "com.bca" }, true, pkg)).toBe(false);
+    expect(autoConfirmable({ app_match: "com.bca" }, false, { package: "com.fake" })).toBe(false);
+    // the parse result carries it
+    const bca = fmt({ name: "BCA", app_match: "com.bca" });
+    const r = parseNotification([bca], note("Dana Masuk", "Rp 1.000 dari X"));
+    expect(r).toMatchObject({ kind: "amount", trusted: true });
+    const g = parseNotification([], note("Dana Masuk", "Rp 1.000 dari X"), { generic: true });
+    expect(g).toMatchObject({ kind: "amount", generic: true, trusted: false });
+    const byName = parseNotification(
+      [fmt({ app_match: "bca" })],
+      note("Dana Masuk", "Rp 1.000 dari X"),
+    );
+    expect(byName).toMatchObject({ kind: "amount", trusted: false });
+  });
+});
+
+describe("formats", () => {
+  it("validates and normalises", () => {
+    expect(formatProblems({ name: "", amount_regex: "(" })).toEqual([
+      "Nama format wajib diisi",
+      "Regex tidak valid",
+    ]);
+    expect(
+      formatProblems({ name: "A", amount_regex: "x", match_mode: "regex", title_match: "(a+)+" }),
+    ).toEqual(["Regex berisiko lambat (quantifier bersarang), sederhanakan polanya"]);
+    const v = formatValues(fmt({ name: " A ", app_match: "  ", must_contain: " masuk " }));
+    expect(v).toMatchObject({ name: "A", app_match: null, must_contain: "masuk", enabled: true });
+    expect(keywords(" A, ,b ")).toEqual(["a", "b"]);
+  });
+});
+
+describe("notification normalisation & minimisation", () => {
+  it("cleans lines, drops unresolved magic text and prefers the big text", () => {
+    expect(cleanLine("a\nb\t c", 10)).toBe("a b c");
+    expect(cleanLine("{not_text_big}", 10)).toBe("");
+    const n = normalizeNotification({
+      app: "BCA",
+      package: "COM.BCA",
+      title: "Dana masuk",
+      text: "Rp 10.000",
+      big_text: "Rp 10.000 dari BUDI ke rek 1234567890",
+      sub_text: "{not_sub_text}",
+    });
+    expect(n).toEqual({
+      app: "BCA",
+      package: "com.bca",
+      title: "Dana masuk",
+      text: "Rp 10.000 dari BUDI ke rek 1234567890",
+    });
+  });
+
+  it("masks long digit runs and caps the excerpt", () => {
+    const m = minimiseText({ title: "Masuk", text: "Rp 1.250.000 ref 9876543210 rek 1234567" });
+    expect(m).toContain("Rp 1.250.000");
+    expect(m).not.toContain("9876543210");
+    expect(m).toContain("••••••210");
+    expect(m).toContain("••••567");
+    expect(minimiseText({ title: "", text: "x".repeat(1000) }).length).toBe(300);
+  });
+
+  it("masks numbers split by -, . or spaces (security review #1 no. 7)", () => {
+    const m = minimiseText({
+      title: "Dana masuk",
+      text: "Rp 1.250.000 dari 0812-3456-7890, rek 123 456 7890, ref 12.34.56.78, kartu 4111 1111 1111 1111",
+    });
+    for (const leak of ["0812", "3456", "123 456", "12.34.56", "4111"])
+      expect(m, leak).not.toContain(leak);
+    expect(m).toContain("Rp 1.250.000");
+    expect(m).toContain("••••••890");
+    expect(m).toContain("•••••678");
+    expect(m).toContain("••••••111");
+  });
+
+  it("keeps amounts, short numbers and thousands groupings readable", () => {
+    expect(
+      minimiseText({
+        title: "",
+        text: "IDR1,250,000.00 · Rp150.000,00 · total 1.250.000 · jam 12 34",
+      }),
+    ).toBe("IDR1,250,000.00 · Rp150.000,00 · total 1.250.000 · jam 12 34");
+    // an amount followed by a long number keeps the amount and masks the rest
+    expect(minimiseText({ title: "", text: "Rp 10.000 0812 3456 7890" })).toBe(
+      "Rp 10.000 ••••••890",
+    );
+  });
+
+  it("masks the number shapes from security review #2 N6", () => {
+    const cases: [string, string][] = [
+      ["dari 0812/3456/7890", "dari ••••••890"],
+      ["hp 0812_3456_7890", "hp ••••••890"],
+      ["id ８１２３４５６７８９", "id ••••••789"],
+      ["rek 1.234.567.890", "rek ••••••890"],
+      ["ref 081,234,567,890", "ref ••••••890"],
+      ["Rp 1.250.000.081234567890 masuk", "Rp 1.250.000.••••••890 masuk"],
+      ["Rp 081234567890", "Rp ••••••890"],
+    ];
+    for (const [text, want] of cases) expect(minimiseText({ title: "", text }), text).toBe(want);
+    // amounts and dates stay readable
+    for (const keep of [
+      "Rp 2.500.000.000 masuk",
+      "tgl 01/11/2026 Rp1250000 masuk",
+      "total 12.500.000",
+    ])
+      expect(minimiseText({ title: "", text: keep })).toBe(keep);
+  });
+
+  it("detects duplicate JSON keys, the injection from security review #2 N4", () => {
+    const remark = '","big_text":"","text":"Rp 500.123 masuk","x":"';
+    const injected = `{"app":"BCA","package":"com.bca","title":"Dana masuk","text":"Rp 1 dari A ${remark}"}`;
+    expect(JSON.parse(injected).text).toBe("Rp 500.123 masuk"); // what JSON.parse would keep
+    expect(hasDuplicateJsonKeys(injected)).toBe(true);
+    expect(hasDuplicateJsonKeys('{"text":"a","te\\u0078t":"b"}')).toBe(true);
+    expect(hasDuplicateJsonKeys('{"a":{"x":1,"x":2}}')).toBe(true);
+    // properly escaped payloads (MacroDroid {lvjson=…}) pass, including quotes in values
+    const escaped = JSON.stringify({ app: "BCA", package: "com.bca", text: `Rp 1 ${remark}` });
+    expect(hasDuplicateJsonKeys(escaped)).toBe(false);
+    expect(hasDuplicateJsonKeys('{"a":[{"x":1},{"x":2}],"b":"x\\"y"}')).toBe(false);
+    expect(hasDuplicateJsonKeys("{oops")).toBe(false);
+  });
+
+  it("reads timestamps and checks freshness", () => {
+    expect(postedAt("1761900000000")).toBe(1761900000000);
+    expect(postedAt("1761900000")).toBe(1761900000000);
+    expect(postedAt("2026-11-01T10:00:00Z")).toBe(Date.parse("2026-11-01T10:00:00Z"));
+    expect(postedAt("{not_timestamp}")).toBeNull();
+    expect(postedAt("")).toBeNull();
+    const now = Date.parse("2026-11-01T10:00:00Z");
+    expect(isFresh(now - 1000, now)).toBe(true);
+    expect(isFresh(now - SIGNAL_MAX_AGE_MS - 1, now)).toBe(false);
+    expect(isFresh(now + 3_600_000, now)).toBe(false);
+  });
+});
+
+describe("unique codes & matching", () => {
+  it("picks a free code in 1..999", () => {
+    expect(pickUniqueCode([], () => 0)).toBe(1);
+    expect(pickUniqueCode([1, 2], () => 0)).toBe(3);
+    expect(pickUniqueCode([999], () => 0.999999)).toBe(1);
+    const all = Array.from({ length: 999 }, (_, i) => i + 1);
+    expect(pickUniqueCode(all)).toBeNull();
+    expect(pickUniqueCode(all.slice(0, 998))).toBe(999);
+    expect(isUniqueCode(0)).toBe(false);
+    expect(isUniqueCode(1000)).toBe(false);
+    expect(isUniqueCode(5)).toBe(true);
+  });
+
+  it("transfer amount = remaining + code while due", () => {
+    expect(transferAmount(150000, 123)).toBe(150123);
+    expect(transferAmount(150000, null)).toBe(150000);
+    expect(transferAmount(0, 123)).toBe(0);
+  });
+
+  const now = Date.parse("2026-11-01T10:00:00Z");
+  const inv = (
+    id: string,
+    total: number,
+    code: number | null,
+    extra: Partial<{ paid: number; created_at: string; account_id: string }> = {},
+  ) => ({
+    id,
+    total,
+    paid: extra.paid ?? 0,
+    unique_code: code,
+    created_at: extra.created_at ?? "2026-10-31T00:00:00Z",
+    account_id: extra.account_id ?? "acc1",
+  });
+
+  it("matches exactly one, flags ambiguous, ignores later invoices and other wallets", () => {
+    const list = [
+      inv("a", 150000, 123),
+      inv("b", 150000, 456),
+      inv("c", 200000, null, { paid: 50000 }),
+    ];
+    expect(matchSignal(150123, list, { postedAt: now })).toEqual({
+      status: "matched",
+      invoiceId: "a",
+    });
+    expect(matchSignal(150000, list, { postedAt: now })).toEqual({
+      status: "matched",
+      invoiceId: "c",
+    });
+    expect(matchSignal(150124, list, { postedAt: now })).toEqual({ status: "unmatched" });
+    const dupes = [inv("x", 100000, null), inv("y", 100000, null)];
+    expect(matchSignal(100000, dupes, { postedAt: now })).toEqual({
+      status: "ambiguous",
+      invoiceIds: ["x", "y"],
+    });
+    const later = [inv("z", 1000, 1, { created_at: "2026-11-02T00:00:00Z" })];
+    expect(matchSignal(1001, later, { postedAt: now })).toEqual({ status: "unmatched" });
+    expect(matchSignal(150123, list, { postedAt: now, accountId: "other" })).toEqual({
+      status: "unmatched",
+    });
+    expect(matchSignal(1, [inv("p", 1000, 1, { paid: 1000 })], { postedAt: now })).toEqual({
+      status: "unmatched",
+    });
+  });
+
+  it("splits the code into an extra income only on an exact match", () => {
+    expect(splitSignalAmount(150123, 150000, 123)).toEqual({ pay: 150000, extra: 123 });
+    expect(splitSignalAmount(150000, 150000, 123)).toEqual({ pay: 150000, extra: 0 });
+    expect(splitSignalAmount(90000, 150000, 123)).toEqual({ pay: 90000, extra: 0 });
+    expect(splitSignalAmount(200000, 150000, null)).toEqual({ pay: 150000, extra: 0 });
+  });
+
+  it("confirmProblem guards status, invoice and amount", () => {
+    const open = { status: "matched", payment_id: null };
+    const i = { status: "unpaid", total: 1000, paid: 0 };
+    expect(confirmProblem(open, i, 1000)).toBeNull();
+    expect(confirmProblem({ status: "confirmed" }, i, 1000)).toBe("Notifikasi ini sudah diproses");
+    expect(confirmProblem({ status: "matched", payment_id: "p" }, i, 1000)).toBe(
+      "Notifikasi ini sudah diproses",
+    );
+    expect(confirmProblem(open, { ...i, status: "paid" }, 1000)).toBe(
+      "Invoice ini tidak bisa menerima pembayaran",
+    );
+    expect(confirmProblem(open, i, 1001)).toBe("Pembayaran melebihi sisa tagihan");
+    expect(confirmProblem(open, i, 0)).toBe("Jumlah harus lebih dari 0");
+    expect(confirmProblem(open, i, 1000, true)).toBe(
+      "Invoice ditahan karena refund; klik Tagih ulang dulu",
+    );
+  });
+});
+
+describe("v26 wiring", () => {
+  it("integration keys: token is a validated secret, toggles default false", () => {
+    expect(INTEGRATION_KEYS).toEqual(
+      expect.arrayContaining(["MACRODROID_TOKEN", "MACRODROID_AUTO_CONFIRM", "MACRODROID_GENERIC"]),
+    );
+    expect(integrationDef("MACRODROID_TOKEN").secret).toBe(true);
+    expect(validateIntegration("MACRODROID_TOKEN", "short").ok).toBe(false);
+    expect(validateIntegration("MACRODROID_TOKEN", "a".repeat(32)).ok).toBe(true);
+    expect(validateIntegration("MACRODROID_TOKEN", `${"a".repeat(31)} `).ok).toBe(false);
+    expect(validateIntegration("MACRODROID_AUTO_CONFIRM", "TRUE")).toEqual({
+      ok: true,
+      value: "true",
+    });
+    expect(integrationDef("MACRODROID_AUTO_CONFIRM").default).toBe("false");
+    expect(integrationDef("MACRODROID_GENERIC").default).toBe("false");
+  });
+
+  it("rate limits exist for valid devices and bad tokens", () => {
+    expect(NOTIFY_RATE_RULES.device.length).toBeGreaterThan(0);
+    expect(NOTIFY_RATE_RULES.bad[0]!.name).toBe("notify:bad");
+  });
+
+  it("backs up formats, never signals, and strips unique codes", () => {
+    expect(RESTORE_TABLES).toContain("payment_notify_formats");
+    expect((RESTORE_TABLES as readonly string[]).includes("payment_signals")).toBe(false);
+    expect(EPHEMERAL_COLUMNS.invoices).toEqual(["unique_code", "unique_code_released_at"]);
+    expect(
+      stripSecrets("invoices", [{ id: "1", unique_code: 5, unique_code_released_at: "x" }]),
+    ).toEqual([{ id: "1" }]);
+  });
+
+  it("classifies the new server fns as admin and labels activities", () => {
+    const c = SERVER_FN_ACCESS["payment-signals.functions.ts"]!;
+    expect(Object.values(c).every((v) => v === "admin")).toBe(true);
+    expect(activityLabel("payment_signals.confirm")).toBe("Notifikasi bank dikonfirmasi");
+    expect(activityLabel("payment_notify_formats.create")).toBe("Format notifikasi ditambahkan");
+  });
+
+  it("invoice email shows the transfer amount with the unique code while open", () => {
+    const base = {
+      kind: "invoice" as const,
+      number: "INV-1",
+      customer_name: "Budi",
+      due_date: null,
+      total: 150000,
+      paid: 0,
+      remaining: 150000,
+      today: "2026-11-01",
+    };
+    const m = buildInvoiceEmail({ ...base, unique_code: 123 });
+    expect(m.text).toContain("Jumlah transfer");
+    expect(m.text).toMatch(/150\.123/);
+    expect(m.text).toContain("kode unik 123");
+    expect(m.html).toContain("kode unik 123");
+    const en = buildInvoiceEmail({ ...base, lang: "en", unique_code: 123 });
+    expect(en.text).toContain("Amount to transfer");
+    expect(buildInvoiceEmail(base).text).not.toContain("Jumlah transfer");
+    expect(buildInvoiceEmail({ ...base, unique_code: 0 }).text).not.toContain("Jumlah transfer");
+    const paid = buildInvoiceEmail({
+      ...base,
+      kind: "payment",
+      unique_code: 123,
+      payment_amount: 1,
+    });
+    expect(paid.text).not.toContain("kode unik");
+  });
+});
+
+describe("serialised booking & code cooldown", () => {
+  it("claim backoff grows, is jittered and capped", () => {
+    expect(claimBackoffMs(0, () => 0)).toBe(40);
+    expect(claimBackoffMs(0, () => 1)).toBe(80);
+    expect(claimBackoffMs(3, () => 0)).toBe(320);
+    expect(claimBackoffMs(20, () => 1)).toBe(1_000);
+    expect(CLAIM_RETRIES).toBeGreaterThanOrEqual(5);
+    // total worst-case wait stays a few seconds (MacroDroid HTTP timeout)
+    let total = 0;
+    for (let i = 0; i < CLAIM_RETRIES; i++) total += claimBackoffMs(i, () => 1);
+    expect(total).toBeLessThan(6_000);
+  });
+
+  it("a released unique code is held for 48 h (the signal age window)", () => {
+    expect(UNIQUE_CODE_COOLDOWN_MS).toBe(SIGNAL_MAX_AGE_MS);
+  });
+});
