@@ -134,6 +134,17 @@ never trusted) and Midtrans uses the Finish Redirect URL from its dashboard. A s
 with `MIDTRANS_PRODUCTION=true`, or a production key in sandbox mode, keeps the gateway off. The
 test-only base overrides apply only in sandbox mode with an `SB-` server key.
 
+## Network (optional)
+
+Per-IP rate limits (invoice proof upload, the pay button, bad gateway webhooks, demo writes) need
+the real client address. `X-Forwarded-For` can be forged by any client, so it is **ignored unless
+you set `TRUSTED_PROXY`**; the address the platform reports for the connection is used instead.
+Env only (a security setting, never manageable from Settings).
+
+| Name            | Example                                     | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                   | When to set                                                                                                                                                                                                                                      |
+| --------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TRUSTED_PROXY` | `1`, `2`, `loopback`, `10.0.0.0/8, ::1/128` | Empty (default) = `X-Forwarded-For`/`X-Real-IP` ignored. A number `1`–`10` = that many proxies in front of the app each append to `X-Forwarded-For`; the client is that many entries from the right (fewer entries = the connection address). A comma list of IPs/CIDRs (plus `loopback`, `private`) = trusted proxy addresses; the header is walked right to left past them. Invalid entries are ignored and never become the client address. | **Vercel** and **Lovable/Cloudflare**: leave empty (the platform already reports the real client). **Docker/Node behind Caddy, Nginx, Traefik or a tunnel**: `1` per proxy hop, or the proxy addresses. Directly exposed container: leave empty. |
+
 ## Monitoring (optional)
 
 | Name         | Example                                          | What it does                                                                                                                                                                                                                                                               |
