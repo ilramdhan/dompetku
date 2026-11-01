@@ -1195,6 +1195,7 @@ export type Database = {
           paid: number;
           created_at: string;
           updated_at: string;
+          unique_code?: number | null;
         };
         Insert: {
           id?: string;
@@ -1212,6 +1213,7 @@ export type Database = {
           paid?: number;
           created_at?: string;
           updated_at?: string;
+          unique_code?: number | null;
         };
         Update: {
           id?: string;
@@ -1229,6 +1231,7 @@ export type Database = {
           paid?: number;
           created_at?: string;
           updated_at?: string;
+          unique_code?: number | null;
         };
         Relationships: [
           {
@@ -1651,6 +1654,145 @@ export type Database = {
           },
           {
             foreignKeyName: "gateway_transactions_payment_id_fkey";
+            columns: ["payment_id"];
+            isOneToOne: false;
+            referencedRelation: "invoice_payments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** v26 (optional table): admin-defined bank/e-wallet notification formats (MacroDroid). */
+      payment_notify_formats: {
+        Row: {
+          id: string;
+          name: string;
+          app_match: string | null;
+          title_match: string | null;
+          text_match: string | null;
+          match_mode: "contains" | "regex";
+          amount_regex: string;
+          must_contain: string | null;
+          ignore_contains: string | null;
+          account_id: string | null;
+          enabled: boolean;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          app_match?: string | null;
+          title_match?: string | null;
+          text_match?: string | null;
+          match_mode?: "contains" | "regex";
+          amount_regex: string;
+          must_contain?: string | null;
+          ignore_contains?: string | null;
+          account_id?: string | null;
+          enabled?: boolean;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          app_match?: string | null;
+          title_match?: string | null;
+          text_match?: string | null;
+          match_mode?: "contains" | "regex";
+          amount_regex?: string;
+          must_contain?: string | null;
+          ignore_contains?: string | null;
+          account_id?: string | null;
+          enabled?: boolean;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payment_notify_formats_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: false;
+            referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /** v26 (optional table): received bank notifications (minimised text, never backed up). */
+      payment_signals: {
+        Row: {
+          id: string;
+          source: "macrodroid";
+          hash: string;
+          device: string | null;
+          app: string | null;
+          excerpt: string | null;
+          format_name: string | null;
+          amount: number | null;
+          posted_at: string | null;
+          received_at: string;
+          status: "unmatched" | "matched" | "ambiguous" | "confirmed" | "ignored";
+          reason: string | null;
+          invoice_id: string | null;
+          candidate_ids: string[];
+          payment_id: string | null;
+          claimed_at: string | null;
+          reviewed_at: string | null;
+          last_error: string | null;
+        };
+        Insert: {
+          id?: string;
+          source?: "macrodroid";
+          hash: string;
+          device?: string | null;
+          app?: string | null;
+          excerpt?: string | null;
+          format_name?: string | null;
+          amount?: number | null;
+          posted_at?: string | null;
+          received_at?: string;
+          status?: "unmatched" | "matched" | "ambiguous" | "confirmed" | "ignored";
+          reason?: string | null;
+          invoice_id?: string | null;
+          candidate_ids?: string[];
+          payment_id?: string | null;
+          claimed_at?: string | null;
+          reviewed_at?: string | null;
+          last_error?: string | null;
+        };
+        Update: {
+          id?: string;
+          source?: "macrodroid";
+          hash?: string;
+          device?: string | null;
+          app?: string | null;
+          excerpt?: string | null;
+          format_name?: string | null;
+          amount?: number | null;
+          posted_at?: string | null;
+          received_at?: string;
+          status?: "unmatched" | "matched" | "ambiguous" | "confirmed" | "ignored";
+          reason?: string | null;
+          invoice_id?: string | null;
+          candidate_ids?: string[];
+          payment_id?: string | null;
+          claimed_at?: string | null;
+          reviewed_at?: string | null;
+          last_error?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payment_signals_invoice_id_fkey";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_signals_payment_id_fkey";
             columns: ["payment_id"];
             isOneToOne: false;
             referencedRelation: "invoice_payments";

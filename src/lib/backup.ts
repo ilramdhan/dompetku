@@ -33,6 +33,11 @@ import { z } from "zod";
  * Its snap_token / redirect_url (live payment-page credentials, 24 h) are SECRET_COLUMNS: stripped
  * on export and restore. invoice_payments.refunded (v25) travels with its row; older instances drop
  * the unknown column on restore (missing-column retry).
+ * v26: payment_notify_formats (→ accounts) is backed up (admin configuration). payment_signals is
+ * NOT: it holds excerpts of bank notifications (kept minimal, pruned) and is review state only; the
+ * payments it booked are ordinary invoice_payments. invoices.unique_code is an EPHEMERAL column
+ * (stripped on export and restore) so a merge restore can never collide with the codes of the
+ * current open invoices; codes are re-assigned on demand.
  */
 export const RESTORE_TABLES = [
   "accounts",
@@ -65,6 +70,7 @@ export const RESTORE_TABLES = [
   "invoice_payment_methods",
   "invoice_proofs",
   "gateway_transactions",
+  "payment_notify_formats",
 ] as const;
 export type RestoreTable = (typeof RESTORE_TABLES)[number];
 
@@ -110,6 +116,7 @@ export const CONFLICT_KEYS: Record<RestoreTable, string[]> = {
   invoice_payment_methods: ["invoice_id", "method_id"],
   invoice_proofs: ["id"],
   gateway_transactions: ["id"],
+  payment_notify_formats: ["id"],
 };
 
 /**
@@ -164,12 +171,23 @@ export const SECRET_COLUMNS: Partial<Record<RestoreTable, string[]>> = {
   gateway_transactions: ["snap_token", "redirect_url"],
 };
 
+/**
+ * Columns that are re-derived on demand and never exported or restored (v26 unique codes: restoring
+ * them could collide with the partial unique index of the current open invoices).
+ */
+export const EPHEMERAL_COLUMNS: Partial<Record<RestoreTable, string[]>> = {
+  invoices: ["unique_code"],
+};
+
 /** Tables whose rows are kept in "replace" mode (deleting them would reset the password to env). */
 export const KEEP_ON_REPLACE: readonly RestoreTable[] = ["app_users"];
 
-/** Removes SECRET_COLUMNS from exported/restored rows. */
+/** Removes SECRET_COLUMNS and EPHEMERAL_COLUMNS from exported/restored rows. */
 export function stripSecrets(table: string, rows: Row[]): Row[] {
-  const cols = SECRET_COLUMNS[table as RestoreTable];
+  const cols = [
+    ...(SECRET_COLUMNS[table as RestoreTable] ?? []),
+    ...(EPHEMERAL_COLUMNS[table as RestoreTable] ?? []),
+  ];
   if (!cols?.length) return rows;
   return rows.map((r) => {
     const out: Row = { ...r };
