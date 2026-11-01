@@ -12,7 +12,7 @@ export const getNotifySettingsFn = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
   .handler(async () => {
     const { listNotifySettings } = await import("./notify.server");
-    return listNotifySettings();
+    return listNotifySettings({ setBy: true });
   });
 
 export const saveNotifySettingsFn = createServerFn({ method: "POST" })

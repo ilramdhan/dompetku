@@ -202,3 +202,75 @@ export function selfNotifyUserId(
     throw new Error("Pemilik memakai TELEGRAM_ADMIN_CHAT_ID di Pengaturan → Integrasi");
   return sessionUserId;
 }
+
+/**
+ * Masked chat id for admin display and the activity log (#122 L1): sign + last 4 digits, so an
+ * admin can recognise a member-set chat without the full id being repeated everywhere.
+ */
+export function maskChatId(raw: string | null | undefined): string {
+  const s = normalizeChatId(raw ?? "");
+  if (!s) return "";
+  const sign = s.startsWith("-") ? "-" : "";
+  const digits = s.replace(/^-/, "");
+  return `${sign}•••${digits.slice(digits.length > 4 ? -4 : -1)}`;
+}
+
+export type NotifySetBy = "member" | "admin";
+
+/**
+ * Who last saved each member's notification row, from activity log rows (newest first):
+ * `notify.self_update` = member, `notify.update` = admin. Rows carry `user_id` (newer) or the
+ * immutable username (`name`). Unverified member-set chat ids are flagged in the admin dialog.
+ */
+export function notifySetByMap(
+  rows: readonly { action: string; detail: unknown }[],
+  users: readonly { user_id: string; username?: string | null }[],
+): Record<string, NotifySetBy> {
+  const out: Record<string, NotifySetBy> = {};
+  for (const r of rows) {
+    const by =
+      r.action === "notify.self_update" ? "member" : r.action === "notify.update" ? "admin" : null;
+    if (!by || !r.detail || typeof r.detail !== "object") continue;
+    const d = r.detail as { user_id?: unknown; name?: unknown };
+    const u = users.find(
+      (x) =>
+        (typeof d.user_id === "string" && d.user_id === x.user_id) ||
+        (typeof d.user_id !== "string" &&
+          typeof d.name === "string" &&
+          !!x.username &&
+          d.name.toLowerCase() === x.username.toLowerCase()),
+    );
+    if (u && !(u.user_id in out)) out[u.user_id] = by;
+  }
+  return out;
+}
+
+/**
+ * True when a member's own save would change nothing (#122 L3): same chat id, toggles and wallet
+ * set as the stored row. Unchanged saves skip every write and the activity log entry.
+ */
+export function sameSelfNotify(
+  cur: {
+    chat_id: string;
+    send_report: boolean;
+    send_reminders: boolean;
+    wallets: readonly string[];
+  } | null,
+  next: {
+    chat_id: string;
+    send_report: boolean;
+    send_reminders: boolean;
+    wallets: readonly string[];
+  },
+): boolean {
+  if (!cur) return false;
+  const a = [...new Set(cur.wallets)].sort();
+  const b = [...new Set(next.wallets)].sort();
+  return (
+    cur.chat_id === next.chat_id &&
+    cur.send_report === next.send_report &&
+    cur.send_reminders === next.send_reminders &&
+    a.length === b.length &&
+    a.every((id, i) => id === b[i])
+  );
+}

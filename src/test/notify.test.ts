@@ -5,7 +5,10 @@ import {
   isNotifyKind,
   normalizeChatId,
   myNotifySchema,
+  maskChatId,
   notifyRecipientSchema,
+  notifySetByMap,
+  sameSelfNotify,
   planSelfNotify,
   selfNotifyUserId,
   notifyScope,
@@ -186,5 +189,44 @@ describe("member self-service notifications (#122)", () => {
   it("labels the self-service activity", () => {
     expect(activityLabel("notify.self_update")).not.toBe("notify.self_update");
     expect(activityLabel("notify.self_delete")).not.toBe("notify.self_delete");
+  });
+});
+
+describe("security review helpers (#122)", () => {
+  it("maskChatId keeps the sign and the last 4 digits", () => {
+    expect(maskChatId("-1001234567")).toBe("-•••4567");
+    expect(maskChatId(" 987654321 ")).toBe("•••4321");
+    expect(maskChatId("42")).toBe("•••2");
+    expect(maskChatId("abc")).toBe("");
+    expect(maskChatId(null)).toBe("");
+  });
+
+  it("notifySetByMap takes the newest saver per member (user_id, then username)", () => {
+    const users = [
+      { user_id: "u1", username: "dini" },
+      { user_id: "u2", username: "budi" },
+    ];
+    const map = notifySetByMap(
+      [
+        { action: "notify.self_update", detail: { name: "dini", user_id: "u1" } },
+        { action: "notify.update", detail: { name: "dini", user_id: "u1" } },
+        { action: "notify.update", detail: { name: "BUDI" } },
+        { action: "notify.self_update", detail: { name: "budi" } },
+        { action: "notify.delete", detail: { name: "x" } },
+        { action: "notify.self_update", detail: null },
+      ],
+      users,
+    );
+    expect(map).toEqual({ u1: "member", u2: "admin" });
+    expect(notifySetByMap([], users)).toEqual({});
+  });
+
+  it("sameSelfNotify compares chat id, toggles and the wallet set", () => {
+    const cur = { chat_id: "7", send_report: true, send_reminders: false, wallets: ["b", "a"] };
+    expect(sameSelfNotify(cur, { ...cur, wallets: ["a", "b", "a"] })).toBe(true);
+    expect(sameSelfNotify(cur, { ...cur, chat_id: "8" })).toBe(false);
+    expect(sameSelfNotify(cur, { ...cur, send_report: false })).toBe(false);
+    expect(sameSelfNotify(cur, { ...cur, wallets: ["a"] })).toBe(false);
+    expect(sameSelfNotify(null, cur)).toBe(false);
   });
 });
