@@ -226,6 +226,49 @@ describe("regex safety", () => {
     }
   });
 
+  it("rejects multi-character escapes `\\c` / `\\0N` (security review #3 R1)", () => {
+    const attacks: [string, string][] = [
+      [String.raw`.{0,99}\c.{0,99}\c.{0,99}\c.{0,99}\c.{0,99}x`, "\\c"],
+      [String.raw`\D{0,99}\c\D{0,99}\c\D{0,99}\c\D{0,99}x`, "\\c"],
+      [String.raw`\S{0,99}\c\S{0,99}\c\S{0,99}x`, "\\c"],
+      [String.raw`[^]*\c[^]*\c[^]*x`, "\\c"],
+      [String.raw`[\s\S]*\c[\s\S]*\c[\s\S]*x`, "\\c"],
+      [String.raw`.*\c.*\c.*x`, "\\c"],
+      [String.raw`(?:.{0,99}\c){3}x`, "\\c"],
+      [String.raw`\s{0,299}\012\s{0,299}\012\s{0,299}x`, "\n"],
+      [String.raw`[\x01]{0,299}\01[\x01]{0,299}\01[\x01]{0,299}x`, "\x01"],
+      [String.raw`[^\d]{0,299}\01[^\d]{0,299}\01[^\d]{0,299}x`, "\x01"],
+      [String.raw`\d{0,150}\01\d{0,150}`, "1"],
+    ];
+    for (const [bad] of attacks) expect(regexProblem(bad), bad).not.toBeNull();
+    // the valid one-character forms stay usable
+    for (const ok of [String.raw`\cJ\d+`, String.raw`\0\s?Rp`, String.raw`a\0b`])
+      expect(regexProblem(ok), ok).toBeNull();
+    // and an accepted pattern on the same hostile texts stays fast
+    const re = compileRegex(String.raw`\s{0,99}\0\s{0,99}x`)!;
+    for (const [, unit] of attacks) {
+      const t0 = performance.now();
+      re.test(unit.repeat(MAX_SCAN_CHARS).slice(0, MAX_SCAN_CHARS));
+      expect(performance.now() - t0).toBeLessThan(50);
+    }
+  });
+
+  it("caps distinct atoms and memoises verdicts (security review #3 R2)", () => {
+    const many = Array.from({ length: 100 }, (_, k) => `${String.fromCharCode(0x4e00 + k)}?`).join(
+      "",
+    );
+    expect(regexProblem(many)).toBe(REGEX_PROBLEM.complex);
+    expect(regexProblem(String.raw`(?:Rp\.?|IDR)\s?(?<amount>\d[\d.,]*)`)).toBeNull();
+    // different 40-atom patterns: the second pass is answered from the verdict cache
+    const pats = Array.from({ length: 15 }, (_, f) =>
+      Array.from({ length: 40 }, (_, k) => `${String.fromCharCode(0x5000 + f * 40 + k)}?`).join(""),
+    );
+    for (const p of pats) regexProblem(p);
+    const t0 = performance.now();
+    for (const p of pats) regexProblem(p);
+    expect(performance.now() - t0).toBeLessThan(50);
+  });
+
   it("MAX_SCAN_CHARS is ~300 and the error keys exist", () => {
     expect(MAX_SCAN_CHARS).toBe(300);
     expect(REGEX_PROBLEM.overlap).toMatch(/berisiko lambat/);

@@ -1715,6 +1715,8 @@ const DICT: Record<string, string> = {
     "Regex may be slow (nested quantifiers), simplify the pattern",
   "Regex berisiko lambat (terlalu banyak * atau +), sederhanakan polanya":
     "Regex may be slow (too many * or +), simplify the pattern",
+  "Regex terlalu rumit (terlalu banyak karakter berbeda), sederhanakan polanya":
+    "Regex too complex (too many different characters), simplify the pattern",
   "Nama format wajib diisi": "Format name is required",
   "Nama format terlalu panjang": "Format name is too long",
   "Teks pencocokan terlalu panjang": "Match text is too long",

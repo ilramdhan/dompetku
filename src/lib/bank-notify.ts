@@ -35,6 +35,8 @@ export const MAX_FORMATS = 50;
 export const MAX_SCAN_CHARS = 300;
 /** Max unbounded quantifiers (`*`, `+`, `{n,}`) in an admin regex. */
 export const MAX_UNBOUNDED = 3;
+/** Max distinct character atoms (letters, escapes, classes) in an admin regex. */
+export const MAX_DISTINCT_ATOMS = 40;
 /** Unique code range (rupiah added to the amount to transfer). */
 export const UNIQUE_CODE_MIN = 1;
 export const UNIQUE_CODE_MAX = 999;
@@ -116,6 +118,7 @@ export const REGEX_PROBLEM = {
   overlap:
     "Regex berisiko lambat (dua pengulangan bisa mencocokkan karakter yang sama), sederhanakan polanya",
   unbounded: "Regex berisiko lambat (terlalu banyak * atau +), sederhanakan polanya",
+  complex: "Regex terlalu rumit (terlalu banyak karakter berbeda), sederhanakan polanya",
 } as const;
 
 /**
@@ -140,6 +143,47 @@ export const REGEX_PROBLEM = {
  */
 export function regexProblem(src: string | null | undefined): string | null {
   const s = String(src ?? "");
+  // Saved formats are checked on every notification: memoise the verdict per source.
+  const known = lruGet(verdicts, s);
+  if (known !== undefined) return known;
+  const v = regexVerdict(s);
+  lruSet(verdicts, s, v, 256);
+  return v;
+}
+
+/** Map-based LRU helpers (a Map keeps insertion order; re-insert on hit). */
+function lruGet<V>(m: Map<string, V>, k: string): V | undefined {
+  const v = m.get(k);
+  if (v !== undefined) {
+    m.delete(k);
+    m.set(k, v);
+  }
+  return v;
+}
+function lruSet<V>(m: Map<string, V>, k: string, v: V, max: number) {
+  m.delete(k);
+  m.set(k, v);
+  while (m.size > max) m.delete(m.keys().next().value!);
+}
+const verdicts = new Map<string, string | null>();
+
+/**
+ * Escapes that are not one character in non-`u` JavaScript, so the one-atom model would be
+ * wrong (security review #3 R1): `\c` not followed by an ASCII letter matches the two characters
+ * `\c`, and `\0` followed by a digit is a legacy octal escape (`\012` = newline).
+ */
+function hasMultiCharEscape(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] !== "\\") continue;
+    const e = s[i + 1] ?? "";
+    if (e === "c" && !/^[a-z]$/i.test(s[i + 2] ?? "")) return true;
+    if (e === "0" && /^\d$/.test(s[i + 2] ?? "")) return true;
+    i++;
+  }
+  return false;
+}
+
+function regexVerdict(s: string): string | null {
   if (!s.trim()) return REGEX_PROBLEM.empty;
   if (s.length > NOTIFY_LIMITS.regex) return REGEX_PROBLEM.long;
   try {
@@ -149,6 +193,7 @@ export function regexProblem(src: string | null | undefined): string | null {
   }
   if (/\\[1-9]|\\k</.test(s)) return REGEX_PROBLEM.backref;
   if (/\(\?<[=!]/.test(s)) return REGEX_PROBLEM.lookbehind;
+  if (hasMultiCharEscape(s)) return REGEX_PROBLEM.invalid;
   let tree: Alt;
   try {
     tree = parseRegex(s);
@@ -156,6 +201,8 @@ export function regexProblem(src: string | null | undefined): string | null {
     return REGEX_PROBLEM.invalid;
   }
   if (countUnbounded(tree) > MAX_UNBOUNDED) return REGEX_PROBLEM.unbounded;
+  // Each distinct atom costs one pass over all 65 536 code units (~0.5 ms): cap them (R2).
+  if (new Set(allLeaves(tree)).size > MAX_DISTINCT_ATOMS) return REGEX_PROBLEM.complex;
   return shapeProblem(tree);
 }
 
@@ -265,6 +312,15 @@ function leaves(alts: Alt, out: string[] = []): string[] {
   return out;
 }
 
+/** Every character-consuming leaf, also inside lookarounds. */
+function allLeaves(alts: Alt, out: string[] = []): string[] {
+  for (const seq of alts)
+    for (const it of seq)
+      if (it.node.kind === "group") allLeaves(it.node.alts, out);
+      else if (!it.node.zero) out.push(it.node.src);
+  return out;
+}
+
 /** Min / max characters an alternation consumes. */
 function lengthOf(alts: Alt): Quant {
   let min = Infinity;
@@ -371,7 +427,12 @@ function shapeProblem(root: Alt): string | null {
     if (v === undefined) {
       const sx = setOf(x);
       const sy = setOf(y);
-      v = sx.some((w, k) => (w & sy[k]!) !== 0);
+      // Backstop: an atom matching no single character (other than the literal `[]`) is not
+      // modelled correctly (it may match several characters), so it overlaps everything.
+      v =
+        (x !== "[]" && isEmpty(sx)) ||
+        (y !== "[]" && isEmpty(sy)) ||
+        sx.some((w, k) => (w & sy[k]!) !== 0);
       pairs.set(key, v);
     }
     return v;
@@ -424,9 +485,11 @@ let codeUnits: string | null = null;
  * classes, `[^]`, `[]`, non-Latin ranges, case folding) — security review #2 showed that comparing
  * on a fixed probe set misses characters only a negated class can match.
  */
+const isEmpty = (bits: Uint32Array) => bits.every((w) => w === 0);
+
 const charSets = new Map<string, Uint32Array>();
 function charSet(src: string): Uint32Array {
-  const hit = charSets.get(src);
+  const hit = lruGet(charSets, src);
   if (hit) return hit;
   codeUnits ??= Array.from({ length: 0x10000 }, (_, k) => String.fromCharCode(k)).join("");
   const bits = new Uint32Array(0x10000 / 32);
@@ -435,8 +498,7 @@ function charSet(src: string): Uint32Array {
     if (m[0].length === 0) re.lastIndex++;
     else bits[m.index >>> 5]! |= 1 << (m.index & 31);
   }
-  if (charSets.size >= 512) charSets.clear();
-  charSets.set(src, bits);
+  lruSet(charSets, src, bits, 512);
   return bits;
 }
 
