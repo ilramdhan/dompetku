@@ -35,7 +35,14 @@ import {
   saveIntegration,
 } from "@/lib/integrations.server";
 
-const ENV = ["SESSION_SECRET", "AI_API_KEY", "BOT_TEXT_AI", "N8N_API_KEY"] as const;
+const ENV = [
+  "SESSION_SECRET",
+  "AI_API_KEY",
+  "BOT_TEXT_AI",
+  "N8N_API_KEY",
+  "PUBLIC_SITE_URL",
+  "DEMO_MODE",
+] as const;
 const saved = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
 beforeEach(() => {
   rows = [];
@@ -91,6 +98,33 @@ describe("integrations.server", () => {
     expect(await getIntegration("AI_API_KEY")).toBe("env-key-000000000");
     const item = (await readIntegrations()).items.find((i) => i.key === "AI_API_KEY")!;
     expect(item).toMatchObject({ source: "env", problem: "decrypt", stored: true });
+  });
+
+  it("resolves PUBLIC_SITE_URL for SEO, links and Midtrans as Settings > env (#117)", async () => {
+    const { seoConfig } = await import("@/lib/seo.server");
+    delete process.env["DEMO_MODE"];
+    process.env["PUBLIC_SITE_URL"] = "https://env.test/";
+    expect((await seoConfig()).siteUrl).toBe("https://env.test");
+    rows = [
+      { key: "PUBLIC_SITE_URL", value: "https://db.test", is_secret: false, updated_at: "x" },
+    ];
+    clearIntegrationsCache();
+    expect(await seoConfig()).toMatchObject({ siteUrl: "https://db.test", indexable: true });
+    delete process.env["PUBLIC_SITE_URL"];
+    rows = [];
+    clearIntegrationsCache();
+    expect((await seoConfig()).siteUrl).toBeNull();
+    failWith = { message: "Could not find the table", code: "PGRST205" };
+    process.env["PUBLIC_SITE_URL"] = "https://env.test";
+    clearIntegrationsCache();
+    expect((await seoConfig()).siteUrl).toBe("https://env.test");
+  });
+
+  it("stores PUBLIC_SITE_URL normalised and in plaintext", async () => {
+    await expect(saveIntegration("PUBLIC_SITE_URL", "http://x.test")).rejects.toThrow();
+    await saveIntegration("PUBLIC_SITE_URL", "https://x.test/");
+    const w = upserts.find((u) => u.table === "integration_settings")!.v;
+    expect(w).toMatchObject({ key: "PUBLIC_SITE_URL", value: "https://x.test", is_secret: false });
   });
 
   it("stores secrets encrypted and validates before writing", async () => {

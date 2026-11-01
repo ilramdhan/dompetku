@@ -8,7 +8,7 @@ export const Route = createFileRoute("/llms.txt")({
     handlers: {
       GET: withErrorLogging("public:llms", async () => {
         const { seoConfig } = await import("@/lib/seo.server");
-        const cfg = seoConfig();
+        const cfg = await seoConfig();
         if (!cfg.indexable)
           return new Response("Not found", {
             status: 404,
