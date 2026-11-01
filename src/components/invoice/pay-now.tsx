@@ -148,9 +148,14 @@ export function PayNowButton({
       <div className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           {t("Kartu, e-wallet, QRIS, atau virtual account lewat Midtrans.")}{" "}
-          <span className="num font-semibold text-foreground">
-            {money(charge, currency, { reveal: true })}
-          </span>
+          {invalid ? (
+            // Never show an amount the server would refuse; the hint under the input explains why.
+            <span className="font-semibold text-expense">{t("Jumlah tidak valid")}</span>
+          ) : (
+            <span className="num font-semibold text-foreground">
+              {money(charge, currency, { reveal: true })}
+            </span>
+          )}
         </p>
         <Button
           type="button"
