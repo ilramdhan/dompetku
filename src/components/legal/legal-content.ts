@@ -1,6 +1,6 @@
 /** Privacy policy and terms content. Strings are Indonesian DICT keys (English in i18n.tsx). */
 /** Last content change of the privacy policy and terms (ISO date, rendered per language). */
-export const LEGAL_UPDATED = "2026-10-31";
+export const LEGAL_UPDATED = "2026-11-01";
 
 export type LegalSection = {
   id: string;
@@ -32,6 +32,7 @@ export const PRIVACY: LegalSection[] = [
       "Data keuangan yang Anda masukkan — akun, transaksi, budget, hutang, piutang, emas, target, foto struk, dan pengaturan — disimpan di proyek Supabase (PostgreSQL dan Storage) milik pemilik instance.",
       "Database hanya diakses oleh server aplikasi ini; browser tidak pernah terhubung langsung ke database. Pembuat Dompetku tidak memiliki akses ke instance ini.",
       "Bila fitur invoice dipakai, data pelanggan yang diisi pemilik instance (nama, email, telepon) dan bukti transfer yang diunggah pelanggan juga disimpan di sana. Untuk membatasi penyalahgunaan unggahan, alamat IP pengunggah hanya disimpan dalam bentuk hash.",
+      "Bila notifikasi bank via MacroDroid diaktifkan, HP pemilik instance meneruskan notifikasi dari aplikasi bank/e-wallet yang dipilih ke server ini. Teks notifikasi diproses di server untuk mencocokkan pembayaran invoice; yang disimpan hanya cuplikan singkat (nomor rekening atau referensi panjang disamarkan), nominal, nama aplikasi, waktu, dan status — tidak pernah teks lengkapnya. Notifikasi yang diabaikan atau tidak cocok dihapus otomatis setelah sekitar 90 hari dan tidak ikut backup.",
     ],
   },
   {
@@ -61,6 +62,7 @@ export const PRIVACY: LegalSection[] = [
       "Telegram dan n8n — meneruskan pesan bot, ringkasan, dan pengingat antara Anda dan aplikasi.",
       "Resend — mengirim email pengingat ke alamat yang diatur pemilik instance, serta email invoice, konfirmasi pembayaran, dan pengingat jatuh tempo ke email pelanggan invoice.",
       "Midtrans (payment gateway) — bila pembayaran online diaktifkan, menerima nomor invoice, jumlah tagihan, serta nama, email, dan telepon pelanggan untuk memproses pembayaran. Data kartu atau e-wallet diisi langsung di halaman Midtrans dan tidak pernah melewati aplikasi ini.",
+      "MacroDroid (aplikasi Android di HP pemilik instance) — membaca notifikasi aplikasi bank/e-wallet yang dipilih pemilik dan mengirimkannya hanya ke server instance ini. Teks notifikasi tidak dikirim ke pihak lain.",
       "Sentry — menerima laporan error teknis (pesan error dan konteks permintaan), bukan isi data keuangan Anda.",
       "Google Drive — menyimpan file backup bila backup terjadwal diaktifkan.",
     ],
