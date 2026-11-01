@@ -178,9 +178,10 @@ export const GATEWAY_MIN_PARTIAL = 10_000;
 
 /**
  * Amount to charge for a "Bayar sekarang" request (issue #124). `requested` empty → the whole
- * remaining amount. With partial payments on, a whole-rupiah amount between
- * min(GATEWAY_MIN_PARTIAL, remaining) and the remaining amount is accepted; otherwise only the
- * exact remaining amount. null = refused (caller answers a fixed public error).
+ * remaining amount. With partial payments on, a whole-rupiah amount of at least
+ * GATEWAY_MIN_PARTIAL that also leaves at least GATEWAY_MIN_PARTIAL unpaid is accepted (a smaller
+ * rest could not be paid online, Midtrans channels have minimums); otherwise only the exact
+ * remaining amount. null = refused (caller answers a fixed public error).
  */
 export function chargeAmount(
   remaining: number | string,
@@ -193,8 +194,22 @@ export function chargeAmount(
   if (typeof requested !== "number" || !Number.isInteger(requested)) return null;
   if (requested === full) return full;
   if (!partial) return null;
-  if (requested > full || requested < Math.min(GATEWAY_MIN_PARTIAL, full)) return null;
+  if (requested < GATEWAY_MIN_PARTIAL || full - requested < GATEWAY_MIN_PARTIAL) return null;
   return requested;
+}
+
+/** Partial amounts are possible at all: the remaining amount fits two minimum payments. */
+export const partialAllowed = (remaining: number | string): boolean =>
+  (gatewayAmount(remaining) ?? 0) >= 2 * GATEWAY_MIN_PARTIAL;
+
+/**
+ * Public input `amount` (#124): absent/null → null (= whole remaining amount); a positive safe
+ * integer passes through (chargeAmount still re-checks it); anything else (string, fraction,
+ * ≤ 0, NaN) → "invalid" so the request is refused instead of silently charging the full amount.
+ */
+export function parseRequestedAmount(v: unknown): number | null | "invalid" {
+  if (v === undefined || v === null) return null;
+  return typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? v : "invalid";
 }
 
 export const amountsMatch = (a: number | string, b: number | string) =>

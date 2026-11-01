@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { parseRequestedAmount } from "./gateway/types";
 
 /**
  * PUBLIC (no login, issue #93): the customer view of one invoice by its share token. This is the
@@ -13,14 +14,8 @@ import { createServerFn } from "@tanstack/react-start";
  */
 export const getPublicInvoice = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => {
-    const o = (d ?? {}) as { token?: unknown; amount?: unknown };
-    // #124: optional partial amount; only a safe integer passes, the server re-checks it against
-    // the remaining amount (chargeAmount) — never trusted as is.
-    const amount =
-      typeof o.amount === "number" && Number.isSafeInteger(o.amount) && o.amount > 0
-        ? o.amount
-        : null;
-    return { token: typeof o.token === "string" ? o.token.slice(0, 128) : "", amount };
+    const token = (d as { token?: unknown } | null)?.token;
+    return { token: typeof token === "string" ? token.slice(0, 128) : "" };
   })
   .handler(async ({ data }) => {
     const { publicInvoiceByToken } = await import("./invoice-share.server");
@@ -99,14 +94,13 @@ export const submitInvoiceProof = createServerFn({ method: "POST" })
  */
 export const createGatewayPayment = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => {
-    const o = (d ?? {}) as { token?: unknown; amount?: unknown };
-    // #124: optional partial amount; only a safe integer passes, the server re-checks it against
-    // the remaining amount (chargeAmount) — never trusted as is.
-    const amount =
-      typeof o.amount === "number" && Number.isSafeInteger(o.amount) && o.amount > 0
-        ? o.amount
-        : null;
-    return { token: typeof o.token === "string" ? o.token.slice(0, 128) : "", amount };
+    const o = (d && typeof d === "object" ? d : {}) as { token?: unknown; amount?: unknown };
+    // #124: optional partial amount. Absent = whole remaining amount; anything but a positive safe
+    // integer is refused (never silently charged in full); chargeAmount re-checks the range.
+    return {
+      token: typeof o.token === "string" ? o.token.slice(0, 128) : "",
+      amount: parseRequestedAmount(o.amount),
+    };
   })
   .handler(async ({ data }) => {
     const gw = await import("./gateway/payments.server");
@@ -115,6 +109,7 @@ export const createGatewayPayment = createServerFn({ method: "POST" })
     const { getRequest } = await import("@tanstack/react-start/server");
     const allowed = new Set([gw.PAY_UNAVAILABLE, gw.PAY_RATE_LIMITED, gw.PAY_FAILED]);
     if (isDemo()) throw new Error(DEMO_DISABLED);
+    if (data.amount === "invalid") throw new Error(gw.PAY_UNAVAILABLE);
     try {
       const req = getRequest();
       const { seoConfig } = await import("./seo.server");

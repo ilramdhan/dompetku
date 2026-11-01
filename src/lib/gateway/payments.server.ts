@@ -37,6 +37,7 @@ import {
   makeOrderId,
   nextRefundSeq,
   nextStatus,
+  partialAllowed,
   refundExternalId,
   refundKey,
   refundProblem,
@@ -159,9 +160,9 @@ export async function publicGatewayFor(
     if (ready && (await refundHeldInvoices([invoiceId])).has(invoiceId)) return off;
     const available = gatewayAvailable({ ready, configured: true, demo, status, remaining });
     if (!available) return off;
-    // #124: partial amounts only when enabled and the remaining amount is above the minimum.
-    const full = gatewayAmount(remaining) ?? 0;
-    const partial = !!c.partial && full > GATEWAY_MIN_PARTIAL;
+    // #124: partial amounts only when enabled and the remaining amount fits two minimum payments
+    // (a partial must leave at least GATEWAY_MIN_PARTIAL unpaid, see chargeAmount).
+    const partial = !!c.partial && partialAllowed(remaining);
     return { available, partial, min: partial ? GATEWAY_MIN_PARTIAL : null };
   } catch {
     return off;

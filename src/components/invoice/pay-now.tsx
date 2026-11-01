@@ -181,11 +181,13 @@ export function PayNowButton({
           />
           <p className={invalid ? "text-xs text-expense" : "text-xs text-muted-foreground"}>
             {t("Boleh bayar sebagian: minimal")}{" "}
-            <span className="num">
-              {money(Math.min(partialMin, amount), currency, { reveal: true })}
-            </span>
+            <span className="num">{money(partialMin, currency, { reveal: true })}</span>
             {", "}
-            {t("maksimal sisa tagihan. Kosongkan untuk melunasi.")}
+            {t("maksimal")}{" "}
+            <span className="num">
+              {money(Math.max(0, amount - partialMin), currency, { reveal: true })}
+            </span>
+            {t(" (sisa minimal sama). Kosongkan untuk melunasi.")}
           </p>
         </div>
       ) : null}

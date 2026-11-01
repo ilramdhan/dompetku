@@ -1560,8 +1560,9 @@ const DICT: Record<string, string> = {
   "Persentase biaya harus di bawah 50%": "Fee percentage must be below 50%",
   "Jumlah yang dibayar (opsional)": "Amount to pay (optional)",
   "Boleh bayar sebagian: minimal": "Partial payment allowed: at least",
-  "maksimal sisa tagihan. Kosongkan untuk melunasi.":
-    "at most the remaining balance. Leave empty to pay in full.",
+  maksimal: "at most",
+  " (sisa minimal sama). Kosongkan untuk melunasi.":
+    " (leaving at least the same). Leave empty to pay in full.",
   "Biaya MDR": "MDR fee",
   "diterima bersih": "net received",
   "Payment gateway (Midtrans)": "Payment gateway (Midtrans)",

@@ -7,7 +7,12 @@ import {
   mdrRulesProblem,
   parseMdrRules,
 } from "@/lib/gateway/mdr";
-import { GATEWAY_MIN_PARTIAL, chargeAmount } from "@/lib/gateway/types";
+import {
+  GATEWAY_MIN_PARTIAL,
+  chargeAmount,
+  parseRequestedAmount,
+  partialAllowed,
+} from "@/lib/gateway/types";
 import { validateIntegration, resolveIntegration } from "@/lib/integrations";
 import { paymentProblem, derivedStatus } from "@/lib/invoices";
 
@@ -99,6 +104,28 @@ describe("partial gateway payments (#124)", () => {
     // Remaining below the minimum: only the exact remaining amount.
     expect(chargeAmount(5000, 5000, true)).toBe(5000);
     expect(chargeAmount(5000, 4000, true)).toBeNull();
+  });
+
+  it("refuses partials that would leave less than the minimum unpaid (review I5)", () => {
+    const min = GATEWAY_MIN_PARTIAL;
+    expect(chargeAmount(250000, 250000 - 1, true)).toBeNull();
+    expect(chargeAmount(250000, 250000 - min + 1, true)).toBeNull();
+    expect(chargeAmount(250000, 250000 - min, true)).toBe(250000 - min);
+    // 15.000 left: any partial would leave < 10.000 or be < 10.000, so only the full amount.
+    expect(chargeAmount(15000, 10000, true)).toBeNull();
+    expect(chargeAmount(15000, 15000, true)).toBe(15000);
+    expect(chargeAmount(2 * min, min, true)).toBe(min);
+    expect(partialAllowed(2 * min)).toBe(true);
+    expect(partialAllowed(2 * min - 1)).toBe(false);
+    expect(partialAllowed(5000)).toBe(false);
+  });
+
+  it("refuses a malformed public amount instead of charging in full (review I3)", () => {
+    expect(parseRequestedAmount(undefined)).toBeNull();
+    expect(parseRequestedAmount(null)).toBeNull();
+    expect(parseRequestedAmount(10000)).toBe(10000);
+    for (const bad of ["10000", 10000.5, 0, -1, Number.NaN, Infinity, 2 ** 60, {}, true])
+      expect(parseRequestedAmount(bad), String(bad)).toBe("invalid");
   });
 
   it("partial payments move the invoice partial → paid via the existing rules", () => {
