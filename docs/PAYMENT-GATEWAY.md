@@ -107,6 +107,25 @@ Masuk Dompetku sebagai admin → **Pengaturan → Integrasi → Payment gateway 
 | `MIDTRANS_CLIENT_KEY` | Client Key dari langkah 3                |
 | `MIDTRANS_PRODUCTION` | `false` (sandbox) dulu                   |
 | `MIDTRANS_ENABLED`    | `true` setelah tiga kolom di atas terisi |
+| `MIDTRANS_FEES`       | Opsional — tarif MDR, lihat di bawah     |
+| `MIDTRANS_PARTIAL`    | Opsional — `true` = boleh bayar sebagian |
+
+**Biaya MDR (`MIDTRANS_FEES`, opsional).** API status Midtrans tidak mengirim besar biaya, jadi
+Dompetku menghitungnya dari tarif yang Anda isi per `payment_type`, contoh
+`qris=0.7%; gopay=2%; shopeepay=2%; credit_card=2.9%+2000; bank_transfer=4000; cstore=5000; *=0`
+(`*` = metode lain; tambahkan PPN sendiri bila tarifnya belum termasuk PPN). Saat pembayaran
+tercatat, biaya dibukukan **sekali** sebagai pengeluaran kategori **Biaya Admin** di dompet invoice
+(kunci `invoice_mdr:<id transaksi gateway>`), sehingga saldo = dana bersih yang diterima. Refund
+tidak mengubah atau mengulang biaya itu (Midtrans tidak mengembalikan MDR). Kosong = tidak
+dicatat. Cocokkan dengan laporan payout di dashboard Midtrans (Billings → Transfer History).
+Jangan aktifkan **Automatic Fee Imposition** di Snap Preference: biaya yang dibebankan ke pelanggan
+mengubah `gross_amount`, sehingga pembayaran ditandai "Jumlah dari Midtrans tidak cocok".
+
+**Bayar sebagian (`MIDTRANS_PARTIAL`, opsional).** `true` = di halaman invoice publik pelanggan
+boleh mengisi jumlah (minimal Rp10.000, maksimal sisa tagihan; sisa di bawah Rp10.000 harus
+dilunasi sekaligus). Jumlah selalu dicek ulang di server. Setiap pembayaran parsial tercatat
+seperti biasa dan status invoice berubah **Dibayar sebagian → Lunas**. Hanya satu nominal order
+yang aktif per invoice: order tertunda dengan nominal lain otomatis dibatalkan (expire).
 
 Server Key disimpan terenkripsi dan tidak pernah ditampilkan lagi (hanya 4 karakter terakhir).
 Perubahan berlaku dalam ±1 menit.
@@ -241,13 +260,15 @@ notifikasi.
 
 ### 12. FAQ
 
-**Apakah pelanggan bisa membayar sebagian?** Tidak lewat gateway: tombol selalu menagih seluruh
-sisa. Untuk cicilan, catat pembayaran manual atau pakai transfer + bukti (v24).
+**Apakah pelanggan bisa membayar sebagian?** Bisa bila `MIDTRANS_PARTIAL=true` (lihat langkah 4).
+Default-nya tombol menagih seluruh sisa.
 
 **Berapa lama order berlaku?** 24 jam. Klik ulang dalam masa itu memakai order yang sama.
 
-**Apakah biaya Midtrans dicatat?** Belum. Dompetku mencatat jumlah kotor. Catat biaya MDR sebagai
-pengeluaran "Biaya Admin" bila perlu.
+**Apakah biaya Midtrans dicatat?** Ya, bila `MIDTRANS_FEES` diisi: pemasukan "Invoice" = jumlah
+kotor, ditambah satu pengeluaran "Biaya Admin" = MDR. Biaya dihitung dari tarif Anda (Midtrans
+tidak mengirimkannya lewat API), jadi selisih pembulatan kecil dengan laporan payout mungkin.
+Pembayaran yang tercatat sebelum tarif diisi tidak dihitung ulang.
 
 **Bisa pakai transfer + bukti dan Midtrans sekaligus?** Bisa. Keduanya tampil di halaman publik.
 
@@ -259,9 +280,10 @@ Midtrans tidak ikut backup; isi ulang setelah restore ke instance baru.
 ### 13. Batasan
 
 - Satu provider (Midtrans Snap), mata uang IDR, nominal bilangan bulat rupiah.
-- Selalu menagih seluruh sisa tagihan; tidak ada pembayaran sebagian lewat gateway.
+- Bayar sebagian hanya bila `MIDTRANS_PARTIAL=true`; minimal Rp10.000.
 - Refund otomatis hanya untuk metode yang didukung Midtrans; sisanya manual.
-- Biaya transaksi (MDR) tidak dicatat otomatis.
+- MDR dihitung dari tarif `MIDTRANS_FEES`, bukan dari data Midtrans; Automatic Fee Imposition tidak
+  didukung.
 - Chargeback dicatat sebagai refund dan baru terlihat setelah **Cek status** atau notifikasi.
 - Order dibuat di lingkungan sandbox tidak bisa dicek setelah pindah ke production.
 
@@ -330,6 +352,25 @@ Sign in as admin → **Settings → Integrasi → Payment gateway (Midtrans)**:
 | `MIDTRANS_CLIENT_KEY` | Client Key from step 3                     |
 | `MIDTRANS_PRODUCTION` | `false` (sandbox) first                    |
 | `MIDTRANS_ENABLED`    | `true` once the three fields above are set |
+| `MIDTRANS_FEES`       | Optional — MDR rates, see below            |
+| `MIDTRANS_PARTIAL`    | Optional — `true` = allow partial payments |
+
+**MDR fees (`MIDTRANS_FEES`, optional).** Midtrans' status API does not return the fee, so Dompetku
+computes it from the rates you enter per `payment_type`, e.g.
+`qris=0.7%; gopay=2%; shopeepay=2%; credit_card=2.9%+2000; bank_transfer=4000; cstore=5000; *=0`
+(`*` = any other method; add VAT yourself where the rate excludes it). When the payment is booked,
+the fee is booked **once** as an expense in category **Biaya Admin** on the invoice's wallet (key
+`invoice_mdr:<gateway row id>`), so the balance equals the net money received. Refunds never change
+or repeat it (Midtrans does not return the MDR). Empty = not booked. Reconcile with the payout
+report in the Midtrans dashboard (Billings → Transfer History). Do not enable **Automatic Fee
+Imposition** in Snap Preference: a customer-paid fee changes `gross_amount`, so the payment is
+flagged "Jumlah dari Midtrans tidak cocok" (amount mismatch).
+
+**Partial payments (`MIDTRANS_PARTIAL`, optional).** `true` = on the public invoice page the
+customer may enter an amount (at least Rp10,000, at most the remaining balance; a balance below
+Rp10,000 must be paid in full). The amount is always re-checked on the server. Each partial payment
+is booked as usual and the invoice moves **partial → paid**. Only one order amount is live per
+invoice: pending orders for another amount are expired automatically.
 
 The Server Key is stored encrypted and never shown again (only its last 4 characters). Changes
 apply within about a minute.
@@ -460,13 +501,15 @@ paid invoice is never undone by the order notifications arrive in.
 
 ### 12. FAQ
 
-**Can customers pay part of the invoice?** Not through the gateway: it always charges the full
-amount due. For instalments record payments manually or use transfer + proof (v24).
+**Can customers pay part of the invoice?** Yes with `MIDTRANS_PARTIAL=true` (see step 4). By
+default the button charges the full amount due.
 
 **How long is an order valid?** 24 hours; clicking again within that time reuses the same order.
 
-**Are Midtrans fees recorded?** Not yet. Dompetku books the gross amount; record the MDR as a
-"Biaya Admin" expense if you need it.
+**Are Midtrans fees recorded?** Yes when `MIDTRANS_FEES` is set: "Invoice" income = gross amount,
+plus one "Biaya Admin" expense = the MDR. The fee comes from your rates (Midtrans does not send it
+through the API), so small rounding differences with the payout report are possible. Payments
+booked before the rates were set are not recalculated.
 
 **Transfer + proof and Midtrans together?** Yes, both show on the public page.
 
@@ -478,8 +521,9 @@ are not; re-enter them after restoring onto a new instance.
 ### 13. Limitations
 
 - One provider (Midtrans Snap), IDR only, whole-rupiah amounts.
-- Always charges the whole amount due; no partial payments through the gateway.
+- Partial payments only with `MIDTRANS_PARTIAL=true`; minimum Rp10,000.
 - Automatic refunds only for methods Midtrans supports; the rest are manual.
-- Transaction fees (MDR) are not booked automatically.
+- MDR comes from the `MIDTRANS_FEES` rates, not from Midtrans data; Automatic Fee Imposition is not
+  supported.
 - Chargebacks are recorded as refunds and appear after **Cek status** or a notification.
 - Sandbox orders cannot be re-checked after switching to production.
