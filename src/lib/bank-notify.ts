@@ -742,31 +742,40 @@ export function parseNotification(
 
 /**
  * What is stored of a notification: one line, ≤ NOTIFY_LIMITS.excerpt, numbers of 6+ digits
- * (account, card, phone or reference numbers — also when written in groups joined by `-`, `.` or
- * spaces, e.g. "0812-3456-7890", "123 456 7890") masked except the last 3 digits. Amounts survive:
- * a number right after Rp/IDR, or one in thousands grouping ("1.250.000", "1,250,000.00").
+ * (account, card, phone or reference numbers — also when written in groups joined by `-`, `.`,
+ * `,`, `/`, `_` or spaces, e.g. "0812-3456-7890", "0812/3456/7890", or in full-width digits)
+ * masked except the last 3 digits. Kept readable: the amount right after Rp/IDR (≤ 12 digits,
+ * anything glued after it is masked), a plausible bare amount in thousands grouping (≤ 9 digits,
+ * no leading zero: "1.250.000", "1,250,000.00") and a date ("01/11/2026"). Security review #2 N6.
  */
 export function minimiseText(n: Pick<NotificationInput, "title" | "text">): string {
   return `${n.title}${n.title && n.text ? " · " : ""}${n.text}`
+    .normalize("NFKC") // full-width / styled digits → ASCII
     .replace(
-      /((?:rp\.?|idr)\s?)?(\d+(?:[-., ]\d+)*)/gi,
+      /((?:rp\.?|idr)\s?)?(\p{Nd}+(?:[-., /_]\p{Nd}+)*)/giu,
       (_, pre: string | undefined, run: string) => {
         if (!pre) return maskNumber(run);
-        const amount = /^\d[\d.,]*/.exec(run)![0].replace(/[.,]$/, "");
+        const amount = RP_AMOUNT.exec(run)?.[0] ?? "";
         return `${pre}${amount}${maskNumber(run.slice(amount.length))}`;
       },
     )
     .slice(0, NOTIFY_LIMITS.excerpt);
 }
 
-/** A digit run (possibly with `-`/`.`/`,`/space separators): kept when short or thousands-grouped. */
+/** The amount after Rp/IDR: thousands grouping (≤ 4 groups) or ≤ 10 plain digits, + cents. */
+const RP_AMOUNT =
+  /^(?:(?:[1-9]\d{0,2}(?:([.,])\d{3}(?:\1\d{3}){0,2})?|0)|[1-9]\d{0,9})(?:[.,]\d{1,2})?(?!\d)/;
+/** A bare number kept as an amount: thousands grouping, ≤ 9 integer digits, no leading zero. */
+const BARE_AMOUNT =
+  /^[1-9]\d{0,2}(?:\.\d{3}){1,2}(?:,\d{1,2})?$|^[1-9]\d{0,2}(?:,\d{3}){1,2}(?:\.\d{1,2})?$/;
+const DATE = /^\d{1,2}[-/.]\d{1,2}[-/.](?:\d{2}|\d{4})$/;
+
+/** A digit run (possibly with separators): kept when short, an amount or a date, else masked. */
 function maskNumber(run: string): string {
-  const lead = /^\D*/.exec(run)![0];
+  const lead = /^\D*/u.exec(run)![0];
   const body = run.slice(lead.length);
-  const digits = body.replace(/\D/g, "");
-  if (digits.length < 6) return run;
-  if (/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$|^\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(body))
-    return run;
+  const digits = body.replace(/\P{Nd}/gu, "");
+  if (digits.length < 6 || BARE_AMOUNT.test(body) || DATE.test(body)) return run;
   return `${lead}${"•".repeat(Math.min(6, digits.length - 3))}${digits.slice(-3)}`;
 }
 

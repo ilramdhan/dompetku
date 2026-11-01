@@ -448,6 +448,26 @@ describe("notification normalisation & minimisation", () => {
     );
   });
 
+  it("masks the number shapes from security review #2 N6", () => {
+    const cases: [string, string][] = [
+      ["dari 0812/3456/7890", "dari ••••••890"],
+      ["hp 0812_3456_7890", "hp ••••••890"],
+      ["id ８１２３４５６７８９", "id ••••••789"],
+      ["rek 1.234.567.890", "rek ••••••890"],
+      ["ref 081,234,567,890", "ref ••••••890"],
+      ["Rp 1.250.000.081234567890 masuk", "Rp 1.250.000.••••••890 masuk"],
+      ["Rp 081234567890", "Rp ••••••890"],
+    ];
+    for (const [text, want] of cases) expect(minimiseText({ title: "", text }), text).toBe(want);
+    // amounts and dates stay readable
+    for (const keep of [
+      "Rp 2.500.000.000 masuk",
+      "tgl 01/11/2026 Rp1250000 masuk",
+      "total 12.500.000",
+    ])
+      expect(minimiseText({ title: "", text: keep })).toBe(keep);
+  });
+
   it("reads timestamps and checks freshness", () => {
     expect(postedAt("1761900000000")).toBe(1761900000000);
     expect(postedAt("1761900000")).toBe(1761900000000);
