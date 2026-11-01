@@ -6,11 +6,13 @@ import { withErrorLogging } from "@/lib/monitoring";
 // device token (Authorization: Bearer / X-Device-Token) compared as SHA-256 digests in constant
 // time → 401 (only wrong tokens are rate limited per IP → 429, so a spoofed X-Forwarded-For can
 // never block the real phone); v26 missing → 503; per-device limit → 429; body ≤ 16 KB (413) and
-// JSON without repeated keys (400); then the notification is parsed with the admin-defined formats, deduplicated by hash,
-// matched against open invoices (remaining + unique code) and stored with minimised text.
+// JSON without repeated keys (400); then the notification is parsed with the admin-defined
+// formats, deduplicated by hash, matched against open invoices (remaining + unique code) and
+// stored with minimised text.
 // Body: { app, package, title, text, big_text?, sub_text?, posted_at?, device? } (MacroDroid magic
 // text {not_app_name} {not_app_package} {not_title} {notification} {not_text_big} {not_sub_text}
-// {not_timestamp}), sent as an escaped `{lvjson=payload}` dictionary. Answers 200 { ok, status } for stored/duplicate/ignored notifications.
+// {not_timestamp}), sent as an escaped `{lvjson=payload}` dictionary. Answers 200 { ok, status }
+// for stored/duplicate/ignored notifications.
 export const Route = createFileRoute("/api/public/payments/notify")({
   server: {
     handlers: {
