@@ -886,3 +886,11 @@ do $$ begin
     check (refunded >= 0 and refunded <= amount);
 exception when duplicate_object then null; end $$;
 notify pgrst, 'reload schema';
+
+-- ============ v27: invoice — bahasa email pelanggan (aman dijalankan ulang) ============
+-- Opsional, butuh v21. Bahasa (id/en) email invoice, konfirmasi pembayaran dan pengingat jatuh tempo untuk
+-- pelanggan ini. Dipilih di form invoice (default id) dan di "Kirim invoice" (perubahan disimpan kembali).
+-- Tanpa bagian ini semua email invoice memakai Bahasa Indonesia; kolom ikut tabel invoices di cadangan.
+-- Kosong (null, baris lama) = id.
+alter table public.invoices add column if not exists lang text check (lang in ('id','en'));
+notify pgrst, 'reload schema';
