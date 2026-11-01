@@ -17,13 +17,15 @@ export type MdrRule = { percent: number; flat: number };
 export type MdrRules = Record<string, MdrRule>;
 
 const KEY = /^(\*|[a-z0-9_]{2,40})$/;
+/** Object-prototype names never accepted as a payment type (rules use a null-prototype object). */
+const RESERVED = new Set(["__proto__", "constructor", "prototype"]);
 const VALUE = /^(?:(\d{1,2}(?:\.\d{1,3})?)%)?(?:\s*\+?\s*(\d{1,7}))?$/;
 
 /** Parsed schedule, or an Indonesian i18n error key for the first bad entry. */
 export function parseMdrRules(
   raw: string | null | undefined,
 ): { ok: true; rules: MdrRules } | { ok: false; error: string } {
-  const rules: MdrRules = {};
+  const rules: MdrRules = Object.create(null) as MdrRules;
   const parts = (raw ?? "")
     .split(/[;\n,]/)
     .map((s) => s.trim())
@@ -38,7 +40,7 @@ export function parseMdrRules(
       .trim()
       .replace(/\s+/g, "");
     const m = VALUE.exec(val);
-    if (!KEY.test(key) || !val || !m || (m[1] === undefined && m[2] === undefined))
+    if (!KEY.test(key) || RESERVED.has(key) || !val || !m || (m[1] === undefined && m[2] === undefined))
       return { ok: false, error: "Format biaya: metode=persen%+tetap" };
     const percent = m[1] === undefined ? 0 : Number(m[1]);
     if (percent >= 50) return { ok: false, error: "Persentase biaya harus di bawah 50%" };
@@ -85,7 +87,8 @@ export function mdrFee(
   const g = Number(gross);
   if (!(g > 0)) return 0;
   const type = (paymentType ?? "").toLowerCase();
-  const rule = (type && rules[type]) || rules["*"];
+  const own = (k: string) => (Object.hasOwn(rules, k) ? rules[k] : undefined);
+  const rule = (type && own(type)) || own("*");
   if (!rule) return 0;
   const fee = Math.round((g * rule.percent) / 100 + rule.flat);
   if (!(fee > 0)) return 0;

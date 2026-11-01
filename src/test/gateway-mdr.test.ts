@@ -63,6 +63,17 @@ describe("MDR schedule (#124)", () => {
     expect(mdrFee(rules, "qris", 0)).toBe(0);
   });
 
+  it("refuses prototype keys and never reads inherited properties (review I1)", () => {
+    for (const bad of ["__proto__=1%", "constructor=1%", "prototype=1%"])
+      expect(mdrRulesProblem(bad), bad).not.toBeNull();
+    const r = parseMdrRules("qris=1%");
+    if (!r.ok) throw new Error(r.error);
+    expect(Object.getPrototypeOf(r.rules)).toBeNull();
+    expect(mdrFee(r.rules, "constructor", 100000)).toBe(0);
+    expect(mdrFee(r.rules, "toString", 100000)).toBe(0);
+    expect(mdrFee(r.rules, "__proto__", 100000)).toBe(0);
+  });
+
   it("uses one idempotency key per gateway row", () => {
     expect(mdrExternalId("abc-123")).toBe("invoice_mdr:abc-123");
     expect(mdrExternalId("a/b c")).toBe("invoice_mdr:abc");
