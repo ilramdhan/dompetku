@@ -435,4 +435,56 @@ describe("one live pending order per invoice (review L1, #124)", () => {
     const liveOrders = live().map((r) => r.order_id);
     for (const o of created) expect(liveOrders.includes(o) || expired.includes(o)).toBe(true);
   });
+
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+
+  it("ages out an expired Snap order Midtrans neither expires nor knows (review M1)", async () => {
+    tables["gateway_transactions"] = [
+      { ...pendingRow("old", "INV-1-old", 100000), expires_at: ago(11 * 60_000) },
+    ];
+    expireOk = false;
+    deadStatus = null; // Get Status 404
+    expect(await retirePendingOrders("inv", { amount: 250000 })).toBe(0);
+    expect(gw()[0]!.status).toBe("expired");
+    // ...so a new order for another amount is no longer blocked.
+    await startGatewayPayment(TOKEN, "1.1.1.1", null, 50000);
+    expect(created).toHaveLength(1);
+  });
+
+  it("ages out a tokenless row, by created_at + 24 h when expires_at is missing (review M1)", async () => {
+    expireOk = false;
+    tables["gateway_transactions"] = [
+      { ...pendingRow("a", "INV-1-a", 100000), snap_token: null, created_at: ago(3 * 60_000) },
+      {
+        ...pendingRow("b", "INV-1-b", 100000),
+        expires_at: null,
+        created_at: ago(24 * 3_600_000 + 11 * 60_000),
+      },
+    ];
+    expect(await retirePendingOrders("inv", { amount: 250000 })).toBe(0);
+    expect(gw().map((r) => r.status)).toEqual(["expired", "expired"]);
+  });
+
+  it("keeps a still-valid or just-created row pending when expire fails and Get Status is 404", async () => {
+    expireOk = false;
+    tables["gateway_transactions"] = [
+      pendingRow("live", "INV-1-live", 100000),
+      { ...pendingRow("new", "INV-1-new", 100000), snap_token: null, created_at: ago(5_000) },
+      { ...pendingRow("grace", "INV-1-g", 100000), expires_at: ago(5 * 60_000) },
+    ];
+    expect(await retirePendingOrders("inv", { amount: 250000 })).toBe(3);
+    expect(live()).toHaveLength(3);
+  });
+
+  it("books a paid-but-unsynced old order through the claim instead of only blocking (review I6)", async () => {
+    tables["gateway_transactions"] = [pendingRow("g1", "INV-1-a", 150000)];
+    expireOk = false;
+    deadStatus = "success";
+    expect(await retirePendingOrders("inv", { amount: 50000 })).toBe(1);
+    expect(booked).toEqual([150000]);
+    expect(gw()[0]).toMatchObject({ status: "success", payment_id: "pay1" });
+    // A second pass books nothing more and no longer blocks (the row is not pending).
+    expect(await retirePendingOrders("inv", { amount: 50000 })).toBe(0);
+    expect(booked).toEqual([150000]);
+  });
 });

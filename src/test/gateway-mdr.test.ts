@@ -10,8 +10,12 @@ import {
 import {
   GATEWAY_MIN_PARTIAL,
   chargeAmount,
+  EXPIRY_GRACE_MS,
+  ORDER_EXPIRY_MIN,
+  TOKENLESS_GRACE_MS,
   parseRequestedAmount,
   partialAllowed,
+  pendingAgedOut,
 } from "@/lib/gateway/types";
 import { validateIntegration, resolveIntegration } from "@/lib/integrations";
 import { paymentProblem, derivedStatus } from "@/lib/invoices";
@@ -142,5 +146,34 @@ describe("partial gateway payments (#124)", () => {
     expect(validateIntegration("MIDTRANS_PARTIAL", "TRUE")).toEqual({ ok: true, value: "true" });
     expect(validateIntegration("MIDTRANS_PARTIAL", "maybe").ok).toBe(false);
     expect(resolveIntegration("MIDTRANS_PARTIAL", null, undefined).value).toBe("false");
+  });
+});
+
+describe("pendingAgedOut (review M1, #124)", () => {
+  const now = new Date("2026-11-02T12:00:00Z");
+  const at = (ms: number) => new Date(now.getTime() - ms).toISOString();
+  it("ages out tokenless rows after a short grace and tokens after expiry + grace", () => {
+    expect(pendingAgedOut({ snap_token: null, created_at: at(TOKENLESS_GRACE_MS + 1) }, now)).toBe(
+      true,
+    );
+    expect(pendingAgedOut({ snap_token: null, created_at: at(1000) }, now)).toBe(false);
+    expect(pendingAgedOut({ snap_token: "s", expires_at: at(EXPIRY_GRACE_MS + 1) }, now)).toBe(
+      true,
+    );
+    expect(pendingAgedOut({ snap_token: "s", expires_at: at(EXPIRY_GRACE_MS - 1000) }, now)).toBe(
+      false,
+    );
+    const day = ORDER_EXPIRY_MIN * 60_000;
+    expect(
+      pendingAgedOut(
+        { snap_token: "s", expires_at: null, created_at: at(day + EXPIRY_GRACE_MS + 1) },
+        now,
+      ),
+    ).toBe(true);
+    expect(pendingAgedOut({ snap_token: "s", expires_at: null, created_at: at(day) }, now)).toBe(
+      false,
+    );
+    expect(pendingAgedOut({ snap_token: "s", expires_at: "garbage" }, now)).toBe(false);
+    expect(pendingAgedOut({ snap_token: null, created_at: null }, now)).toBe(false);
   });
 });

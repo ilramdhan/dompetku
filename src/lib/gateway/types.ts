@@ -212,6 +212,35 @@ export function parseRequestedAmount(v: unknown): number | null | "invalid" {
   return typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? v : "invalid";
 }
 
+/** Snap order lifetime (minutes); a pending order is reused while > 10 min remain. */
+export const ORDER_EXPIRY_MIN = 24 * 60;
+/** Extra time after a Snap order's expiry before a never-started order is treated as dead. */
+export const EXPIRY_GRACE_MS = 10 * 60_000;
+/** A row without a Snap token older than this was never handed out (create crashed / aborted). */
+export const TOKENLESS_GRACE_MS = 2 * 60_000;
+
+/**
+ * A pending row whose expire Midtrans refused and whose Get Status is unknown (404: the customer
+ * never picked a method, so there is no Core transaction) can no longer be paid when (review M1 of
+ * #124): it has no Snap token (never handed to anyone) and is older than TOKENLESS_GRACE_MS (an
+ * in-flight create may still save its token), or its Snap token is past `expires_at` (or
+ * `created_at` + ORDER_EXPIRY_MIN) plus EXPIRY_GRACE_MS. Unparsable dates = not aged out.
+ */
+export function pendingAgedOut(
+  row: { snap_token?: string | null; expires_at?: string | null; created_at?: string | null },
+  now: Date,
+): boolean {
+  const t = now.getTime();
+  const created = Date.parse(row.created_at ?? "");
+  if (!row.snap_token) return Number.isFinite(created) && t - created > TOKENLESS_GRACE_MS;
+  const exp = row.expires_at
+    ? Date.parse(row.expires_at)
+    : Number.isFinite(created)
+      ? created + ORDER_EXPIRY_MIN * 60_000
+      : NaN;
+  return Number.isFinite(exp) && t - exp > EXPIRY_GRACE_MS;
+}
+
 export const amountsMatch = (a: number | string, b: number | string) =>
   Math.abs(Number(a) - Number(b)) < 0.005;
 
