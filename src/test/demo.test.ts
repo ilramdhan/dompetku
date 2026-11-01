@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  clientIp,
   createRateLimiter,
   DEMO_CAP_REACHED,
   DEMO_DISABLED,
@@ -69,11 +68,6 @@ describe("caps and write detection", () => {
     expect(isDemoWrite("POST", "serverFn")).toBe(true);
     expect(isDemoWrite("get", "serverFn")).toBe(false);
     expect(isDemoWrite("POST", "router")).toBe(false);
-  });
-  it("reads the client IP from proxy headers", () => {
-    expect(clientIp(new Headers({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" }))).toBe("1.2.3.4");
-    expect(clientIp(new Headers({ "x-real-ip": "5.6.7.8" }))).toBe("5.6.7.8");
-    expect(clientIp(new Headers())).toBe("unknown");
   });
 });
 
