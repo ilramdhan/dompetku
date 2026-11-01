@@ -383,6 +383,79 @@ describe("regex safety", () => {
       expect(regexProblem(ok), ok).toBeNull();
   });
 
+  it("grammar table: every shape is rejected or linear on 300-char worst cases", () => {
+    const R = String.raw;
+    const shapes = [
+      // review #6 list
+      R`(?:a{0,99}|b{0,99})a{0,99}x`,
+      R`(?:\d{0,99}|\s{0,99})\d{0,99}x`,
+      R`(a{0,9}){0,9}`,
+      R`(a|b)*x`,
+      R`(?:a|ab)(?:a|ab)(?:a|ab)x`,
+      R`(?:)*`,
+      R`(?:a?){0,8}x`,
+      R`[A-Za-z]{0,99}[a-z]{0,99}x`,
+      R`\w{0,99}\d{0,99}\s{0,99}x`,
+      R`.{0,99}.{0,99}x`,
+      // more shapes of the remaining grammar
+      R`(?:a|b|ab)(?:a|b|ab)(?:a|b|ab)(?:a|b|ab)x`,
+      R`(?:a|a)(?:a|a)(?:a|a)x`,
+      R`a?a?a?aaa`,
+      R`a{0,99}b?a{0,99}b?a{0,99}x`,
+      R`a{0,99}?a{0,99}x`,
+      R`\d+[.,]?\d+[.,]?\d+x`,
+      R`(?:\d{1,3}[.,])*\d+x`,
+      R`a?(?:a|b)a?(?:a|b)a?x`,
+      R`[\s\S]{0,99}x`,
+      R`.{0,99}a.{0,99}x`,
+      R`(?:a{2}){0,50}a{0,99}x`,
+      R`\d{0,1}\d{0,150}x`,
+      R`\w+\s?\w+\s?\w+x`,
+      R`(?:a|b)(?:a|b)?(?:a|b)?(?:a|b)?x`,
+      R`[^\d]*\d+`,
+      R`Rp[^\d]*(\d[\d.,]*)`,
+      R`dari [^,]+, Rp\s?(\d[\d.,]*)`,
+      // presets and documented examples (docs/MACRODROID.md, Settings help)
+      DEFAULT_AMOUNT_REGEX,
+      ...NOTIFY_PRESETS.map((p) => p.amount_regex),
+      GENERIC_FORMAT.amount_regex,
+      R`Rp\.?\s?\d[\d.,]*`,
+      R`Rp ([\d.]+),\d{2}`,
+      R`sebesar Rp\s?([\d.,]+)`,
+      R`(?:Rp|Rp\.)\s?\d+`,
+      R`dari\s+\w+`,
+      R`\d?\d+`,
+      R`IDR\s?(?<amount>\d+(?:,\d{3})*)`,
+      R`(?:masuk|diterima)`,
+      R`(?:Rp|IDR)\.?\s*([\d.,]+)\s*`,
+      R`(\d{2}){3,}`,
+    ];
+    // Repeated units covering every atom above, each with non-matching tails.
+    const units = ["a", "b", "ab", "1", "1.", "1,", " ", "\n", "x", "Rp", "Rp1", "Rp 1.", "IDR"];
+    units.push("dari ", "sebesar Rp ", "masuk", "é", "ж", "😀");
+    const tails = ["", "!", "\u0000", "y"];
+    const mustAccept = new Set([
+      DEFAULT_AMOUNT_REGEX,
+      ...NOTIFY_PRESETS.map((p) => p.amount_regex),
+    ]);
+    for (const src of new Set(shapes)) {
+      if (regexProblem(src)) {
+        expect(mustAccept.has(src), `preset rejected: ${src}`).toBe(false);
+        continue;
+      }
+      const re = compileRegex(src)!;
+      for (const u of units)
+        for (const tail of tails) {
+          const text =
+            u.repeat(Math.ceil(MAX_SCAN_CHARS / u.length)).slice(0, MAX_SCAN_CHARS - tail.length) +
+            tail;
+          const t0 = performance.now();
+          re.test(text);
+          expect(performance.now() - t0, `${src} on ${JSON.stringify(u + tail)}`).toBeLessThan(50);
+        }
+    }
+  });
+
   it("MAX_SCAN_CHARS is ~300 and the error keys exist", () => {
     expect(MAX_SCAN_CHARS).toBe(300);
     expect(REGEX_PROBLEM.overlap).toMatch(/berisiko lambat/);
