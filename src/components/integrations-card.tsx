@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Bot,
   CreditCard,
+  Globe,
   Link2,
   Link2Off,
   Mail,
@@ -40,6 +41,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const GROUP: Record<IntegrationGroup, { title: string; icon: typeof Bot }> = {
+  site: { title: "Situs", icon: Globe },
   telegram: { title: "Bot Telegram", icon: Bot },
   ai: { title: "AI (OCR & parsing chat)", icon: Sparkles },
   email: { title: "Email (Resend)", icon: Mail },
@@ -349,6 +351,8 @@ export function IntegrationsCard() {
   const q = useQuery({ queryKey: QK, queryFn: () => read() });
   const refresh = async () => {
     await qc.invalidateQueries({ queryKey: QK });
+    // PUBLIC_SITE_URL (#117) feeds the cached public SEO config (share links, heads).
+    await qc.invalidateQueries({ queryKey: ["seo"] });
   };
   const data = q.data;
   const disabled = !data || !data.ready;

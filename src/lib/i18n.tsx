@@ -1531,6 +1531,14 @@ const DICT: Record<string, string> = {
     "What data this Dompetku instance stores, where it is stored, and which third-party services may be used.",
   "Ketentuan penggunaan Dompetku: lisensi MIT, tanpa jaminan, bukan nasihat keuangan.":
     "Terms of use for Dompetku: MIT license, no warranty, not financial advice.",
+  // Site URL from Settings (#117)
+  Situs: "Site",
+  "URL situs publik": "Public site URL",
+  "Alamat publik instance ini. Dipakai untuk canonical, sitemap, tautan invoice/email dan URL kembali Midtrans. Kosong = env PUBLIC_SITE_URL.":
+    "This instance's public address. Used for canonical URLs, the sitemap, invoice/email links and the Midtrans return URL. Empty = env PUBLIC_SITE_URL.",
+  "URL situs tidak valid": "Invalid site URL",
+  "URL situs harus https:// (http hanya untuk localhost)":
+    "The site URL must be https:// (http only for localhost)",
   // v25 payment gateway (#97)
   "Aktifkan Midtrans": "Enable Midtrans",
   'true = tombol "Bayar sekarang" di halaman invoice publik (butuh skema v25 dan server key).':

@@ -9,6 +9,7 @@ import {
   maskHint,
   parseCipher,
   resolveIntegration,
+  siteUrlError,
   validateIntegration,
 } from "@/lib/integrations";
 import { decryptSecret, encryptSecret, settingsKey } from "@/lib/secret-box.server";
@@ -46,6 +47,41 @@ describe("integration catalog", () => {
     expect(validateIntegration("TELEGRAM_BOT_TOKEN", "123456789:" + "A".repeat(35)).ok).toBe(true);
     expect(validateIntegration("TELEGRAM_BOT_TOKEN", "nope").ok).toBe(false);
     expect(validateIntegration("AI_MODEL", "   ").ok).toBe(false);
+  });
+
+  it("validates PUBLIC_SITE_URL: https (http only for localhost), clean path, normalised", () => {
+    expect(validateIntegration("PUBLIC_SITE_URL", " https://Dompet.Example.com/ ")).toEqual({
+      ok: true,
+      value: "https://dompet.example.com",
+    });
+    expect(validateIntegration("PUBLIC_SITE_URL", "https://x.test/app/")).toEqual({
+      ok: true,
+      value: "https://x.test/app",
+    });
+    expect(validateIntegration("PUBLIC_SITE_URL", "http://localhost:3000").ok).toBe(true);
+    expect(validateIntegration("PUBLIC_SITE_URL", "http://127.0.0.1:3000/").ok).toBe(true);
+    expect(siteUrlError("http://dompet.example.com")).toBe(
+      "URL situs harus https:// (http hanya untuk localhost)",
+    );
+    for (const bad of [
+      "dompet.example.com",
+      "ftp://x.test",
+      "javascript:alert(1)",
+      "https://x.test/?a=1",
+      "https://x.test/#top",
+      "https://user:pw@x.test",
+      "https://x.test/a b",
+      "https://x.test//evil",
+      "https://x.test/a/../b",
+      "https://x.test/%2e%2e",
+      `https://${"a".repeat(200)}.test`,
+    ])
+      expect(validateIntegration("PUBLIC_SITE_URL", bad).ok, bad).toBe(false);
+    // An invalid DB value is ignored in favour of env.
+    expect(resolveIntegration("PUBLIC_SITE_URL", "http://evil.test", "https://env.test")).toEqual({
+      value: "https://env.test",
+      source: "env",
+    });
   });
 
   it("accepts sender formats", () => {

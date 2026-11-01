@@ -2,7 +2,7 @@ import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import type { SeoConfig } from "@/lib/seo";
 import { getSeoConfig } from "@/lib/seo.functions";
 
-/** Fixed per deployment (env), so it never goes stale. */
+/** Changes only when PUBLIC_SITE_URL is saved in Settings, which invalidates ["seo"] (#117). */
 export const seoQuery = () =>
   queryOptions({
     queryKey: ["seo"],
