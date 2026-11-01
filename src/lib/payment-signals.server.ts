@@ -141,13 +141,17 @@ export function tokenFrom(headers: Headers): string {
   );
 }
 
-/** v25 refund hold of one invoice (false before v25 / on error). */
+/**
+ * v25 refund hold of one invoice. False before v25 (missing table/column); on any other error it
+ * fails closed (true): the signal stays "matched" for the admin and no code is handed out
+ * (security review #2 N5).
+ */
 async function onRefundHold(invoiceId: string): Promise<boolean> {
   try {
-    const { refundHeldInvoices } = await import("./gateway/payments.server");
-    return (await refundHeldInvoices([invoiceId])).has(invoiceId);
+    const { refundHoldStrict } = await import("./gateway/payments.server");
+    return await refundHoldStrict(invoiceId);
   } catch {
-    return false;
+    return true;
   }
 }
 

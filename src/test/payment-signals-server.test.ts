@@ -104,8 +104,13 @@ vi.mock("../lib/invoices.server", () => ({
   },
 }));
 let held = new Set<string>();
+let holdError = false;
 vi.mock("../lib/gateway/payments.server", () => ({
   refundHeldInvoices: async (ids: string[]) => new Set(ids.filter((i) => held.has(i))),
+  refundHoldStrict: async (id: string) => {
+    if (holdError) throw new Error("connection reset");
+    return held.has(id);
+  },
 }));
 const extras: number[] = [];
 vi.mock("../lib/finance.server", () => ({
@@ -202,6 +207,7 @@ beforeEach(() => {
   calls.length = 0;
   rateOk = true;
   held = new Set();
+  holdError = false;
 });
 
 describe("POST /api/public/payments/notify", () => {
@@ -355,6 +361,27 @@ describe("refund hold (security review #1 no. 3)", () => {
     tables["invoices"]![0].unique_code = null;
     expect(await ensureUniqueCode("inv1")).toBeNull();
     expect(tables["invoices"]![0].unique_code).toBeNull();
+  });
+});
+
+describe("refund hold fails closed on DB errors (security review #2 N5)", () => {
+  it("a hold-check error keeps the signal matched and never auto-books", async () => {
+    cfg["MACRODROID_AUTO_CONFIRM"] = "true";
+    holdError = true;
+    const r = await handleNotify(headers(TOKEN), body(), "x");
+    expect(r.body).toMatchObject({ status: "matched" });
+    expect(booked).toEqual([]);
+  });
+
+  it("a hold-check error refuses manual confirm and hides the code", async () => {
+    await handleNotify(headers(TOKEN), body(), "x");
+    const sig = (await loadSignal(tables["payment_signals"]![0].id))!;
+    holdError = true;
+    await expect(
+      confirmSignal(sig, "inv1", () => ({ pay: 150000, extra: 123 }), null, "admin"),
+    ).rejects.toThrow();
+    expect(booked).toEqual([]);
+    expect(await peekUniqueCode("inv1")).toBeNull();
   });
 });
 
