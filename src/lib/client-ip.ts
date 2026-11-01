@@ -11,7 +11,8 @@
  * TRUSTED_PROXY accepts either
  * - a hop count `1`..`10`: that many proxies in front of the app each append their peer to
  *   X-Forwarded-For, so the client is the N-th entry from the right (fewer entries = connection
- *   address), or
+ *   address). The header is only read when the connection comes from a loopback/private address
+ *   (a proxy), so a directly reachable port cannot be spoofed; or
  * - a comma list of IPs/CIDRs (plus `loopback`, `private`): X-Forwarded-For is walked right to left
  *   starting at the socket peer, skipping trusted addresses; the first untrusted one is the client.
  * Invalid tokens are ignored; nothing valid = unset. Invalid addresses never become the client.
@@ -24,7 +25,7 @@ export type IpRange = { v6: boolean; base: bigint; bits: number };
 
 export const NO_TRUSTED_PROXY: TrustedProxy = { kind: "none" };
 export const MAX_TRUSTED_HOPS = 10;
-/** Returned when no usable address is known (all such callers share one rate-limit bucket). */
+/** Returned when no usable address is known; never used as a rate-limit bucket (`ipRateKey`). */
 export const UNKNOWN_IP = "unknown";
 
 const ALIASES: Readonly<Record<string, readonly string[]>> = {
@@ -33,6 +34,31 @@ const ALIASES: Readonly<Record<string, readonly string[]>> = {
 };
 
 type ParsedIp = { v6: boolean; value: bigint; text: string };
+
+/** RFC 5952 text: lower-case hex, no leading zeros, longest (≥ 2) zero run as `::`, first wins. */
+function formatV6(value: bigint): string {
+  const words = Array.from({ length: 8 }, (_, i) =>
+    Number((value >> BigInt((7 - i) * 16)) & 0xffffn),
+  );
+  let best = -1;
+  let bestLen = 1;
+  for (let i = 0; i < 8;) {
+    if (words[i] !== 0) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < 8 && words[j] === 0) j++;
+    if (j - i > bestLen) {
+      best = i;
+      bestLen = j - i;
+    }
+    i = j;
+  }
+  const hex = (ws: number[]) => ws.map((w) => w.toString(16)).join(":");
+  if (best === -1) return hex(words);
+  return `${hex(words.slice(0, best))}::${hex(words.slice(best + bestLen))}`;
+}
 
 function parseV4(s: string): bigint | null {
   const parts = s.split(".");
@@ -105,7 +131,7 @@ export function parseIp(raw: string | null | undefined): ParsedIp | null {
     const text = [24n, 16n, 8n, 0n].map((b) => String((n >> b) & 0xffn)).join(".");
     return { v6: false, value: n, text };
   }
-  return { v6: true, value: v6, text: s.toLowerCase() };
+  return { v6: true, value: v6, text: formatV6(v6) };
 }
 
 /** Normalised address text, or null when `raw` is not a valid IPv4/IPv6 address. */
@@ -134,6 +160,25 @@ function inRange(ip: ParsedIp, r: IpRange): boolean {
   if (ip.v6 !== r.v6) return false;
   const shift = BigInt((r.v6 ? 128 : 32) - r.bits);
   return ip.value >> shift === r.base >> shift;
+}
+
+const PROXY_PEER_RANGES: readonly IpRange[] = [
+  ...(ALIASES["loopback"] ?? []),
+  ...(ALIASES["private"] ?? []),
+]
+  .map(parseCidr)
+  .filter((r): r is IpRange => r !== null);
+
+/**
+ * Per-IP rate-limit key: IPv4 as is, IPv6 bucketed by its /64 (one client usually controls a
+ * whole /64). Null for UNKNOWN_IP/invalid input — callers then skip the per-IP rule instead of
+ * putting every visitor into one shared bucket (other limits, e.g. per token, still apply).
+ */
+export function ipRateKey(ip: string | null | undefined): string | null {
+  const p = parseIp(ip);
+  if (!p) return null;
+  if (!p.v6) return p.text;
+  return `${formatV6((p.value >> 64n) << 64n)}/64`;
 }
 
 /** Parses the TRUSTED_PROXY value. Empty/invalid = `{ kind: "none" }` (X-Forwarded-For ignored). */
@@ -176,10 +221,13 @@ export function resolveClientIp(
   if (trust.kind === "none") return peer?.text ?? UNKNOWN_IP;
   const chain = forwardedChain(forwardedFor);
   if (trust.kind === "hops") {
+    // Only a proxy (loopback/private peer) may supply the header; a direct public peer is the client.
+    if (!peer) return UNKNOWN_IP;
+    if (!PROXY_PEER_RANGES.some((r) => inRange(peer, r))) return peer.text;
     // Fewer entries than trusted hops = a proxy was bypassed; every entry may be forged.
-    if (chain.length < trust.hops) return peer?.text ?? UNKNOWN_IP;
+    if (chain.length < trust.hops) return peer.text;
     const pick = parseIp(chain[chain.length - trust.hops]);
-    return pick?.text ?? peer?.text ?? UNKNOWN_IP;
+    return pick?.text ?? peer.text;
   }
   // CIDR mode: only an address we can verify starts the walk.
   if (!peer) return UNKNOWN_IP;

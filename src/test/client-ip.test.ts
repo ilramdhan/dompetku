@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   clientIp,
   forwardedChain,
+  ipRateKey,
   normalizeIp,
   parseCidr,
   parseTrustedProxy,
@@ -42,6 +43,26 @@ describe("normalizeIp", () => {
       undefined,
     ])
       expect(normalizeIp(bad)).toBeNull();
+  });
+});
+
+describe("IPv6 canonical form (RFC 5952) and rate-limit keys", () => {
+  it("spells the same IPv6 address one way", () => {
+    expect(normalizeIp("2001:0db8:0:0:0:0:0:1")).toBe("2001:db8::1");
+    expect(normalizeIp("2001:DB8::0:1")).toBe("2001:db8::1");
+    expect(normalizeIp("2001:db8:0:0:1:0:0:1")).toBe("2001:db8::1:0:0:1");
+    expect(normalizeIp("2001:db8:0:1:1:1:1:1")).toBe("2001:db8:0:1:1:1:1:1");
+    expect(normalizeIp("0:0:0:0:0:0:0:0")).toBe("::");
+    expect(normalizeIp("fe80:0:0:0:0:0:0:0")).toBe("fe80::");
+  });
+  it("buckets IPv6 by /64, keeps IPv4 and refuses unknown", () => {
+    expect(ipRateKey("2001:db8:1:2:aaaa::1")).toBe("2001:db8:1:2::/64");
+    expect(ipRateKey("2001:0db8:1:2:ffff:ffff:ffff:ffff")).toBe("2001:db8:1:2::/64");
+    expect(ipRateKey("2001:db8:1:3::1")).not.toBe(ipRateKey("2001:db8:1:2::1"));
+    expect(ipRateKey("203.0.113.5")).toBe("203.0.113.5");
+    expect(ipRateKey("::ffff:203.0.113.5")).toBe("203.0.113.5");
+    expect(ipRateKey(UNKNOWN_IP)).toBeNull();
+    expect(ipRateKey("")).toBeNull();
   });
 });
 
@@ -92,6 +113,18 @@ describe("resolveClientIp", () => {
     expect(resolveClientIp(null, "10.0.0.2", one)).toBe("10.0.0.2");
     // Invalid entry at the trusted position never becomes the client.
     expect(resolveClientIp("1.1.1.1, nonsense", "10.0.0.2", one)).toBe("10.0.0.2");
+  });
+  it("hop count: reads X-Forwarded-For only from a loopback/private peer", () => {
+    const one = parseTrustedProxy("1");
+    // Directly reachable port: public peer with a forged header → the peer itself.
+    expect(resolveClientIp("6.6.6.6", "203.0.113.5", one)).toBe("203.0.113.5");
+    expect(resolveClientIp("6.6.6.6", "2001:db8::5", one)).toBe("2001:db8::5");
+    // Loopback / private / IPv4-mapped loopback peers are proxies.
+    expect(resolveClientIp("198.51.100.7", "127.0.0.1", one)).toBe("198.51.100.7");
+    expect(resolveClientIp("198.51.100.7", "::1", one)).toBe("198.51.100.7");
+    expect(resolveClientIp("198.51.100.7", "::ffff:172.17.0.1", one)).toBe("198.51.100.7");
+    expect(resolveClientIp("198.51.100.7", "fd00::2", one)).toBe("198.51.100.7");
+    expect(resolveClientIp("198.51.100.7", undefined, one)).toBe(UNKNOWN_IP);
   });
   it("CIDR list: walks right to left past trusted proxies", () => {
     const t = parseTrustedProxy("10.0.0.0/8, loopback");
