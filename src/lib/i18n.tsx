@@ -1710,7 +1710,7 @@ const DICT: Record<string, string> = {
   "Regex terlalu panjang (maks. 200 karakter)": "Regex too long (max. 200 characters)",
   "Regex tidak valid": "Invalid regex",
   "Regex tidak boleh memakai backreference": "Regex must not use backreferences",
-  "Regex tidak boleh memakai lookbehind": "Regex must not use lookbehind",
+  "Regex tidak boleh memakai lookahead/lookbehind": "Regex must not use lookahead/lookbehind",
   "Regex berisiko lambat (quantifier bersarang), sederhanakan polanya":
     "Regex may be slow (nested quantifiers), simplify the pattern",
   "Regex berisiko lambat (terlalu banyak * atau +), sederhanakan polanya":

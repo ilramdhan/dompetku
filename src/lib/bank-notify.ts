@@ -10,7 +10,7 @@
  * - Admin regexes are untrusted-ish and run on attacker-controlled text (anyone can send an SMS or
  *   chat that shows up as a notification): `regexProblem()` caps length, requires them to compile
  *   and only accepts shapes that backtrack at most linearly (no quantifier inside a quantified
- *   group, no overlapping variable-length neighbours, no backreferences/lookbehind). They only ever
+ *   group, no overlapping variable-length neighbours, no backreferences/lookarounds). They only ever
  *   run on text truncated to MAX_SCAN_CHARS.
  * - `parseRupiah()` reads Indonesian and international amount spellings.
  * - `matchSignal()` finds the open invoice whose remaining amount + unique code equals the amount.
@@ -37,6 +37,8 @@ export const MAX_SCAN_CHARS = 300;
 export const MAX_UNBOUNDED = 3;
 /** Max distinct character atoms (letters, escapes, classes) in an admin regex. */
 export const MAX_DISTINCT_ATOMS = 40;
+/** Max variable quantifiers (`*`, `+`, `?`, `{n,}`, `{n,m}` with m > n) in an admin regex. */
+export const MAX_VARIABLE = 8;
 /** Unique code range (rupiah added to the amount to transfer). */
 export const UNIQUE_CODE_MIN = 1;
 export const UNIQUE_CODE_MAX = 999;
@@ -113,7 +115,7 @@ export const REGEX_PROBLEM = {
   long: "Regex terlalu panjang (maks. 200 karakter)",
   invalid: "Regex tidak valid",
   backref: "Regex tidak boleh memakai backreference",
-  lookbehind: "Regex tidak boleh memakai lookbehind",
+  lookaround: "Regex tidak boleh memakai lookahead/lookbehind",
   nested: "Regex berisiko lambat (quantifier bersarang), sederhanakan polanya",
   overlap:
     "Regex berisiko lambat (dua pengulangan bisa mencocokkan karakter yang sama), sederhanakan polanya",
@@ -134,7 +136,8 @@ export const REGEX_PROBLEM = {
  *   another variable-length item that can match one of its characters, unless a mandatory item
  *   that cannot match any of its characters sits between them (`\d*\d*`, `\d+.*`, `a?a?` are
  *   rejected; `Rp\s?\d[\d.,]*`, `\d+,\d+` pass).
- * - At most MAX_UNBOUNDED `*` / `+` / `{n,}`, no backreferences or lookbehind, and the text it
+ * - At most MAX_UNBOUNDED `*` / `+` / `{n,}` and MAX_VARIABLE variable quantifiers, no
+ *   backreferences or lookarounds, and the text it
  *   ever sees is cut to MAX_SCAN_CHARS.
  * - "Can match the same character" is decided on the exact code-unit set of each atom (`charSet`,
  *   all 65 536 UTF-16 units with the `i` flag), so negated classes, `[^]`, non-Latin ranges and case
@@ -171,7 +174,9 @@ function regexVerdict(s: string): string | null {
   if (!s.trim()) return REGEX_PROBLEM.empty;
   if (s.length > NOTIFY_LIMITS.regex) return REGEX_PROBLEM.long;
   if (/\\[1-9]|\\k</.test(s)) return REGEX_PROBLEM.backref;
-  if (/\(\?<[=!]/.test(s)) return REGEX_PROBLEM.lookbehind;
+  // Lookarounds are not supported at all: nested ones multiply backtracking (O(n^depth), security
+  // review #5 N1) and bank amount formats never need them.
+  if (/\(\?(?:[=!]|<[=!])/.test(s)) return REGEX_PROBLEM.lookaround;
   // Allowlist first, so the verdict never depends on what this engine happens to accept.
   let tree: Alt;
   try {
@@ -181,6 +186,8 @@ function regexVerdict(s: string): string | null {
     return REGEX_PROBLEM.invalid;
   }
   if (countUnbounded(tree) > MAX_UNBOUNDED) return REGEX_PROBLEM.unbounded;
+  // Global budget (defence in depth): few variable quantifiers bound any backtracking product.
+  if (countVariable(tree) > MAX_VARIABLE) return REGEX_PROBLEM.complex;
   // Each distinct atom costs one pass over all 65 536 code units (~0.5 ms): cap them (R2).
   if (new Set(allLeaves(tree)).size > MAX_DISTINCT_ATOMS) return REGEX_PROBLEM.complex;
   return shapeProblem(tree);
@@ -191,7 +198,7 @@ function regexVerdict(s: string): string | null {
  * not explicitly model throws (→ "Regex tidak valid"), whatever the runtime accepts: engines keep
  * adding syntax (inline modifiers `(?s:…)` / `(?i:…)` in V8 12.5+, Node 24, workerd and browsers
  * — security review #4 R5), and each unmodelled form so far was a ReDoS bypass. Supported:
- * - groups `(…)`, `(?:…)`, `(?<name>…)` (ASCII name), lookahead `(?=…)` / `(?!…)`;
+ * - groups `(…)`, `(?:…)`, `(?<name>…)` (ASCII name) — no lookaround (security review #5 N1);
  * - alternation `|`, anchors `^` `$`, word boundaries `\b` `\B` (never quantified);
  * - quantifiers `*` `+` `?` `{n}` `{n,}` `{n,m}`, each optionally lazy (`?`);
  * - `.`, classes `[…]` / `[^…]` (also `[]`, `[^]`) with ranges;
@@ -200,7 +207,7 @@ function regexVerdict(s: string): string | null {
  * - any other literal character except unescaped `{ } ] * + ?` outside a class.
  */
 export const REGEX_SYNTAX = {
-  groups: ["(", "(?:", "(?=", "(?!", "(?<name>"],
+  groups: ["(", "(?:", "(?<name>"],
   /**
    * Two-character escapes allowed outside and inside a class: character classes, control
    * characters, `\0` (not followed by a digit) and every ASCII punctuation / space (identity).
@@ -269,21 +276,17 @@ function parseRegex(s: string): Alt {
       }
       let node: Leaf | Group;
       if (c === "(") {
-        let look = false;
         if (s[i + 1] !== "?") i++;
         else if (s.startsWith("(?:", i)) i += 3;
-        else if (s.startsWith("(?=", i) || s.startsWith("(?!", i)) {
-          look = true;
-          i += 3;
-        } else {
+        else {
           const name = /^\(\?<[A-Za-z_$][\w$]*>/.exec(s.slice(i));
-          if (!name) throw unsupported(); // (?s:…), (?i:…), (?-i:…), (?<=…), (?#…), …
+          if (!name) throw unsupported(); // lookarounds, (?s:…), (?i:…), (?-i:…), (?#…), …
           i += name[0].length;
         }
         const inner = parseAlt(true);
         if (s[i] !== ")") throw new Error("unbalanced");
         i++;
-        node = { kind: "group", alts: inner, look };
+        node = { kind: "group", alts: inner, look: false };
       } else if (c === "[") {
         // Without the `u` flag `[]` (matches nothing) and `[^]` (matches anything) are complete
         // classes: a `]` right after `[` / `[^` closes the class, it is not a literal.
@@ -325,6 +328,17 @@ function parseRegex(s: string): Alt {
     return alts;
   };
   return parseAlt(false);
+}
+
+/** Variable quantifiers (`*`, `+`, `?`, `{n,}`, `{n,m}` with m > n), anywhere. */
+function countVariable(alts: Alt): number {
+  let n = 0;
+  for (const seq of alts)
+    for (const it of seq) {
+      if (isVariable(it.q)) n++;
+      if (it.node.kind === "group") n += countVariable(it.node.alts);
+    }
+  return n;
 }
 
 function countUnbounded(alts: Alt): number {

@@ -9,6 +9,7 @@ import {
   packageMatches,
   GENERIC_FORMAT,
   MAX_SCAN_CHARS,
+  MAX_VARIABLE,
   NOTIFY_PRESETS,
   PARSE_REASON,
   SIGNAL_MAX_AGE_MS,
@@ -98,7 +99,7 @@ describe("regex safety", () => {
     for (const bad of ["(a+)+$", "(a*)*b", "(a|aa)+", "(?:x+y)*", "(a|b){2,}", "((ab)+)+"])
       expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
     expect(regexProblem(String.raw`(a)\1`)).toMatch(/backreference/);
-    expect(regexProblem("(?<=Rp)\\d+")).toMatch(/lookbehind/);
+    expect(regexProblem("(?<=Rp)\\d+")).toBe(REGEX_PROBLEM.lookaround);
     expect(regexProblem("a+b+c+d+e+")).toMatch(/terlalu banyak/);
   });
 
@@ -125,7 +126,6 @@ describe("regex safety", () => {
       String.raw`\s*\s*$`,
       "a?a?a?a?a?a?aaaaaa",
       "(a|a)(a|a)(a|a)(a|a)(a|a)x",
-      "(?=a+)+b",
     ])
       expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
   });
@@ -314,8 +314,6 @@ describe("regex safety", () => {
       }
     // other unmodelled forms
     for (const bad of [
-      "(?<=a)b",
-      "(?<!a)b",
       "(?#c)a",
       "(?>a)",
       "(?|a)",
@@ -338,8 +336,51 @@ describe("regex safety", () => {
       "[a",
     ]) {
       expect(regexProblem(bad), bad).not.toBeNull();
-      if (!/\\[1-9k]|\(\?<[=!]/.test(bad)) expect(regexSyntaxOk(bad), bad).toBe(false);
+      if (!/\\[1-9k]/.test(bad)) expect(regexSyntaxOk(bad), bad).toBe(false);
     }
+  });
+
+  it("rejects every lookaround, incl. nested lookaheads (security review #5 N1)", () => {
+    for (const bad of [
+      String.raw`.*(?=.*(?=.*y))z`,
+      String.raw`.{0,299}(?=.{0,299}(?=.{0,299}y))z`,
+      String.raw`.{0,99}(?=.{0,99}(?=.{0,99}(?=.{0,99}y)))z`,
+      "(?=a+)+b",
+      "(?=a)b",
+      "(?!a)b",
+      "(?<=a)b",
+      "(?<!a)b",
+      "x(?:(?=a))",
+      String.raw`(?<n>(?!\d))`,
+    ]) {
+      expect(regexProblem(bad), bad).toBe(REGEX_PROBLEM.lookaround);
+      expect(regexSyntaxOk(bad), bad).toBe(false); // the parser alone refuses them too
+    }
+    // escaped `(?=` is just text
+    expect(regexProblem(String.raw`\(\?=`)).toBeNull();
+  });
+
+  it("caps variable quantifiers at MAX_VARIABLE (8 ok, 9 rejected)", () => {
+    expect(MAX_VARIABLE).toBe(8);
+    const pattern = (n: number) =>
+      Array.from({ length: n }, (_, k) => `${"abcdefghij"[k]}?x`).join("");
+    expect(regexProblem(pattern(8))).toBeNull();
+    expect(regexProblem(pattern(9))).toBe(REGEX_PROBLEM.complex);
+    // {n,m} with m > n counts, {n} and {n,n} do not
+    expect(regexProblem(`${pattern(7)}y{1,3}`)).toBeNull();
+    expect(regexProblem(`${pattern(8)}y{1,3}`)).toBe(REGEX_PROBLEM.complex);
+    expect(regexProblem(`${pattern(8)}y{3}z{2,2}`)).toBeNull();
+  });
+
+  it("every preset and documented example still parses", () => {
+    const fmts = [...NOTIFY_PRESETS, GENERIC_FORMAT];
+    for (const f of fmts) expect(formatProblems(f), f.name).toEqual([]);
+    for (const ok of [
+      String.raw`Rp\.?\s?\d[\d.,]*`,
+      String.raw`Rp ([\d.]+),\d{2}`,
+      String.raw`sebesar Rp\s?([\d.,]+)`,
+    ])
+      expect(regexProblem(ok), ok).toBeNull();
   });
 
   it("MAX_SCAN_CHARS is ~300 and the error keys exist", () => {
