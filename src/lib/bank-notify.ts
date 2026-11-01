@@ -7,10 +7,11 @@
  * - Notification formats are admin-defined (table `payment_notify_formats`): which app (package /
  *   name substrings), optional title/text filter (contains or regex), an amount regex, and
  *   "must contain" / "ignore if contains" keyword lists. PRESETS are editable examples only.
- * - Admin regexes are untrusted-ish: `regexProblem()` caps length, requires them to compile and
- *   rejects shapes known for catastrophic backtracking (nested/alternating quantified groups,
- *   backreferences, lookbehind, many unbounded quantifiers). They only ever run on text truncated
- *   to MAX_SCAN_CHARS.
+ * - Admin regexes are untrusted-ish and run on attacker-controlled text (anyone can send an SMS or
+ *   chat that shows up as a notification): `regexProblem()` caps length, requires them to compile
+ *   and only accepts shapes that backtrack at most linearly (no quantifier inside a quantified
+ *   group, no overlapping variable-length neighbours, no backreferences/lookbehind). They only ever
+ *   run on text truncated to MAX_SCAN_CHARS.
  * - `parseRupiah()` reads Indonesian and international amount spellings.
  * - `matchSignal()` finds the open invoice whose remaining amount + unique code equals the amount.
  */
@@ -31,7 +32,7 @@ export const NOTIFY_LIMITS = {
 /** Max formats per instance. */
 export const MAX_FORMATS = 50;
 /** Text a regex ever sees (title + text + big text, joined), keeps worst-case backtracking small. */
-export const MAX_SCAN_CHARS = 600;
+export const MAX_SCAN_CHARS = 300;
 /** Max unbounded quantifiers (`*`, `+`, `{n,}`) in an admin regex. */
 export const MAX_UNBOUNDED = 3;
 /** Unique code range (rupiah added to the amount to transfer). */
@@ -105,79 +106,316 @@ function groupsOk(s: string, sep: string): boolean {
 
 /* ---------------- regex safety ---------------- */
 
+export const REGEX_PROBLEM = {
+  empty: "Regex tidak boleh kosong",
+  long: "Regex terlalu panjang (maks. 200 karakter)",
+  invalid: "Regex tidak valid",
+  backref: "Regex tidak boleh memakai backreference",
+  lookbehind: "Regex tidak boleh memakai lookbehind",
+  nested: "Regex berisiko lambat (quantifier bersarang), sederhanakan polanya",
+  overlap:
+    "Regex berisiko lambat (dua pengulangan bisa mencocokkan karakter yang sama), sederhanakan polanya",
+  unbounded: "Regex berisiko lambat (terlalu banyak * atau +), sederhanakan polanya",
+} as const;
+
 /**
  * Problem with an admin-supplied regex (Indonesian i18n key) or null. Compiles with the `i` flag
  * (the same flags `compileRegex` uses).
+ *
+ * JavaScript has no linear-time regex engine everywhere this runs (browser, Workers, Node), so
+ * safety comes from the shape: a pattern passes only when every match attempt backtracks at most
+ * linearly in the text length.
+ * - A quantified group may contain neither a quantifier nor an alternation (`(a+)+`, `(a?){25}`,
+ *   `(\d{1,30}){1,30}`, `(a|b)*` are rejected).
+ * - Within one sequence, a variable-length item (`*`, `+`, `?`, `{n,m}`) must not be followed by
+ *   another variable-length item that can match one of its characters, unless a mandatory item
+ *   that cannot match any of its characters sits between them (`\d*\d*`, `\d+.*`, `a?a?` are
+ *   rejected; `Rp\s?\d[\d.,]*`, `\d+,\d+` pass).
+ * - At most MAX_UNBOUNDED `*` / `+` / `{n,}`, no backreferences or lookbehind, and the text it
+ *   ever sees is cut to MAX_SCAN_CHARS.
  */
 export function regexProblem(src: string | null | undefined): string | null {
   const s = String(src ?? "");
-  if (!s.trim()) return "Regex tidak boleh kosong";
-  if (s.length > NOTIFY_LIMITS.regex) return "Regex terlalu panjang (maks. 200 karakter)";
+  if (!s.trim()) return REGEX_PROBLEM.empty;
+  if (s.length > NOTIFY_LIMITS.regex) return REGEX_PROBLEM.long;
   try {
     new RegExp(s, "i");
   } catch {
-    return "Regex tidak valid";
+    return REGEX_PROBLEM.invalid;
   }
-  if (/\\[1-9]|\\k</.test(s)) return "Regex tidak boleh memakai backreference";
-  if (/\(\?<[=!]/.test(s)) return "Regex tidak boleh memakai lookbehind";
-  const shape = quantifierShape(s);
-  if (shape.nested) return "Regex berisiko lambat (quantifier bersarang), sederhanakan polanya";
-  if (shape.unbounded > MAX_UNBOUNDED)
-    return "Regex berisiko lambat (terlalu banyak * atau +), sederhanakan polanya";
-  return null;
+  if (/\\[1-9]|\\k</.test(s)) return REGEX_PROBLEM.backref;
+  if (/\(\?<[=!]/.test(s)) return REGEX_PROBLEM.lookbehind;
+  let tree: Alt;
+  try {
+    tree = parseRegex(s);
+  } catch {
+    return REGEX_PROBLEM.invalid;
+  }
+  if (countUnbounded(tree) > MAX_UNBOUNDED) return REGEX_PROBLEM.unbounded;
+  return shapeProblem(tree, probeChars(s));
+}
+
+/* A tiny parser for the JavaScript regex subset admins write (no `u` flag). */
+type Quant = { min: number; max: number };
+type Leaf = { kind: "leaf"; src: string; zero?: boolean };
+type Group = { kind: "group"; alts: Alt; look: boolean };
+type Item = { node: Leaf | Group; q: Quant };
+type Alt = Item[][];
+
+const ONE: Quant = { min: 1, max: 1 };
+const isQuantified = (q: Quant) => q.min !== 1 || q.max !== 1;
+const isVariable = (q: Quant) => q.min !== q.max;
+
+function parseRegex(s: string): Alt {
+  let i = 0;
+  const parseAlt = (inGroup: boolean): Alt => {
+    const alts: Alt = [[]];
+    while (i < s.length) {
+      const c = s[i]!;
+      if (c === ")") {
+        if (!inGroup) throw new Error("unbalanced");
+        return alts;
+      }
+      if (c === "|") {
+        alts.push([]);
+        i++;
+        continue;
+      }
+      let node: Leaf | Group;
+      if (c === "(") {
+        let look = false;
+        if (s.startsWith("(?:", i)) i += 3;
+        else if (s.startsWith("(?=", i) || s.startsWith("(?!", i)) {
+          look = true;
+          i += 3;
+        } else if (s.startsWith("(?<", i)) i = s.indexOf(">", i) + 1;
+        else i++;
+        const inner = parseAlt(true);
+        if (s[i] !== ")") throw new Error("unbalanced");
+        i++;
+        node = { kind: "group", alts: inner, look };
+      } else if (c === "[") {
+        let j = i + 1;
+        if (s[j] === "^") j++;
+        if (s[j] === "]") j++; // `[]` / `[^]` edge: a leading `]` is a literal in non-u mode
+        while (j < s.length && s[j] !== "]") j += s[j] === "\\" ? 2 : 1;
+        node = { kind: "leaf", src: s.slice(i, j + 1) };
+        i = j + 1;
+      } else if (c === "\\") {
+        const e = s[i + 1] ?? "";
+        let len = 2;
+        if (e === "x" && /^[0-9a-f]{2}$/i.test(s.slice(i + 2, i + 4))) len = 4;
+        else if (e === "u" && /^[0-9a-f]{4}$/i.test(s.slice(i + 2, i + 6))) len = 6;
+        else if (e === "c" && /^[a-z]$/i.test(s[i + 2] ?? "")) len = 3;
+        node = { kind: "leaf", src: s.slice(i, i + len), zero: e === "b" || e === "B" };
+        i += len;
+      } else {
+        node = { kind: "leaf", src: c, zero: c === "^" || c === "$" };
+        i++;
+      }
+      // Quantifier (a `{` that does not form one is a literal in non-u mode).
+      let q = ONE;
+      const m = /^(?:([*+?])|\{(\d+)(?:(,)(\d*))?\})/.exec(s.slice(i));
+      if (m) {
+        if (m[1] === "*") q = { min: 0, max: Infinity };
+        else if (m[1] === "+") q = { min: 1, max: Infinity };
+        else if (m[1] === "?") q = { min: 0, max: 1 };
+        else {
+          const min = Number(m[2]);
+          q = { min, max: m[3] ? (m[4] ? Number(m[4]) : Infinity) : min };
+        }
+        i += m[0].length;
+        if (s[i] === "?") i++; // lazy modifier
+      }
+      alts[alts.length - 1]!.push({ node, q });
+    }
+    if (inGroup) throw new Error("unbalanced");
+    return alts;
+  };
+  return parseAlt(false);
+}
+
+function countUnbounded(alts: Alt): number {
+  let n = 0;
+  for (const seq of alts)
+    for (const it of seq) {
+      if (it.q.max === Infinity) n++;
+      if (it.node.kind === "group") n += countUnbounded(it.node.alts);
+    }
+  return n;
+}
+
+const hasAlternation = (alts: Alt): boolean =>
+  alts.length > 1 ||
+  alts.some((seq) => seq.some((it) => it.node.kind === "group" && hasAlternation(it.node.alts)));
+
+/** Leaf sources (character-consuming atoms) anywhere inside. */
+function leaves(alts: Alt, out: string[] = []): string[] {
+  for (const seq of alts)
+    for (const it of seq) {
+      if (it.node.kind === "leaf") {
+        if (!it.node.zero) out.push(it.node.src);
+      } else if (!it.node.look) leaves(it.node.alts, out);
+    }
+  return out;
+}
+
+/** Min / max characters an alternation consumes. */
+function lengthOf(alts: Alt): Quant {
+  let min = Infinity;
+  let max = 0;
+  for (const seq of alts) {
+    let a = 0;
+    let b = 0;
+    for (const it of seq) {
+      const inner: Quant =
+        it.node.kind === "leaf"
+          ? it.node.zero
+            ? { min: 0, max: 0 }
+            : ONE
+          : it.node.look
+            ? { min: 0, max: 0 }
+            : lengthOf(it.node.alts);
+      a += inner.min * it.q.min;
+      b += inner.max * it.q.max;
+    }
+    min = Math.min(min, a);
+    max = Math.max(max, b);
+  }
+  return { min: min === Infinity ? 0 : min, max };
+}
+
+/** Atoms a branch can start with (up to and including its first mandatory step). */
+function firsts(seq: Item[]): string[] {
+  const out: string[] = [];
+  for (const st of steps(seq)) {
+    out.push(...st.first);
+    if (st.mandatory) break;
+  }
+  return out;
+}
+
+/** Any variable-length quantifier (`?`, `*`, `+`, `{n,m}`) inside? */
+const hasVariable = (alts: Alt): boolean =>
+  alts.some((seq) =>
+    seq.some((it) => isVariable(it.q) || (it.node.kind === "group" && hasVariable(it.node.alts))),
+  );
+
+/**
+ * One sequence step after flattening plain groups: its character-consuming atoms, whether it can
+ * consume a varying number of characters (from a quantifier — an unquantified alternation of
+ * fixed branches only varies by a constant) and whether it must consume at least one character.
+ */
+type Step = {
+  leaves: string[];
+  /** Atoms its first character can come from. */
+  first: string[];
+  variable: boolean;
+  mandatory: boolean;
+  span: number;
+};
+
+function steps(seq: Item[], out: Step[] = []): Step[] {
+  for (const it of seq) {
+    const n = it.node;
+    if (n.kind === "leaf") {
+      if (n.zero) continue;
+      out.push({
+        leaves: [n.src],
+        first: [n.src],
+        variable: isVariable(it.q),
+        mandatory: it.q.min >= 1,
+        span: it.q.max - it.q.min,
+      });
+    } else if (n.look) {
+      continue; // zero width; its content is checked on its own
+    } else if (!isQuantified(it.q) && n.alts.length === 1) {
+      steps(n.alts[0]!, out); // plain (capture) group: part of this sequence
+    } else {
+      const len = lengthOf(n.alts);
+      out.push({
+        leaves: leaves(n.alts),
+        first: n.alts.flatMap(firsts),
+        variable: isVariable(it.q) || hasVariable(n.alts),
+        mandatory: it.q.min >= 1 && len.min >= 1,
+        span: len.max * it.q.max - len.min * it.q.min,
+      });
+    }
+  }
+  return out;
 }
 
 /**
- * Walks the pattern once: counts unbounded quantifiers and flags a quantified group that itself
- * contains an unbounded quantifier or an alternation — the classic `(a+)+` / `(a|a)*` shapes.
+ * Overlaps that only multiply the work by a small constant (an optional single character next to
+ * an overlapping repetition, an alternation whose branches can start with the same character) are
+ * allowed up to this many per pattern; together they bound backtracking by 2^n · text length.
  */
-function quantifierShape(s: string): { nested: boolean; unbounded: number } {
-  type Frame = { unbounded: boolean; alt: boolean };
-  const stack: Frame[] = [{ unbounded: false, alt: false }];
-  let unbounded = 0;
-  let nested = false;
-  let inClass = false;
-  let closed: Frame | null = null;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i]!;
-    if (c === "\\") {
-      i++;
-      closed = null;
-      continue;
+const MAX_AMBIGUITY = 3;
+
+function shapeProblem(root: Alt, probes: string[]): string | null {
+  const sets = new Map<string, boolean[]>();
+  const setOf = (src: string) => {
+    let v = sets.get(src);
+    if (!v) {
+      const re = new RegExp(`^(?:${src})$`, "i");
+      v = probes.map((c) => re.test(c));
+      sets.set(src, v);
     }
-    if (inClass) {
-      if (c === "]") inClass = false;
-      closed = null;
-      continue;
-    }
-    const isUnbounded =
-      c === "*" || c === "+" || (c === "{" && /^\{\d+,\}/.test(s.slice(i, i + 12)));
-    const isQuant = isUnbounded || c === "?" || (c === "{" && /^\{\d+(,\d*)?\}/.test(s.slice(i)));
-    if (isQuant) {
-      // `?` right after another quantifier is the lazy modifier, not a quantifier.
-      const prev = s[i - 1];
-      const lazy = c === "?" && (prev === "*" || prev === "+" || prev === "?" || prev === "}");
-      if (!lazy) {
-        if (isUnbounded) {
-          unbounded++;
-          stack[stack.length - 1]!.unbounded = true;
+    return v;
+  };
+  const overlap = (a: string[], b: string[]) =>
+    a.some((x) => b.some((y) => setOf(x).some((hit, k) => hit && setOf(y)[k])));
+  let ambiguity = 0;
+
+  const walk = (alts: Alt): string | null => {
+    for (let a = 0; a < alts.length; a++)
+      for (let b = a + 1; b < alts.length; b++)
+        if (overlap(firsts(alts[a]!), firsts(alts[b]!)) && ++ambiguity > MAX_AMBIGUITY)
+          return REGEX_PROBLEM.overlap;
+    for (const seq of alts) {
+      for (const it of seq) {
+        if (it.node.kind !== "group") continue;
+        if (isQuantified(it.q)) {
+          if (it.node.look || hasVariable(it.node.alts) || hasAlternation(it.node.alts))
+            return REGEX_PROBLEM.nested;
         }
-        if (closed && (closed.unbounded || closed.alt) && (isUnbounded || c === "{")) nested = true;
+        const inner = walk(it.node.alts);
+        if (inner) return inner;
       }
-      if (c === "{") i = s.indexOf("}", i);
-      closed = null;
-      continue;
+      const st = steps(seq);
+      for (let a = 0; a < st.length; a++) {
+        const x = st[a]!;
+        if (!x.variable) continue;
+        for (let b = a + 1; b < st.length; b++) {
+          const y = st[b]!;
+          // Where `x` stops is ambiguous only if `y` can start with a character `x` also eats.
+          const hits = overlap(x.leaves, y.first);
+          if (hits && y.variable) {
+            if (x.span > 1 && y.span > 1) return REGEX_PROBLEM.overlap;
+            if (++ambiguity > MAX_AMBIGUITY) return REGEX_PROBLEM.overlap;
+          }
+          if (!hits && y.mandatory) break; // a mandatory, disjoint step pins where `x` ends
+        }
+      }
     }
-    closed = null;
-    if (c === "[") inClass = true;
-    else if (c === "(") stack.push({ unbounded: false, alt: false });
-    else if (c === "|") stack[stack.length - 1]!.alt = true;
-    else if (c === ")" && stack.length > 1) {
-      closed = stack.pop()!;
-      if (closed.unbounded) stack[stack.length - 1]!.unbounded = true;
-    }
-  }
-  return { nested, unbounded };
+    return null;
+  };
+  return walk(root);
+}
+
+/**
+ * Characters used to compare character sets: Latin-1, common punctuation/symbols, and every
+ * character or range endpoint written in the pattern (two overlapping ranges always share an
+ * endpoint of one of them).
+ */
+function probeChars(s: string): string[] {
+  const out = new Set<string>();
+  for (let c = 0; c <= 0xff; c++) out.add(String.fromCharCode(c));
+  for (const c of "–—‘’“”•…€一０") out.add(c);
+  for (const c of s) out.add(c);
+  for (const m of s.matchAll(/\\u([0-9a-f]{4})|\\x([0-9a-f]{2})/gi))
+    out.add(String.fromCharCode(parseInt(m[1] ?? m[2]!, 16)));
+  return [...out];
 }
 
 /** Compiled regex (flag `i`) or null when it fails `regexProblem`. */

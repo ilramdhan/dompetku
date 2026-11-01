@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_AMOUNT_REGEX,
+  REGEX_PROBLEM,
   GENERIC_FORMAT,
   MAX_SCAN_CHARS,
   NOTIFY_PRESETS,
@@ -101,6 +102,62 @@ describe("regex safety", () => {
   it("compileRegex returns null for unsafe patterns and is case-insensitive", () => {
     expect(compileRegex("(a+)+")).toBeNull();
     expect(compileRegex("masuk")!.test("DANA MASUK")).toBe(true);
+  });
+
+  it("rejects every ReDoS bypass from security review #1", () => {
+    for (const bad of [
+      String.raw`\d*\d*\d*x`,
+      String.raw`(\d{1,30}){1,30}x`,
+      String.raw`(?:\d?){40}\d{40}`,
+      "(a?){25}a{25}",
+      // more of the same families
+      String.raw`\d+.*x`,
+      String.raw`\w+\d+`,
+      String.raw`[\d.]+[\d,]+`,
+      String.raw`\s*\s*$`,
+      "a?a?a?a?a?a?aaaaaa",
+      "(a|a)(a|a)(a|a)(a|a)(a|a)x",
+      "(?=a+)+b",
+    ])
+      expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
+  });
+
+  it("keeps the usual amount patterns usable", () => {
+    for (const ok of [
+      String.raw`Rp\.?\s?\d[\d.,]*`,
+      String.raw`Rp ([\d.]+),\d{2}`,
+      String.raw`(?:Rp|Rp\.)\s?\d+`,
+      String.raw`dari\s+\w+`,
+      String.raw`\d?\d+`,
+      String.raw`IDR\s?(?<amount>\d+(?:,\d{3})*)`,
+      "(?:masuk|diterima)",
+      String.raw`(?:Rp|IDR)\.?\s*([\d.,]+)\s*`,
+      String.raw`(\d{2}){3,}`,
+      String.raw`(\d{3})x`,
+    ])
+      expect(regexProblem(ok), ok).toBeNull();
+  });
+
+  it("the accepted shapes stay fast on hostile text", () => {
+    const hostile = [
+      "1".repeat(MAX_SCAN_CHARS),
+      `Rp${"1.".repeat(MAX_SCAN_CHARS / 2)}`,
+      " ".repeat(MAX_SCAN_CHARS),
+      "a".repeat(MAX_SCAN_CHARS),
+    ];
+    for (const src of [DEFAULT_AMOUNT_REGEX, String.raw`Rp\.?\s?\d[\d.,]*!`, String.raw`\d?\d+x`]) {
+      const re = compileRegex(src)!;
+      for (const h of hostile) re.test(`${h}!`); // warm up the JIT
+      const t0 = performance.now();
+      for (const h of hostile) re.test(`${h}!`);
+      // Linear shapes take well under 1 ms here; catastrophic ones take seconds or never finish.
+      expect(performance.now() - t0, src).toBeLessThan(250);
+    }
+  });
+
+  it("MAX_SCAN_CHARS is ~300 and the error keys exist", () => {
+    expect(MAX_SCAN_CHARS).toBe(300);
+    expect(REGEX_PROBLEM.overlap).toMatch(/berisiko lambat/);
   });
 
   it("runs only on truncated text", () => {
