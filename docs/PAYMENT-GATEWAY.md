@@ -129,7 +129,9 @@ boleh mengisi jumlah (minimal Rp10.000, dan sisa tagihan setelahnya juga minimal
 di bawah Rp20.000 harus dilunasi sekaligus). Jumlah selalu dicek ulang di server. Setiap pembayaran parsial tercatat
 seperti biasa dan status invoice berubah **Dibayar sebagian → Lunas**. Hanya satu nominal order
 yang aktif per invoice: order tertunda lain dibatalkan (expire) di Midtrans dulu; bila Midtrans
-belum bisa dihubungi, order lama tetap aktif dan pelanggan diminta mencoba lagi.
+belum bisa dihubungi, order lama tetap aktif dan pelanggan diminta mencoba lagi. Order lama yang
+ternyata sudah dibayar langsung dicatat; order yang tidak pernah dimulai dianggap habis setelah
+masa berlaku Snap (24 jam) lewat.
 
 Server Key disimpan terenkripsi dan tidak pernah ditampilkan lagi (hanya 4 karakter terakhir).
 Perubahan berlaku dalam ±1 menit.
@@ -378,7 +380,9 @@ customer may enter an amount (at least Rp10,000, and the balance left afterwards
 least Rp10,000; a balance below Rp20,000 must be paid in full). The amount is always re-checked on the server. Each partial payment
 is booked as usual and the invoice moves **partial → paid**. Only one order amount is live per
 invoice: other pending orders are expired at Midtrans first; if Midtrans cannot be reached, the old
-order stays live and the customer is asked to try again.
+order stays live and the customer is asked to try again. An old order that turns out to be paid is
+booked right away; an order that was never started counts as dead once its Snap lifetime (24 h)
+has passed.
 
 The Server Key is stored encrypted and never shown again (only its last 4 characters). Changes
 apply within about a minute.
