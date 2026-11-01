@@ -167,36 +167,16 @@ function lruSet<V>(m: Map<string, V>, k: string, v: V, max: number) {
 }
 const verdicts = new Map<string, string | null>();
 
-/**
- * Escapes that are not one character in non-`u` JavaScript, so the one-atom model would be
- * wrong (security review #3 R1): `\c` not followed by an ASCII letter matches the two characters
- * `\c`, and `\0` followed by a digit is a legacy octal escape (`\012` = newline).
- */
-function hasMultiCharEscape(s: string): boolean {
-  for (let i = 0; i < s.length; i++) {
-    if (s[i] !== "\\") continue;
-    const e = s[i + 1] ?? "";
-    if (e === "c" && !/^[a-z]$/i.test(s[i + 2] ?? "")) return true;
-    if (e === "0" && /^\d$/.test(s[i + 2] ?? "")) return true;
-    i++;
-  }
-  return false;
-}
-
 function regexVerdict(s: string): string | null {
   if (!s.trim()) return REGEX_PROBLEM.empty;
   if (s.length > NOTIFY_LIMITS.regex) return REGEX_PROBLEM.long;
-  try {
-    new RegExp(s, "i");
-  } catch {
-    return REGEX_PROBLEM.invalid;
-  }
   if (/\\[1-9]|\\k</.test(s)) return REGEX_PROBLEM.backref;
   if (/\(\?<[=!]/.test(s)) return REGEX_PROBLEM.lookbehind;
-  if (hasMultiCharEscape(s)) return REGEX_PROBLEM.invalid;
+  // Allowlist first, so the verdict never depends on what this engine happens to accept.
   let tree: Alt;
   try {
     tree = parseRegex(s);
+    new RegExp(s, "i");
   } catch {
     return REGEX_PROBLEM.invalid;
   }
@@ -206,7 +186,31 @@ function regexVerdict(s: string): string | null {
   return shapeProblem(tree);
 }
 
-/* A tiny parser for the JavaScript regex subset admins write (no `u` flag). */
+/*
+ * A strict ALLOWLIST parser for the regex subset admins may write (no `u` flag). Anything it does
+ * not explicitly model throws (→ "Regex tidak valid"), whatever the runtime accepts: engines keep
+ * adding syntax (inline modifiers `(?s:…)` / `(?i:…)` in V8 12.5+, Node 24, workerd and browsers
+ * — security review #4 R5), and each unmodelled form so far was a ReDoS bypass. Supported:
+ * - groups `(…)`, `(?:…)`, `(?<name>…)` (ASCII name), lookahead `(?=…)` / `(?!…)`;
+ * - alternation `|`, anchors `^` `$`, word boundaries `\b` `\B` (never quantified);
+ * - quantifiers `*` `+` `?` `{n}` `{n,}` `{n,m}`, each optionally lazy (`?`);
+ * - `.`, classes `[…]` / `[^…]` (also `[]`, `[^]`) with ranges;
+ * - escapes in REGEX_SYNTAX.escapes (+ `\b` = backspace inside a class), `\xHH`, `\uHHHH`,
+ *   `\cA`–`\cZ`, and `\0` not followed by a digit;
+ * - any other literal character except unescaped `{ } ] * + ?` outside a class.
+ */
+export const REGEX_SYNTAX = {
+  groups: ["(", "(?:", "(?=", "(?!", "(?<name>"],
+  /**
+   * Two-character escapes allowed outside and inside a class: character classes, control
+   * characters, `\0` (not followed by a digit) and every ASCII punctuation / space (identity).
+   */
+  escapes: `dDwWsStnvfr0 !"#$%&'()*+,-./:;<=>?@[\\]^_\`{|}~`,
+  /** Allowed only outside a class (zero-width). */
+  assertions: ["b", "B"],
+  quantifiers: ["*", "+", "?", "{2}", "{2,}", "{2,5}", "*?", "+?", "??", "{2,5}?"],
+} as const;
+
 type Quant = { min: number; max: number };
 type Leaf = { kind: "leaf"; src: string; zero?: boolean };
 type Group = { kind: "group"; alts: Alt; look: boolean };
@@ -216,6 +220,37 @@ type Alt = Item[][];
 const ONE: Quant = { min: 1, max: 1 };
 const isQuantified = (q: Quant) => q.min !== 1 || q.max !== 1;
 const isVariable = (q: Quant) => q.min !== q.max;
+
+const unsupported = () => new Error("unsupported regex syntax");
+
+/** Length of the escape at `s[i] === "\\"`, or throws when it is not on the allowlist. */
+function escapeLength(s: string, i: number, inClass: boolean): number {
+  const e = s[i + 1] ?? "";
+  if (e === "0") {
+    if (/^\d$/.test(s[i + 2] ?? "")) throw unsupported(); // legacy octal (`\012`)
+    return 2;
+  }
+  if (e && REGEX_SYNTAX.escapes.includes(e)) return 2;
+  if (e === "b") return 2; // word boundary outside, backspace inside a class
+  if (e === "B" && !inClass) return 2;
+  if (e === "x" && /^[0-9a-f]{2}$/i.test(s.slice(i + 2, i + 4))) return 4;
+  if (e === "u" && /^[0-9a-f]{4}$/i.test(s.slice(i + 2, i + 6))) return 6;
+  if (e === "c" && /^[a-z]$/i.test(s[i + 2] ?? "")) return 3;
+  throw unsupported(); // \p{…}, \k, \1, \c1, \x1, \u{…}, identity escapes of letters, …
+}
+
+/**
+ * Whether `src` uses only the allowlisted syntax (parser only, independent of what the running
+ * engine would accept). `regexProblem` runs it before compiling.
+ */
+export function regexSyntaxOk(src: string): boolean {
+  try {
+    parseRegex(src);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function parseRegex(s: string): Alt {
   let i = 0;
@@ -235,12 +270,16 @@ function parseRegex(s: string): Alt {
       let node: Leaf | Group;
       if (c === "(") {
         let look = false;
-        if (s.startsWith("(?:", i)) i += 3;
+        if (s[i + 1] !== "?") i++;
+        else if (s.startsWith("(?:", i)) i += 3;
         else if (s.startsWith("(?=", i) || s.startsWith("(?!", i)) {
           look = true;
           i += 3;
-        } else if (s.startsWith("(?<", i)) i = s.indexOf(">", i) + 1;
-        else i++;
+        } else {
+          const name = /^\(\?<[A-Za-z_$][\w$]*>/.exec(s.slice(i));
+          if (!name) throw unsupported(); // (?s:…), (?i:…), (?-i:…), (?<=…), (?#…), …
+          i += name[0].length;
+        }
         const inner = parseAlt(true);
         if (s[i] !== ")") throw new Error("unbalanced");
         i++;
@@ -250,31 +289,32 @@ function parseRegex(s: string): Alt {
         // classes: a `]` right after `[` / `[^` closes the class, it is not a literal.
         let j = i + 1;
         if (s[j] === "^") j++;
-        while (j < s.length && s[j] !== "]") j += s[j] === "\\" ? 2 : 1;
+        while (j < s.length && s[j] !== "]") j += s[j] === "\\" ? escapeLength(s, j, true) : 1;
+        if (j >= s.length) throw new Error("unterminated class");
         node = { kind: "leaf", src: s.slice(i, j + 1) };
         i = j + 1;
       } else if (c === "\\") {
-        const e = s[i + 1] ?? "";
-        let len = 2;
-        if (e === "x" && /^[0-9a-f]{2}$/i.test(s.slice(i + 2, i + 4))) len = 4;
-        else if (e === "u" && /^[0-9a-f]{4}$/i.test(s.slice(i + 2, i + 6))) len = 6;
-        else if (e === "c" && /^[a-z]$/i.test(s[i + 2] ?? "")) len = 3;
+        const len = escapeLength(s, i, false);
+        const e = s[i + 1];
         node = { kind: "leaf", src: s.slice(i, i + len), zero: e === "b" || e === "B" };
         i += len;
+      } else if ("{}]*+?".includes(c)) {
+        throw unsupported(); // a lone quantifier or brace: write `\{`, `\]`, …
       } else {
         node = { kind: "leaf", src: c, zero: c === "^" || c === "$" };
         i++;
       }
-      // Quantifier (a `{` that does not form one is a literal in non-u mode).
       let q = ONE;
       const m = /^(?:([*+?])|\{(\d+)(?:(,)(\d*))?\})/.exec(s.slice(i));
       if (m) {
+        if (node.kind === "leaf" && node.zero) throw unsupported(); // `^*`, `\b+`
         if (m[1] === "*") q = { min: 0, max: Infinity };
         else if (m[1] === "+") q = { min: 1, max: Infinity };
         else if (m[1] === "?") q = { min: 0, max: 1 };
         else {
           const min = Number(m[2]);
           q = { min, max: m[3] ? (m[4] ? Number(m[4]) : Infinity) : min };
+          if (q.max < min) throw unsupported();
         }
         i += m[0].length;
         if (s[i] === "?") i++; // lazy modifier

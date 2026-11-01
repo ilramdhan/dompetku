@@ -30,7 +30,9 @@ import {
   parseRupiah,
   pickUniqueCode,
   postedAt,
+  REGEX_SYNTAX,
   regexProblem,
+  regexSyntaxOk,
   scanText,
   splitSignalAmount,
   transferAmount,
@@ -172,9 +174,9 @@ describe("regex safety", () => {
       String.raw`Rp[^]*?(?<amount>\d[\d.,]*)[^]*masuk`,
       String.raw`[^]*\s*(?<amount>\d+)`,
       String.raw`.*[^]*Rp`,
-      String.raw`[]a]*a*a*x`,
     ])
       expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
+    expect(regexProblem(String.raw`[]a]*a*a*x`)).not.toBeNull(); // lone `]` → invalid
     for (const ok of [String.raw`[^]a(b)`, String.raw`[^]|a`, String.raw`(?<n>[^])`, "a[]*b"])
       expect(regexProblem(ok), ok).toBeNull();
   });
@@ -267,6 +269,77 @@ describe("regex safety", () => {
     const t0 = performance.now();
     for (const p of pats) regexProblem(p);
     expect(performance.now() - t0).toBeLessThan(50);
+  });
+
+  it("rejects inline modifier groups and \\p{} on every runtime (security review #4 R5)", () => {
+    for (const bad of [
+      String.raw`(?s:.*\n.*\n.*)x`,
+      String.raw`(?s:.{0,99}\n.{0,99}\n.{0,99}\n.{0,99})x`,
+      String.raw`(?s:.*\r.*\r.*)x`,
+      "(?i:a)",
+      "(?-i:a)",
+      "(?ims-ims:a)",
+      "(?m:^a)",
+      String.raw`\p{L}`,
+      String.raw`\P{L}+x`,
+      String.raw`[\p{L}]`,
+    ]) {
+      expect(regexProblem(bad), bad).toBe(REGEX_PROBLEM.invalid);
+      // rejected by the allowlist parser itself, not by this Node's RegExp (Node 22 lacks
+      // modifiers; Node 24 / workerd / browsers accept them)
+      expect(regexSyntaxOk(bad), bad).toBe(false);
+    }
+  });
+
+  it("the parser is a strict allowlist (walks REGEX_SYNTAX)", () => {
+    // every allowed escape, outside and inside a class
+    for (const e of REGEX_SYNTAX.escapes) {
+      expect(regexProblem(`a\\${e}`), `\\${e}`).toBeNull();
+      expect(regexProblem(`[\\${e}]`), `[\\${e}]`).toBeNull();
+    }
+    for (const e of REGEX_SYNTAX.assertions) expect(regexProblem(`a\\${e}`), e).toBeNull();
+    expect(regexProblem(String.raw`[\b]`)).toBeNull(); // backspace
+    for (const ok of [String.raw`\x41`, String.raw`\u0041`, String.raw`\cJ`, String.raw`\0`])
+      expect(regexProblem(ok), ok).toBeNull();
+    for (const g of REGEX_SYNTAX.groups) {
+      const src = `${g.replace("name", "n")}a)`;
+      expect(regexProblem(src), src).toBeNull();
+    }
+    for (const q of REGEX_SYNTAX.quantifiers) expect(regexProblem(`a${q}b`), q).toBeNull();
+    // every other letter escape (identity escapes, \p, \k, \a, \e …) is invalid
+    for (let k = 0; k < 26; k++)
+      for (const l of [String.fromCharCode(97 + k), String.fromCharCode(65 + k)]) {
+        if (REGEX_SYNTAX.escapes.includes(l) || "bBxuc".includes(l)) continue;
+        expect(regexProblem(`a\\${l}`), `\\${l}`).not.toBeNull();
+      }
+    // other unmodelled forms
+    for (const bad of [
+      "(?<=a)b",
+      "(?<!a)b",
+      "(?#c)a",
+      "(?>a)",
+      "(?|a)",
+      "(?P<n>a)",
+      String.raw`\k<n>`,
+      String.raw`(?<n>a)\k<n>`,
+      String.raw`\1`,
+      String.raw`\012`,
+      String.raw`\c1`,
+      String.raw`\x1`,
+      String.raw`\u{41}`,
+      String.raw`[\B]`,
+      "a{,9}",
+      "a{",
+      "a}",
+      "]",
+      "^*a",
+      String.raw`\b+a`,
+      "a{5,2}",
+      "[a",
+    ]) {
+      expect(regexProblem(bad), bad).not.toBeNull();
+      if (!/\\[1-9k]|\(\?<[=!]/.test(bad)) expect(regexSyntaxOk(bad), bad).toBe(false);
+    }
   });
 
   it("MAX_SCAN_CHARS is ~300 and the error keys exist", () => {
