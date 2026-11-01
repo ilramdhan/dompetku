@@ -90,6 +90,14 @@ const MONTHS = 14; // offsets -13 … 0
 
 /* ---------------- reset / guard ---------------- */
 const WIPE = [
+  // Invoice tables first (v21-v25, FK order; gateway_transactions restricts invoice deletes). Missing
+  // tables are skipped. invoice_shares / invoice_payment_methods cascade from invoices.
+  "gateway_transactions",
+  "invoice_proofs",
+  "invoice_payments",
+  "invoice_items",
+  "invoices",
+  "payment_methods",
   "pocket_alerts",
   "budget_alerts",
   "account_reconciliations",
@@ -1157,10 +1165,173 @@ async function main() {
     pocketAlerts.push({ pocket_id: P.ride, period: ym(0), level: "low", created_at: ts(TODAY, 8) });
   } else console.log("Skipping Kantong: run schema v19 to seed pockets.");
 
+  /* ----- invoices (v21) + payment methods (v24): fictional customers, fake bank data ----- */
+  // Skipped when the section isn't run. Never seeds invoice_shares (public links hold only a hashed
+  // token that is shown once) or gateway rows. Payments mirror invoices.server.ts: an income in
+  // category "Invoice" with external_id invoice_pay:<payment id>, linked via transaction_id.
+  const HAS_INVOICES =
+    (await hasTable("invoices", "customer_name")) &&
+    (await hasTable("invoice_items")) &&
+    (await hasTable("invoice_payments", "transaction_id"));
+  const HAS_PAY_METHODS = HAS_INVOICES && (await hasTable("payment_methods", "bank_name"));
+  const invoices = [];
+  const invItems = [];
+  const invPayments = [];
+  const payMethods = [];
+  if (HAS_INVOICES) {
+    await sb
+      .from("categories")
+      .upsert([{ name: "Invoice", kind: "income", color: "#2f9e8f" }], { onConflict: "name,kind" });
+    const invCats = await sb
+      .from("categories")
+      .select("id")
+      .eq("name", "Invoice")
+      .eq("kind", "income");
+    const invCat = invCats.data?.[0]?.id ?? null;
+    const invoice = (n, o, items, pays) => {
+      const id = uuid();
+      const total = items.reduce((a, [, q, u]) => a + q * u, 0);
+      const number = `INV-${o.issue.slice(0, 4)}${o.issue.slice(5, 7)}-${String(n).padStart(4, "0")}`;
+      let paid = 0;
+      for (const [amount, date, method, reference] of pays) {
+        if (!past(date)) continue;
+        paid += amount;
+        const payId = uuid();
+        const txId = add({
+          kind: "income",
+          amount,
+          account: A.bca,
+          category: invCat,
+          description: `Pembayaran invoice ${number} \u00b7 ${o.customer}`,
+          date,
+          notes: reference ? `Ref: ${reference}` : null,
+          external_id: `invoice_pay:${payId}`,
+        });
+        invPayments.push({
+          id: payId,
+          invoice_id: id,
+          amount,
+          paid_at: date,
+          method,
+          reference: reference ?? null,
+          transaction_id: txId,
+          created_at: ts(date, 13),
+        });
+      }
+      const status = o.status ?? (paid >= total ? "paid" : paid > 0 ? "partial" : "unpaid");
+      invoices.push({
+        id,
+        number,
+        customer_name: o.customer,
+        customer_email: o.email ?? null,
+        account_id: A.bca,
+        issue_date: o.issue,
+        due_date: o.due,
+        notes: o.notes ?? null,
+        status,
+        currency: "IDR",
+        total,
+        paid,
+        created_at: ts(o.issue, 10),
+        updated_at: ts(o.issue, 10),
+      });
+      items.forEach(([description, qty, unit_price], position) =>
+        invItems.push({
+          id: uuid(),
+          invoice_id: id,
+          description,
+          qty,
+          unit_price,
+          position,
+          created_at: ts(o.issue, 10),
+        }),
+      );
+    };
+    const d = (n) => addDays(TODAY, -n);
+    invoice(
+      1,
+      { customer: "Studio Kopi Senja", email: "halo@kopisenja.example", issue: d(60), due: d(46) },
+      [
+        ["Desain logo & panduan merek", 1, 3_500_000],
+        ["Revisi tambahan", 2, 250_000],
+      ],
+      [[4_000_000, d(50), "transfer", "TRF-DEMO-0001"]],
+    );
+    invoice(
+      2,
+      { customer: "Toko Buku Pelangi", email: "admin@pelangi.example", issue: d(30), due: d(16) },
+      [
+        ["Pembuatan situs katalog", 1, 6_000_000],
+        ["Hosting & domain (1 tahun)", 1, 1_200_000],
+      ],
+      [
+        [3_000_000, d(24), "transfer", "TRF-DEMO-0002"],
+        [1_500_000, d(8), "qris", null],
+      ],
+    );
+    invoice(
+      3,
+      { customer: "Bengkel Maju Jaya", issue: d(12), due: d(-2) },
+      [
+        ["Pelatihan pembukuan dasar", 2, 750_000],
+        ["Modul cetak", 10, 45_000],
+      ],
+      [],
+    );
+    invoice(
+      4,
+      { customer: "CV Karya Nusantara", email: "keuangan@karya.example", issue: d(3), due: d(-11) },
+      [["Konsultasi strategi bulanan", 3, 1_250_000]],
+      [],
+    );
+    invoice(
+      5,
+      {
+        customer: "Warung Makan Sederhana",
+        issue: d(1),
+        due: d(-13),
+        status: "draft",
+        notes: "Draf: menunggu konfirmasi lingkup pekerjaan.",
+      },
+      [["Foto menu (20 foto)", 1, 1_800_000]],
+      [],
+    );
+  } else console.log("Skipping invoices: run schema v21 to seed invoice demo data.");
+  if (HAS_PAY_METHODS)
+    payMethods.push(
+      {
+        id: uuid(),
+        kind: "bank",
+        label: "Transfer BCA",
+        bank_name: "BCA",
+        account_number: "0000000000",
+        account_holder: "Demo Dompetku",
+        active: true,
+        position: 0,
+      },
+      {
+        id: uuid(),
+        kind: "bank",
+        label: "Transfer Mandiri",
+        bank_name: "Mandiri",
+        account_number: "0000000001",
+        account_holder: "Demo Dompetku",
+        active: true,
+        position: 1,
+      },
+    );
+  else if (HAS_INVOICES) console.log("Skipping payment methods: run schema v24.");
+
   /* ----- insert transactions & dependants ----- */
   tx.sort((a, b) => (a.occurred_at < b.occurred_at ? -1 : a.occurred_at > b.occurred_at ? 1 : 0));
   if (pockets.length) await insert("pockets", pockets);
   await insert("transactions", tx);
+  if (invoices.length) {
+    await insert("invoices", invoices);
+    await insert("invoice_items", invItems);
+    if (invPayments.length) await insert("invoice_payments", invPayments);
+  }
+  if (payMethods.length) await insert("payment_methods", payMethods);
   if (pocketAlerts.length) await insert("pocket_alerts", pocketAlerts);
   await insert("debts", debts);
   await insert("debt_payments", debtPayments);
@@ -1542,7 +1713,7 @@ async function main() {
   const bal = Object.fromEntries(accounts.map((a) => [a.name, balanceAt(a.id, TODAY)]));
   console.log(`Seeded demo data for today=${TODAY}:`);
   console.log(
-    `  ${tx.length} transactions, ${debts.length} debts, ${gold.length} gold rows, ${receivables.length} receivables`,
+    `  ${tx.length} transactions, ${debts.length} debts, ${gold.length} gold rows, ${receivables.length} receivables, ${invoices.length} invoices`,
   );
   for (const [n, b] of Object.entries(bal))
     console.log(`  ${n.padEnd(16)} ${b.toLocaleString("id-ID")}`);
