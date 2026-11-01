@@ -133,6 +133,10 @@ export const REGEX_PROBLEM = {
  *   rejected; `Rp\s?\d[\d.,]*`, `\d+,\d+` pass).
  * - At most MAX_UNBOUNDED `*` / `+` / `{n,}`, no backreferences or lookbehind, and the text it
  *   ever sees is cut to MAX_SCAN_CHARS.
+ * - "Can match the same character" is decided on the exact code-unit set of each atom (`charSet`,
+ *   all 65 536 UTF-16 units with the `i` flag), so negated classes, `[^]`, non-Latin ranges and case
+ *   folding are compared exactly. `[]` / `[^]` are complete classes, as in non-`u` JavaScript.
+ * JavaScript has no step budget for `RegExp`, so there is no runtime cap; the shape check is it.
  */
 export function regexProblem(src: string | null | undefined): string | null {
   const s = String(src ?? "");
@@ -152,7 +156,7 @@ export function regexProblem(src: string | null | undefined): string | null {
     return REGEX_PROBLEM.invalid;
   }
   if (countUnbounded(tree) > MAX_UNBOUNDED) return REGEX_PROBLEM.unbounded;
-  return shapeProblem(tree, probeChars(s));
+  return shapeProblem(tree);
 }
 
 /* A tiny parser for the JavaScript regex subset admins write (no `u` flag). */
@@ -195,9 +199,10 @@ function parseRegex(s: string): Alt {
         i++;
         node = { kind: "group", alts: inner, look };
       } else if (c === "[") {
+        // Without the `u` flag `[]` (matches nothing) and `[^]` (matches anything) are complete
+        // classes: a `]` right after `[` / `[^` closes the class, it is not a literal.
         let j = i + 1;
         if (s[j] === "^") j++;
-        if (s[j] === "]") j++; // `[]` / `[^]` edge: a leading `]` is a literal in non-u mode
         while (j < s.length && s[j] !== "]") j += s[j] === "\\" ? 2 : 1;
         node = { kind: "leaf", src: s.slice(i, j + 1) };
         i = j + 1;
@@ -352,19 +357,26 @@ function steps(seq: Item[], out: Step[] = []): Step[] {
  */
 const MAX_AMBIGUITY = 3;
 
-function shapeProblem(root: Alt, probes: string[]): string | null {
-  const sets = new Map<string, boolean[]>();
+function shapeProblem(root: Alt): string | null {
+  const sets = new Map<string, Uint32Array>();
   const setOf = (src: string) => {
     let v = sets.get(src);
-    if (!v) {
-      const re = new RegExp(`^(?:${src})$`, "i");
-      v = probes.map((c) => re.test(c));
-      sets.set(src, v);
+    if (!v) sets.set(src, (v = charSet(src)));
+    return v;
+  };
+  const pairs = new Map<string, boolean>();
+  const pair = (x: string, y: string) => {
+    const key = `${x}\u0000${y}`;
+    let v = pairs.get(key);
+    if (v === undefined) {
+      const sx = setOf(x);
+      const sy = setOf(y);
+      v = sx.some((w, k) => (w & sy[k]!) !== 0);
+      pairs.set(key, v);
     }
     return v;
   };
-  const overlap = (a: string[], b: string[]) =>
-    a.some((x) => b.some((y) => setOf(x).some((hit, k) => hit && setOf(y)[k])));
+  const overlap = (a: string[], b: string[]) => a.some((x) => b.some((y) => pair(x, y)));
   let ambiguity = 0;
 
   const walk = (alts: Alt): string | null => {
@@ -403,19 +415,29 @@ function shapeProblem(root: Alt, probes: string[]): string | null {
   return walk(root);
 }
 
+/** Every UTF-16 code unit once (built on first use). Non-`u` regexes match code units. */
+let codeUnits: string | null = null;
+
 /**
- * Characters used to compare character sets: Latin-1, common punctuation/symbols, and every
- * character or range endpoint written in the pattern (two overlapping ranges always share an
- * endpoint of one of them).
+ * The exact set of code units a one-character atom matches with the `i` flag, as a 65 536-bit
+ * set. Computed with one global pass over all code units, so it is exact for every atom (negated
+ * classes, `[^]`, `[]`, non-Latin ranges, case folding) — security review #2 showed that comparing
+ * on a fixed probe set misses characters only a negated class can match.
  */
-function probeChars(s: string): string[] {
-  const out = new Set<string>();
-  for (let c = 0; c <= 0xff; c++) out.add(String.fromCharCode(c));
-  for (const c of "–—‘’“”•…€一０") out.add(c);
-  for (const c of s) out.add(c);
-  for (const m of s.matchAll(/\\u([0-9a-f]{4})|\\x([0-9a-f]{2})/gi))
-    out.add(String.fromCharCode(parseInt(m[1] ?? m[2]!, 16)));
-  return [...out];
+const charSets = new Map<string, Uint32Array>();
+function charSet(src: string): Uint32Array {
+  const hit = charSets.get(src);
+  if (hit) return hit;
+  codeUnits ??= Array.from({ length: 0x10000 }, (_, k) => String.fromCharCode(k)).join("");
+  const bits = new Uint32Array(0x10000 / 32);
+  const re = new RegExp(src, "gi");
+  for (let m = re.exec(codeUnits); m; m = re.exec(codeUnits)) {
+    if (m[0].length === 0) re.lastIndex++;
+    else bits[m.index >>> 5]! |= 1 << (m.index & 31);
+  }
+  if (charSets.size >= 512) charSets.clear();
+  charSets.set(src, bits);
+  return bits;
 }
 
 /** Compiled regex (flag `i`) or null when it fails `regexProblem`. */

@@ -160,6 +160,71 @@ describe("regex safety", () => {
     }
   });
 
+  it("parses `[]` / `[^]` as complete classes (security review #2 N1)", () => {
+    for (const bad of [
+      String.raw`[^]*[^]*[^]*x`,
+      String.raw`\d*[^]*\d*x`,
+      String.raw`\s*[^]*\s*Rp`,
+      String.raw`[^]*[^]*[^]*(?:x|y)`,
+      String.raw`[^]{0,99}[^]{0,99}[^]{0,99}[^]{0,99}x`,
+      String.raw`(?:[^]*)[^]*[^]*x`,
+      String.raw`Rp[^]*?(?<amount>\d[\d.,]*)[^]*masuk`,
+      String.raw`[^]*\s*(?<amount>\d+)`,
+      String.raw`.*[^]*Rp`,
+      String.raw`[]a]*a*a*x`,
+    ])
+      expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
+    for (const ok of [String.raw`[^]a(b)`, String.raw`[^]|a`, String.raw`(?<n>[^])`, "a[]*b"])
+      expect(regexProblem(ok), ok).toBeNull();
+  });
+
+  it("compares character sets over all of UTF-16, not a probe set (security review #2 N2)", () => {
+    const C = "[^\\0-\\xff–—‘-”•…€一０]";
+    for (const bad of [
+      `${C}*${C}*${C}*x`,
+      `${C}{0,99}${C}{0,99}${C}{0,99}x`,
+      `${C}+${C}+x`,
+      "[ж-я]*[а-ж]*[а-я]*x",
+      String.raw`[\u0400-\u04ff]*[\u0430-\u044f]*\S*x`,
+      String.raw`[^\W]*\w*[^\W]*x`,
+      String.raw`[^a]*[^b]*[^c]*x`,
+      "k{0,99}K{0,99}x",
+      "ſ{0,99}s{0,99}S{0,99}x",
+    ])
+      expect(regexProblem(bad), bad).toMatch(/berisiko lambat/);
+    // negated classes that really are disjoint from their neighbour stay usable
+    for (const ok of [
+      String.raw`[^\d]*\d+`,
+      String.raw`Rp[^\d]*(\d[\d.,]*)`,
+      String.raw`dari [^,]+, Rp\s?(\d[\d.,]*)`,
+    ])
+      expect(regexProblem(ok), ok).toBeNull();
+  });
+
+  it("every accepted pattern stays under 50 ms on 300 hostile characters", () => {
+    const accepted = [
+      DEFAULT_AMOUNT_REGEX,
+      String.raw`[^\d]*\d+x`,
+      String.raw`Rp[^\d]*(\d[\d.,]*)x`,
+      String.raw`dari [^,]+, Rp\s?(\d[\d.,]*)x`,
+      String.raw`\d{0,1}\d{0,150}x`,
+      "ſ{0,99}s{0,99}x",
+      String.raw`[^]a(b)`,
+    ];
+    const hostile = ["ж", "1", " ", "a", "s", "Rp", "Rp1", "一", "😀"].map((c) =>
+      c.repeat(MAX_SCAN_CHARS).slice(0, MAX_SCAN_CHARS),
+    );
+    for (const src of accepted) {
+      expect(regexProblem(src), src).toBeNull();
+      const re = compileRegex(src)!;
+      for (const h of hostile) {
+        const t0 = performance.now();
+        re.test(h);
+        expect(performance.now() - t0, `${src} on ${h.slice(0, 4)}`).toBeLessThan(50);
+      }
+    }
+  });
+
   it("MAX_SCAN_CHARS is ~300 and the error keys exist", () => {
     expect(MAX_SCAN_CHARS).toBe(300);
     expect(REGEX_PROBLEM.overlap).toMatch(/berisiko lambat/);
