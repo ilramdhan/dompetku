@@ -128,7 +128,16 @@ TRIGGERS
     [x] Prevent multiple triggers
 
 ACTIONS
-  Web Interactions → HTTP Request
+  1. Variables → Set Variable (Local Variable, tipe Dictionary, nama: payload), lalu isi key:
+       app       = {not_app_name}
+       package   = {not_app_package}
+       title     = {not_title}
+       text      = {notification}
+       big_text  = {not_text_big}
+       sub_text  = {not_sub_text}
+       posted_at = {not_timestamp}
+       device    = HP Toko
+  2. Web Interactions → HTTP Request
     Settings:
       Request method: POST
       URL: https://<domain-anda>/api/public/payments/notify
@@ -139,21 +148,21 @@ ACTIONS
       Authorization = Bearer <MACRODROID_TOKEN Anda>
     Content Body:
       Content type: application/json
-      Text:
-        {"app":"{not_app_name}","package":"{not_app_package}","title":"{not_title}",
-         "text":"{notification}","big_text":"{not_text_big}","sub_text":"{not_sub_text}",
-         "posted_at":"{not_timestamp}","device":"HP Toko"}
+      Text: {lvjson=payload}
 ```
 
-- Isi `"device"` dengan nama bebas, misalnya nama HP. Nama ini tampil di antrean.
+- **Wajib `{lvjson=payload}`.** MacroDroid menulis JSON yang di-escape dengan benar, sehingga
+  tanda kutip atau baris baru di notifikasi tidak merusak body dan tidak bisa menyisipkan key
+  lain. Jangan menulis JSON sendiri dengan magic text di dalam tanda kutip
+  (`"text":"{notification}"`): berita transfer dari pengirim bisa berisi
+  `","text":"Rp 500.123 masuk` dan menimpa nominal. Dompetku menolak body dengan key ganda
+  (**400**), tetapi **konfirmasi otomatis hanya aman dengan JSON yang di-escape**.
+- Isi `device` dengan nama bebas, misalnya nama HP. Nama ini tampil di antrean.
 - Magic text `{not_app_name}`, `{not_app_package}`, `{not_title}`, `{notification}`,
   `{not_text_big}`, `{not_sub_text}`, dan `{not_timestamp}` berasal dari trigger Notification.
   Nilai yang tidak tersedia (mis. big text kosong) akan diabaikan oleh Dompetku.
-- **Tanda kutip di notifikasi.** Bila teks notifikasi berisi `"` atau baris baru, JSON bisa
-  rusak, dan Dompetku akan menjawab 400. Cara yang lebih tahan adalah membuat _Dictionary_
-  lokal `payload`. Isi key `app`, `package`, `title`, `text`, `big_text`, `posted_at`, dan
-  `device` dengan magic text di atas lewat **Set Variable**, lalu isi Content Body dengan
-  `{lvjson=payload}`. MacroDroid akan menulis JSON yang valid.
+- Untuk uji cepat saja, Content Body boleh berupa JSON tulisan tangan seperti contoh `curl` di
+  bawah, asal teksnya tetap (tanpa magic text).
 - Simpan makro dan pastikan **izin Notification Access** untuk MacroDroid aktif. Matikan juga
   penghematan baterai untuk MacroDroid.
 
@@ -199,7 +208,7 @@ lagi").
 | Jawaban **401**                                  | Token salah. Header harus `Authorization: Bearer <token>` (dengan spasi) atau `X-Device-Token: <token>`. Terlalu banyak token salah dari satu IP → **429**.                                                            |
 | Jawaban **503**                                  | `MACRODROID_TOKEN` belum diatur, v26 belum dijalankan, atau gangguan sementara (MacroDroid boleh mencoba lagi).                                                                                                        |
 | Jawaban **403**                                  | Instance demo; fitur ini mati di demo.                                                                                                                                                                                 |
-| Jawaban **400**                                  | Body bukan JSON yang valid (tanda kutip/baris baru di notifikasi; pakai cara `{lvjson=payload}`) atau judul dan teks kosong.                                                                                           |
+| Jawaban **400**                                  | Body bukan JSON yang valid atau punya key ganda (JSON tulisan tangan; pakai `{lvjson=payload}`), atau judul dan teks kosong.                                                                                           |
 | Jawaban **413**                                  | Body lebih dari 16 KB.                                                                                                                                                                                                 |
 | Status **ignored** "Tidak ada format yang cocok" | Tambah/ubah format, cek isian **Aplikasi**, atau aktifkan `MACRODROID_GENERIC`.                                                                                                                                        |
 | "Tidak ada kata kunci uang masuk"                | Tambah kata dari notifikasi Anda ke **Wajib mengandung salah satu**.                                                                                                                                                   |
@@ -318,20 +327,22 @@ matched format and the parsed amount right away. This runs in your browser and s
 ```
 TRIGGER  Notification → Notification Received → Select Applications (your bank apps, Include)
          Text content: Any text · Ignore ongoing notifications · Prevent multiple triggers
-ACTION   Web Interactions → HTTP Request
+ACTION 1 Variables → Set Variable: local Dictionary `payload` with keys app={not_app_name},
+         package={not_app_package}, title={not_title}, text={notification},
+         big_text={not_text_big}, sub_text={not_sub_text}, posted_at={not_timestamp},
+         device=Shop phone
+ACTION 2 Web Interactions → HTTP Request
          POST https://<your-domain>/api/public/payments/notify
          Header Params: Authorization = Bearer <MACRODROID_TOKEN>
-         Content Body (application/json):
-         {"app":"{not_app_name}","package":"{not_app_package}","title":"{not_title}",
-          "text":"{notification}","big_text":"{not_text_big}","sub_text":"{not_sub_text}",
-          "posted_at":"{not_timestamp}","device":"Shop phone"}
+         Content Body (application/json): {lvjson=payload}
 ```
 
-If a notification contains quotes or line breaks, a hand-written JSON body breaks (400). The
-robust variant:
-
-1. Fill a local dictionary `payload` with **Set Variable**, using the same keys and magic text.
-2. Send `{lvjson=payload}` as the content body. MacroDroid then writes valid JSON.
+**Always send `{lvjson=payload}`.** MacroDroid then writes properly escaped JSON, so quotes or line
+breaks in a notification can neither break the body nor inject keys. Do not hand-write JSON with
+magic text inside quotes (`"text":"{notification}"`): a sender-controlled transfer remark such as
+`","text":"Rp 500.123 masuk` would override the amount. Dompetku rejects bodies with a repeated key
+(**400**), but **auto-confirm assumes escaped JSON**. Hand-written JSON is only for fixed test
+bodies such as the `curl` example below.
 
 Grant MacroDroid **Notification Access**, and exclude it from battery optimisation.
 
@@ -374,7 +385,7 @@ click **Tagih ulang** (Bill again).
 | 401 / 429                   | Wrong token (`Authorization: Bearer <token>` or `X-Device-Token`); too many wrong tokens from one IP give 429.              |
 | 503                         | No `MACRODROID_TOKEN`, v26 not run, or a transient error.                                                                   |
 | 403                         | Demo instance.                                                                                                              |
-| 400 / 413                   | Invalid JSON (use `{lvjson=payload}`) or empty title and text / body over 16 KB.                                            |
+| 400 / 413                   | Invalid JSON or a repeated key (use `{lvjson=payload}`), empty title and text, or body over 16 KB.                          |
 | ignored "No format matches" | Add or fix a format (check **App**) or enable `MACRODROID_GENERIC`.                                                         |
 | "No incoming-money keyword" | Add your bank's wording to **Must contain one of**.                                                                         |
 | "Amount not found"          | Adjust the **Amount regex**, test with **Test with sample text**.                                                           |

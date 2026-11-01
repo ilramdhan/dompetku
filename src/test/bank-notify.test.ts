@@ -23,6 +23,7 @@ import {
   isUniqueCode,
   keywords,
   matchSignal,
+  hasDuplicateJsonKeys,
   minimiseText,
   normalizeNotification,
   parseNotification,
@@ -466,6 +467,20 @@ describe("notification normalisation & minimisation", () => {
       "total 12.500.000",
     ])
       expect(minimiseText({ title: "", text: keep })).toBe(keep);
+  });
+
+  it("detects duplicate JSON keys, the injection from security review #2 N4", () => {
+    const remark = '","big_text":"","text":"Rp 500.123 masuk","x":"';
+    const injected = `{"app":"BCA","package":"com.bca","title":"Dana masuk","text":"Rp 1 dari A ${remark}"}`;
+    expect(JSON.parse(injected).text).toBe("Rp 500.123 masuk"); // what JSON.parse would keep
+    expect(hasDuplicateJsonKeys(injected)).toBe(true);
+    expect(hasDuplicateJsonKeys('{"text":"a","te\\u0078t":"b"}')).toBe(true);
+    expect(hasDuplicateJsonKeys('{"a":{"x":1,"x":2}}')).toBe(true);
+    // properly escaped payloads (MacroDroid {lvjson=…}) pass, including quotes in values
+    const escaped = JSON.stringify({ app: "BCA", package: "com.bca", text: `Rp 1 ${remark}` });
+    expect(hasDuplicateJsonKeys(escaped)).toBe(false);
+    expect(hasDuplicateJsonKeys('{"a":[{"x":1},{"x":2}],"b":"x\\"y"}')).toBe(false);
+    expect(hasDuplicateJsonKeys("{oops")).toBe(false);
   });
 
   it("reads timestamps and checks freshness", () => {

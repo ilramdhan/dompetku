@@ -779,6 +779,50 @@ function maskNumber(run: string): string {
   return `${lead}${"•".repeat(Math.min(6, digits.length - 3))}${digits.slice(-3)}`;
 }
 
+/**
+ * Whether a JSON text repeats a key inside one object (at any depth). `JSON.parse` silently keeps
+ * the last duplicate, so a hand-written MacroDroid template with unescaped magic text could let a
+ * sender-controlled remark inject `","text":"Rp 500.123 masuk` and override `text` while `package`
+ * stays the genuine bank (security review #2 N4). Keys are compared after JSON unescaping.
+ * Invalid JSON returns false here (JSON.parse reports it). Linear in the text length.
+ */
+export function hasDuplicateJsonKeys(text: string): boolean {
+  const stack: (Set<string> | null)[] = []; // null = array
+  let expectKey = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    if (c === "{") {
+      stack.push(new Set());
+      expectKey = true;
+    } else if (c === "[") {
+      stack.push(null);
+      expectKey = false;
+    } else if (c === "}" || c === "]") {
+      stack.pop();
+      expectKey = false;
+    } else if (c === ",") {
+      expectKey = stack.at(-1) instanceof Set;
+    } else if (c === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== '"') j += text[j] === "\\" ? 2 : 1;
+      const top = stack.at(-1);
+      if (expectKey && top) {
+        let key: string;
+        try {
+          key = JSON.parse(text.slice(i, j + 1)) as string;
+        } catch {
+          return false;
+        }
+        if (top.has(key)) return true;
+        top.add(key);
+      }
+      expectKey = false;
+      i = j;
+    }
+  }
+  return false;
+}
+
 /** Notification time from MacroDroid's `{not_timestamp}` (ms epoch) or an ISO string; else null. */
 export function postedAt(raw: unknown): number | null {
   if (raw == null || raw === "") return null;
