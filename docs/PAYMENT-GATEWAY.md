@@ -131,7 +131,12 @@ seperti biasa dan status invoice berubah **Dibayar sebagian → Lunas**. Hanya s
 yang aktif per invoice: order tertunda lain dibatalkan (expire) di Midtrans dulu; bila Midtrans
 belum bisa dihubungi, order lama tetap aktif dan pelanggan diminta mencoba lagi. Order lama yang
 ternyata sudah dibayar langsung dicatat; order yang tidak pernah dimulai dianggap habis setelah
-masa berlaku Snap (24 jam) lewat.
+masa berlaku Snap (24 jam) lewat. Transaksi yang tertunda dengan pesan kesalahan (misalnya jumlah tidak cocok
+atau chargeback) tetap menahan order baru sampai Anda menekan **Cek status** atau menanganinya
+manual. Catatan: bila Midtrans menjawab "order tidak ditemukan" (404) saat order dibatalkan
+(pelanggan belum memilih metode), order dianggap batal; jika pelanggan tetap membayar lewat halaman
+Snap lama, pembayaran terverifikasi tetap dicatat, atau ditandai kelebihan bayar untuk refund
+manual.
 
 Server Key disimpan terenkripsi dan tidak pernah ditampilkan lagi (hanya 4 karakter terakhir).
 Perubahan berlaku dalam ±1 menit.
@@ -382,7 +387,11 @@ is booked as usual and the invoice moves **partial → paid**. Only one order am
 invoice: other pending orders are expired at Midtrans first; if Midtrans cannot be reached, the old
 order stays live and the customer is asked to try again. An old order that turns out to be paid is
 booked right away; an order that was never started counts as dead once its Snap lifetime (24 h)
-has passed.
+has passed. A pending transaction with an error message (for example an amount mismatch
+or a chargeback) keeps blocking new orders until you click **Cek status** or handle it manually.
+Note: when Midtrans answers "order not found" (404) to the expire call (the customer never picked a
+method), the order counts as cancelled; if the customer still pays on the old Snap page, the
+verified payment is still booked, or flagged as an overpayment for a manual refund.
 
 The Server Key is stored encrypted and never shown again (only its last 4 characters). Changes
 apply within about a minute.

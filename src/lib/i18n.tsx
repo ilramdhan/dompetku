@@ -1628,6 +1628,9 @@ const DICT: Record<string, string> = {
   "Refund dengan kunci ini sudah ada dengan jumlah berbeda; cek status lalu coba lagi":
     "A refund with this key already exists with a different amount; check the status and try again",
   "Chargeback dari Midtrans, cek manual": "Chargeback from Midtrans, check manually",
+  "Digantikan order lain yang dibuat bersamaan": "Replaced by another order created at the same time",
+  "Transaksi tertunda ini menahan pembayaran online baru untuk invoice ini sampai dicek (Cek status) atau ditangani manual.":
+    "This pending transaction blocks new online payments for this invoice until it is checked (Check status) or handled manually.",
   "Tagih ulang invoice ini?": "Bill this invoice again?",
   "Tombol Bayar sekarang dan pengingat jatuh tempo aktif lagi untuk sisa tagihan. Pilih Batalkan invoice bila pelanggan tidak perlu membayar lagi.":
     "The Pay now button and due reminders come back for the amount due. Cancel the invoice instead if the customer does not need to pay again.",
