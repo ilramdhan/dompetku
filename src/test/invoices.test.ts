@@ -218,6 +218,17 @@ describe("validation", () => {
   });
 });
 
+describe("verifying filter (#120)", () => {
+  it("is a list filter with a label and matches displayStatus", async () => {
+    const { INVOICE_FILTERS, STATUS_LABEL, displayStatus } = await import("@/lib/invoices");
+    expect(INVOICE_FILTERS).toContain("verifying");
+    expect(STATUS_LABEL.verifying).toBe("Menunggu verifikasi");
+    const inv = { status: "unpaid" as const, due_date: null };
+    expect(displayStatus(inv, "2026-01-01", 1)).toBe("verifying");
+    expect(displayStatus(inv, "2026-01-01", 0)).toBe("unpaid");
+  });
+});
+
 describe("list search & summary", () => {
   it("keeps only a valid account and status", () => {
     expect(validateInvoiceSearch({ account: A.toUpperCase(), status: "overdue" })).toEqual({
@@ -225,6 +236,7 @@ describe("list search & summary", () => {
       status: "overdue",
     });
     expect(validateInvoiceSearch({ account: "x", status: "late" })).toEqual({});
+    expect(validateInvoiceSearch({ status: "verifying" })).toEqual({ status: "verifying" });
   });
   it("sums outstanding and overdue amounts of open invoices", () => {
     expect(

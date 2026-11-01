@@ -105,6 +105,22 @@ function scoped(q: any, scope: Scope, account?: string) {
   return q;
 }
 
+const NIL_ID = "00000000-0000-0000-0000-000000000000";
+
+/** Ids of invoices that have at least one pending payment proof (empty without v24). */
+async function invoicesWithPendingProofs(): Promise<string[]> {
+  const rows = await fetchAll((from, to) =>
+    db()
+      .from("invoice_proofs")
+      .select("invoice_id")
+      .eq("status", "pending")
+      .order("id")
+      .range(from, to),
+  );
+  if (rows.error) return [];
+  return [...new Set((rows.data ?? []).map((r: any) => r.invoice_id as string))];
+}
+
 /** Paginated, sorted list with outstanding/overdue summary of the same wallet selection. */
 export async function listInvoices(o: ListOptions, scope: Scope) {
   const today = (await fin()).today();
@@ -112,7 +128,11 @@ export async function listInvoices(o: ListOptions, scope: Scope) {
   q = scoped(q, scope, o.account);
   if (o.status === "overdue")
     q = q.in("status", ["unpaid", "partial"]).not("due_date", "is", null).lt("due_date", today);
-  else if (o.status) q = q.eq("status", o.status);
+  else if (o.status === "verifying") {
+    // Derived status (#120): open invoices with a pending proof (v24); none/no table → empty list.
+    const ids = await invoicesWithPendingProofs();
+    q = q.in("status", ["unpaid", "partial"]).in("id", ids.length ? ids : [NIL_ID]);
+  } else if (o.status) q = q.eq("status", o.status);
   const s = o.search?.replace(/[%,()*]/g, "").trim();
   if (s) q = q.or(`number.ilike.%${s}%,customer_name.ilike.%${s}%`);
   q = q
