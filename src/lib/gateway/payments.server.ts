@@ -236,8 +236,9 @@ export async function startGatewayPayment(
     throw new Error(PAY_FAILED);
   }
   const now = new Date();
-  // Pending orders for another amount (the remaining amount changed) are expired first.
-  await retirePendingOrders(inv.id, { amount });
+  // Pending orders for another amount (the remaining amount changed) are expired first; when one
+  // cannot be expired at Midtrans it stays pending and no second amount is handed out (L1).
+  if ((await retirePendingOrders(inv.id, { amount })) > 0) throw new Error(PAY_FAILED);
   const reuse = ((open.data ?? []) as any[])
     .map(rowOf)
     .find((r) => reusablePending(r, amount, now));
@@ -250,6 +251,22 @@ export async function startGatewayPayment(
     .single();
   if (ins.error) {
     (await import("../monitoring.server")).logError("gateway:insert", ins.error);
+    throw new Error(PAY_FAILED);
+  }
+  // Serialize per invoice without a schema change (review L1 of #124): once our row exists, every
+  // other pending order is retired. If one survives (Midtrans expire failed) or a concurrent
+  // request retired ours, give up before any Snap order exists, so at most one order is live.
+  const left = await retirePendingOrders(inv.id, { amount: null, except: ins.data.id });
+  const mine = await table().select("status").eq("id", ins.data.id).maybeSingle();
+  if (left > 0 || mine.error || mine.data?.status !== "pending") {
+    await table()
+      .update({
+        status: "failed",
+        last_error: "Superseded by a concurrent order",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", ins.data.id)
+      .in("status", ["pending", "expired"]);
     throw new Error(PAY_FAILED);
   }
   try {
@@ -265,14 +282,26 @@ export async function startGatewayPayment(
       expiryMinutes: ORDER_EXPIRY_MIN,
     });
     const expires = new Date(now.getTime() + ORDER_EXPIRY_MIN * 60_000).toISOString();
-    await table()
+    const saved = await table()
       .update({
         snap_token: r.token,
         redirect_url: r.redirectUrl,
         expires_at: expires,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", ins.data.id);
+      .eq("id", ins.data.id)
+      .eq("status", "pending")
+      .select("id");
+    if (!saved.error && !saved.data?.length) {
+      // Retired by a concurrent request while the Snap order was being created: expire the new
+      // order too; if that fails, put the row back to pending so the next retire retries it.
+      if (!(await midtrans.expire(c, orderId)))
+        await table()
+          .update({ status: "pending", updated_at: new Date().toISOString() })
+          .eq("id", ins.data.id)
+          .eq("status", "expired");
+      throw new Error(PAY_FAILED);
+    }
     await (
       await fin()
     ).logActivity("invoices.gateway_create", "invoices", {
@@ -296,42 +325,70 @@ export async function startGatewayPayment(
 }
 
 /**
+ * Expire refused: true only when Get Status says the order can no longer be paid. Unknown (404:
+ * no method picked yet, the Snap token may still be used) or an error = still payable.
+ */
+async function deadAtMidtrans(c: GatewayConfig, orderId: string): Promise<boolean> {
+  try {
+    const st = await midtrans.fetchStatus(c, orderId);
+    return !!st && DEAD_STATES.includes(st.status);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Retires pending orders of an invoice that must not be paid any more (amount no longer equals
- * the remaining amount, or the invoice is paid/cancelled/draft): best-effort Midtrans
- * `POST /v2/{order}/expire`, and the local row becomes `expired` (conditional on still pending).
- * If a customer still manages to pay one, the verified settlement moves it to success
- * (`nextStatus`) and is booked or flagged as usual. Never throws; no-op before v25.
+ * the remaining amount, or the invoice is paid/cancelled/draft; `amount: null` = every pending
+ * order except `except`): Midtrans `POST /v2/{order}/expire`, and only when Midtrans confirms (or
+ * the gateway is off) the local row becomes `expired` (conditional on still pending). A row whose
+ * expire failed stays `pending`, so the next call retries it (review L1 of #124). If a customer
+ * still manages to pay a retired order, the verified settlement moves it to success
+ * (`nextStatus`) and is booked or flagged as usual. Returns how many orders could not be retired
+ * (1 on an unexpected error). Never throws; no-op before v25.
  */
 export async function retirePendingOrders(
   invoiceId: string,
   keep: { amount: number | null; except?: string | undefined },
-) {
+): Promise<number> {
   try {
     const res = await table()
       .select("id, order_id, gross_amount")
       .eq("invoice_id", invoiceId)
       .eq("status", "pending");
-    if (res.error || !res.data?.length) return;
+    if (res.error) return (await missing(res.error)) ? 0 : 1;
+    if (!res.data?.length) return 0;
     const stale = (res.data as { id: string; order_id: string; gross_amount: number }[]).filter(
       (r) =>
         r.id !== keep.except &&
         (keep.amount === null || !amountsMatch(r.gross_amount, keep.amount)),
     );
-    if (!stale.length) return;
+    if (!stale.length) return 0;
     const c = await midtransConfig().catch(() => null);
+    let left = 0;
     for (const r of stale) {
-      if (c) await midtrans.expire(c, r.order_id);
+      if (c && !(await midtrans.expire(c, r.order_id)) && !(await deadAtMidtrans(c, r.order_id))) {
+        left++;
+        (await import("../monitoring.server")).logError(
+          "gateway:retire",
+          new Error("Midtrans expire failed; order kept pending"),
+          { order_id: r.order_id },
+        );
+        continue;
+      }
       await table()
         .update({ status: "expired", updated_at: new Date().toISOString() })
         .eq("id", r.id)
         .eq("status", "pending");
     }
+    return left;
   } catch (e) {
     try {
       (await import("../monitoring.server")).logError("gateway:retire", e);
     } catch {
       /* ignore */
     }
+    return 1;
   }
 }
 

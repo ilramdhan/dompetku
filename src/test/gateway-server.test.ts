@@ -49,7 +49,9 @@ function query(table: string) {
       if (failSelect === table && op === "select")
         return res({ data: null, error: { message: "boom", code: "XX000" } });
       if (op === "insert") {
-        const r = { id: `id${rows().length + 1}`, ...patch };
+        // Column default of gateway_transactions.status.
+        const def = table === "gateway_transactions" ? { status: "pending" } : {};
+        const r = { id: `id${rows().length + 1}`, ...def, ...patch };
         rows().push(r);
         return res({ data: single ? r : [r], error: null });
       }
@@ -77,6 +79,8 @@ vi.mock("../lib/invoices.server", () => ({
     customer_name: "Budi",
     status: "unpaid",
     account_id: invAccount,
+    total: 250000,
+    paid: 0,
   }),
   loadPayment: async () => payment,
   syncInvoice: async () => ({}),
@@ -110,12 +114,35 @@ vi.mock("../lib/rate-limit.server", () => ({
   rateHit: async (_r: any, s: string) => (rateCalls.push(s), true),
 }));
 let fees: any = null;
+let expireOk = true;
+let deadStatus: string | null = null;
+const expired: string[] = [];
+const created: string[] = [];
+let onCreate: (() => Promise<void>) | null = null;
+vi.mock("../lib/invoice-share.server", () => ({
+  activeShareInvoiceId: async () => "inv",
+  hashShareToken: (t: string) => t,
+}));
 vi.mock("../lib/gateway/midtrans.server", () => ({
-  midtransConfig: async () => ({ serverKey: "SB-Mid-server-TEST", overridden: false, fees }),
+  midtransConfig: async () => ({
+    serverKey: "SB-Mid-server-TEST",
+    overridden: false,
+    fees,
+    partial: true,
+    clientKey: null,
+    production: false,
+  }),
   midtrans: {
+    expire: async (_c: any, orderId: string) => (expired.push(orderId), expireOk),
+    createPayment: async (_c: any, x: any) => {
+      created.push(x.orderId);
+      if (onCreate) await onCreate();
+      return { token: `snap-${x.orderId}`, redirectUrl: `https://pay/${x.orderId}` };
+    },
     verifyWebhook: (_c: any, b: any) =>
       b?.good ? { ok: true, orderId: "INV-1-a" } : { ok: false, status: 401, error: "x" },
-    fetchStatus: async () => null,
+    fetchStatus: async (_c: any, orderId: string) =>
+      deadStatus ? { ...state, orderId, status: deadStatus } : null,
   },
 }));
 
@@ -124,6 +151,8 @@ import {
   assertPaymentNotGateway,
   handleMidtransWebhook,
   releaseInvoiceGateway,
+  retirePendingOrders,
+  startGatewayPayment,
 } from "@/lib/gateway/payments.server";
 
 const state = {
@@ -164,6 +193,11 @@ beforeEach(() => {
   fees = null;
   invAccount = null;
   payment = null;
+  expireOk = true;
+  deadStatus = null;
+  expired.length = 0;
+  created.length = 0;
+  onCreate = null;
 });
 
 describe("booking claim", () => {
@@ -329,5 +363,76 @@ describe("MDR fee (#124)", () => {
     const r = await applyState(baseRow() as any, state);
     expect(r.booked).toBe(true);
     expect(mdrRows()).toEqual([]);
+  });
+});
+
+describe("one live pending order per invoice (review L1, #124)", () => {
+  const TOKEN = "t".repeat(43);
+  const pendingRow = (id: string, order: string, gross: number) => ({
+    ...baseRow(),
+    id,
+    order_id: order,
+    gross_amount: gross,
+    status: "pending",
+    snap_token: "s",
+    redirect_url: "u",
+    expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+  });
+  const gw = () => tables["gateway_transactions"]!;
+  const live = () => gw().filter((r) => r.status === "pending");
+
+  it("keeps a row pending when Midtrans refuses the expire, and retries it next time", async () => {
+    tables["gateway_transactions"] = [pendingRow("old", "INV-1-old", 100000)];
+    expireOk = false;
+    expect(await retirePendingOrders("inv", { amount: 250000 })).toBe(1);
+    expect(gw()[0]!.status).toBe("pending");
+    expireOk = true;
+    expect(await retirePendingOrders("inv", { amount: 250000 })).toBe(0);
+    expect(gw()[0]!.status).toBe("expired");
+    expect(expired).toEqual(["INV-1-old", "INV-1-old"]);
+  });
+
+  it("retires a row whose expire failed when Get Status says it is already dead", async () => {
+    tables["gateway_transactions"] = [pendingRow("old", "INV-1-old", 100000)];
+    expireOk = false;
+    deadStatus = "expired";
+    expect(await retirePendingOrders("inv", { amount: 250000 })).toBe(0);
+    expect(gw()[0]!.status).toBe("expired");
+  });
+
+  it("refuses a new amount while an older order cannot be expired", async () => {
+    tables["gateway_transactions"] = [pendingRow("old", "INV-1-old", 100000)];
+    expireOk = false;
+    await expect(startGatewayPayment(TOKEN, "1.1.1.1", null, 50000)).rejects.toThrow(
+      /gagal dibuat/,
+    );
+    expect(created).toEqual([]);
+    expect(live().map((r) => r.id)).toEqual(["old"]);
+  });
+
+  it("replaces an order of another amount and reuses one of the same amount", async () => {
+    tables["gateway_transactions"] = [pendingRow("old", "INV-1-old", 100000)];
+    const a = await startGatewayPayment(TOKEN, "1.1.1.1", null, 50000);
+    expect(created).toHaveLength(1);
+    expect(live()).toHaveLength(1);
+    expect(live()[0]!.gross_amount).toBe(50000);
+    const b = await startGatewayPayment(TOKEN, "1.1.1.1", null, 50000);
+    expect(b.token).toBe(a.token);
+    expect(created).toHaveLength(1);
+  });
+
+  it("leaves at most one live order when two amounts race", async () => {
+    tables["gateway_transactions"] = [];
+    // Request B runs completely while A is creating its Snap order.
+    onCreate = async () => {
+      onCreate = null;
+      await startGatewayPayment(TOKEN, "1.1.1.1", null, 250000).catch(() => undefined);
+    };
+    const a = startGatewayPayment(TOKEN, "1.1.1.1", null, 50000);
+    await a.catch(() => undefined);
+    expect(live().length).toBeLessThanOrEqual(1);
+    // Every Snap order created is either the live row or was expired at Midtrans.
+    const liveOrders = live().map((r) => r.order_id);
+    for (const o of created) expect(liveOrders.includes(o) || expired.includes(o)).toBe(true);
   });
 });
