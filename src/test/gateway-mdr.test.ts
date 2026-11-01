@@ -16,6 +16,7 @@ import {
   parseRequestedAmount,
   partialAllowed,
   pendingAgedOut,
+  startWinner,
 } from "@/lib/gateway/types";
 import { validateIntegration, resolveIntegration } from "@/lib/integrations";
 import { paymentProblem, derivedStatus } from "@/lib/invoices";
@@ -175,5 +176,22 @@ describe("pendingAgedOut (review M1, #124)", () => {
     );
     expect(pendingAgedOut({ snap_token: "s", expires_at: "garbage" }, now)).toBe(false);
     expect(pendingAgedOut({ snap_token: null, created_at: null }, now)).toBe(false);
+  });
+});
+
+describe("startWinner (#124 E2E concurrency)", () => {
+  const now = new Date("2026-11-02T12:00:00.000Z");
+  const row = (id: string, ms: number, token: string | null = null) => ({
+    id,
+    snap_token: token,
+    created_at: new Date(now.getTime() - ms).toISOString(),
+  });
+  it("picks the earliest in-flight row by (created_at, id), ignoring tokened and stale rows", () => {
+    expect(startWinner([row("b", 100), row("a", 50)], now)).toBe("b");
+    expect(startWinner([row("y", 100), row("x", 100)], now)).toBe("x");
+    expect(startWinner([row("a", 500, "tok"), row("b", 100)], now)).toBe("b");
+    expect(startWinner([row("old", TOKENLESS_GRACE_MS + 1), row("b", 100)], now)).toBe("b");
+    expect(startWinner([row("a", 1, "tok")], now)).toBeNull();
+    expect(startWinner([], now)).toBeNull();
   });
 });

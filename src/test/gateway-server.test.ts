@@ -56,7 +56,10 @@ function query(table: string) {
         return res({ data: null, error: { message: "boom", code: "XX000" } });
       if (op === "insert") {
         // Column default of gateway_transactions.status.
-        const def = table === "gateway_transactions" ? { status: "pending" } : {};
+        const def =
+          table === "gateway_transactions"
+            ? { status: "pending", created_at: new Date().toISOString() }
+            : {};
         const r = { id: `id${rows().length + 1}`, ...def, ...patch };
         rows().push(r);
         return res({ data: single ? r : [r], error: null });
@@ -74,20 +77,28 @@ function query(table: string) {
 vi.mock("../lib/db.server", () => ({ db: () => ({ from: (t: string) => query(t) }) }));
 
 const booked: number[] = [];
+/** When set, every start waits in loadInvoice (after all lazy imports) so they race on the DB. */
+let shareGate: Promise<void> | null = null;
+let atGate = 0;
+const invoiceRow = () => ({
+  id: "inv",
+  number: "INV-1",
+  customer_name: "Budi",
+  status: "unpaid",
+  account_id: invAccount,
+  total: 250000,
+  paid: 0,
+});
 let bookGate: Promise<void> = Promise.resolve();
 let bookError: string | null = null;
 let invAccount: string | null = null;
 let payment: any = null;
 vi.mock("../lib/invoices.server", () => ({
-  loadInvoice: async () => ({
-    id: "inv",
-    number: "INV-1",
-    customer_name: "Budi",
-    status: "unpaid",
-    account_id: invAccount,
-    total: 250000,
-    paid: 0,
-  }),
+  loadInvoice: async () => {
+    atGate++;
+    if (shareGate) await shareGate;
+    return invoiceRow();
+  },
   loadPayment: async () => payment,
   syncInvoice: async () => ({}),
   bookPayment: async (_inv: any, p: any) => {
@@ -125,6 +136,7 @@ let deadStatus: string | null = null;
 const expired: string[] = [];
 const created: string[] = [];
 let onCreate: (() => Promise<void>) | null = null;
+/** When set, every start waits here (after imports + rate limits) so they race on the DB. */
 vi.mock("../lib/invoice-share.server", () => ({
   activeShareInvoiceId: async () => "inv",
   hashShareToken: (t: string) => t,
@@ -205,6 +217,8 @@ beforeEach(() => {
   expired.length = 0;
   created.length = 0;
   onCreate = null;
+  shareGate = null;
+  atGate = 0;
 });
 
 describe("booking claim", () => {
@@ -517,5 +531,50 @@ describe("one live pending order per invoice (review L1, #124)", () => {
     expect(row.status).toBe("pending");
     expect(row.snap_token).toBe(`snap-${created[0]}`);
     expect(Date.parse(row.expires_at)).toBeGreaterThan(Date.now());
+  });
+
+  it("lets one of several simultaneous starts win and hands the same amount its token (E2E)", async () => {
+    tables["gateway_transactions"] = [];
+    // Start the requests one after another (vitest's mocked dynamic imports are not safe to
+    // resolve concurrently), park them all at the share lookup, then release them together.
+    const race = async (amounts: number[]) => {
+      let open!: () => void;
+      shareGate = new Promise((r) => (open = r));
+      atGate = 0;
+      const ps: Promise<any>[] = [];
+      for (const a of amounts) {
+        const n = atGate;
+        ps.push(startGatewayPayment(TOKEN, "1.1.1.1", null, a));
+        while (atGate === n) await new Promise((r) => setTimeout(r, 0));
+      }
+      open();
+      shareGate = null;
+      return settle(ps);
+    };
+    const settle = (ps: Promise<any>[]) =>
+      Promise.all(
+        ps.map((p) =>
+          p.then(
+            (v) => ({ ok: true, v }),
+            (e) => ({ ok: false, v: String(e?.stack).split("\n").slice(0, 2).join(" ") }),
+          ),
+        ),
+      );
+    // Double click / two tabs, same amount: one Snap order, every request gets its token.
+    let rs = await race([50000, 50000, 50000, 50000]);
+    expect(created).toHaveLength(1);
+    expect(rs.map((r) => (r.ok ? "ok" : r.v))).toEqual(["ok", "ok", "ok", "ok"]);
+    expect(new Set(rs.map((r) => r.v.token)).size).toBe(1);
+    expect(live()).toHaveLength(1);
+
+    // Different amounts at once: at least one succeeds, never more than one live order.
+    tables["gateway_transactions"] = [];
+    created.length = 0;
+    expired.length = 0;
+    rs = await race([20000, 30000, 40000, 250000]);
+    expect(rs.filter((r) => r.ok).length).toBeGreaterThanOrEqual(1);
+    expect(live().length).toBe(1);
+    const liveOrders = live().map((r) => r.order_id);
+    for (const o of created) expect(liveOrders.includes(o) || expired.includes(o)).toBe(true);
   });
 });

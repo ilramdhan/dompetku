@@ -40,6 +40,7 @@ import {
   ORDER_EXPIRY_MIN,
   partialAllowed,
   pendingAgedOut,
+  startWinner,
   refundExternalId,
   refundKey,
   refundProblem,
@@ -59,6 +60,9 @@ export const PAY_UNAVAILABLE = "Pembayaran online tidak tersedia untuk invoice i
 export const PAY_RATE_LIMITED = "Terlalu banyak percobaan, coba lagi nanti.";
 export const PAY_FAILED = "Pembayaran online gagal dibuat, coba lagi.";
 
+/** Losers of a concurrent start poll the winner's row this often, this many times (~5 s). */
+const WINNER_WAIT_MS = 250;
+const WINNER_WAIT_STEPS = 20;
 /** A claim older than this without a payment is considered abandoned (crash) and retried. */
 const STALE_CLAIM_MS = 10 * 60_000;
 
@@ -179,6 +183,31 @@ export type PublicPayStart = {
   test_redirect: boolean;
 };
 
+/** A concurrent start still creating its Snap order (tokenless and young). */
+const inFlight = (r: GatewayRow, now: Date) => startWinner([r], now) === r.id;
+
+/** a sorts before b by (created_at, id), the order `startWinner` uses. */
+function orderedBefore(a: GatewayRow, b: GatewayRow): boolean {
+  const ta = Date.parse(a.created_at ?? "");
+  const tb = Date.parse(b.created_at ?? "");
+  if (ta !== tb) return ta < tb;
+  return a.id < b.id;
+}
+
+/** Wait briefly for the winning concurrent start to save its Snap token (same amount only). */
+async function awaitWinnerToken(
+  id: string,
+): Promise<{ snap_token: string; redirect_url: string } | null> {
+  for (let i = 0; i < WINNER_WAIT_STEPS; i++) {
+    await new Promise((r) => setTimeout(r, WINNER_WAIT_MS));
+    const r = await table().select("status, snap_token, redirect_url").eq("id", id).maybeSingle();
+    if (r.error || !r.data || r.data.status !== "pending") return null;
+    if (r.data.snap_token && r.data.redirect_url)
+      return { snap_token: r.data.snap_token, redirect_url: r.data.redirect_url };
+  }
+  return null;
+}
+
 /**
  * Public "Bayar sekarang": rate limit (IP, token) → hashed token lookup → amount = remaining
  * (server) or, with MIDTRANS_PARTIAL (#124), a requested whole-rupiah amount between the minimum
@@ -238,7 +267,9 @@ export async function startGatewayPayment(
   const now = new Date();
   // Pending orders for another amount (the remaining amount changed) are expired first; when one
   // cannot be expired at Midtrans it stays pending and no second amount is handed out (L1).
-  if ((await retirePendingOrders(inv.id, { amount })) > 0) throw new Error(PAY_FAILED);
+  // In-flight starts of concurrent requests (tokenless, young) are left to the winner rule below.
+  if ((await retirePendingOrders(inv.id, { amount, skip: (r) => inFlight(r, now) })) > 0)
+    throw new Error(PAY_FAILED);
   const reuse = ((open.data ?? []) as any[])
     .map(rowOf)
     .find((r) => reusablePending(r, amount, now));
@@ -253,20 +284,62 @@ export async function startGatewayPayment(
     (await import("../monitoring.server")).logError("gateway:insert", ins.error);
     throw new Error(PAY_FAILED);
   }
-  // Serialize per invoice without a schema change (review L1 of #124): once our row exists, every
-  // other pending order is retired. If one survives (Midtrans expire failed) or a concurrent
-  // request retired ours, give up before any Snap order exists, so at most one order is live.
-  const left = await retirePendingOrders(inv.id, { amount: null, except: ins.data.id });
-  const mine = await table().select("status").eq("id", ins.data.id).maybeSingle();
-  if (left > 0 || mine.error || mine.data?.status !== "pending") {
+  // Serialize per invoice without a schema change (review L1 + E2E of #124). Among concurrent
+  // in-flight starts the earliest by (created_at, id) wins (`startWinner`); losers retire nobody
+  // and step aside (a loser asking for the same amount hands out the winner's token once it is
+  // saved, so a double click still opens Snap). The winner retires every other pending order
+  // except in-flight ones that sort before it; if one survives (Midtrans expire failed), its own
+  // row was retired, or a fresh read no longer names it the winner, it gives up before any Snap
+  // order exists. The earliest in-flight row is never retired by anyone, so one start succeeds.
+  const myId = ins.data.id as string;
+  const lose = async () => {
     await table()
       .update({
         status: "failed",
         last_error: "Digantikan order lain yang dibuat bersamaan",
         updated_at: new Date().toISOString(),
       })
-      .eq("id", ins.data.id)
+      .eq("id", myId)
       .in("status", ["pending", "expired"]);
+  };
+  const winnerNow = async () => {
+    const r = await table().select("*").eq("invoice_id", inv.id).eq("status", "pending");
+    if (r.error) return null;
+    const rows = ((r.data ?? []) as any[]).map(rowOf);
+    return { rows, id: startWinner(rows, new Date()) };
+  };
+  const first = await winnerNow();
+  if (!first) {
+    await lose();
+    throw new Error(PAY_FAILED);
+  }
+  if (first.id !== myId) {
+    await lose();
+    const w = first.rows.find((r) => r.id === first.id);
+    if (w && amountsMatch(w.gross_amount, amount)) {
+      const token = await awaitWinnerToken(w.id);
+      if (token) return answer(token);
+    }
+    throw new Error(PAY_FAILED);
+  }
+  const me = first.rows.find((r) => r.id === myId)!;
+  // Younger in-flight starts have no Snap order yet: retire them locally (conditional on still
+  // tokenless), never through Midtrans, whose expire would 404 and make them look payable. If
+  // one creates its Snap order anyway, its own save misses and expires that order.
+  const behind = first.rows
+    .filter((r) => r.id !== myId && inFlight(r, now) && orderedBefore(me, r))
+    .map((r) => r.id);
+  if (behind.length)
+    await table()
+      .update({ status: "expired", updated_at: new Date().toISOString() })
+      .in("id", behind)
+      .eq("status", "pending")
+      .is("snap_token", null);
+  const ahead = (r: GatewayRow) => inFlight(r, new Date()) && orderedBefore(r, me);
+  const left = await retirePendingOrders(inv.id, { amount: null, except: myId, skip: ahead });
+  const again = await winnerNow();
+  if (left > 0 || !again || again.id !== myId) {
+    await lose();
     throw new Error(PAY_FAILED);
   }
   let settled = false;
@@ -378,7 +451,12 @@ async function refusedExpire(
  */
 export async function retirePendingOrders(
   invoiceId: string,
-  keep: { amount: number | null; except?: string | undefined },
+  keep: {
+    amount: number | null;
+    except?: string | undefined;
+    /** Keep these rows too (in-flight starts that win over the caller, see startWinner). */
+    skip?: (r: GatewayRow) => boolean;
+  },
 ): Promise<number> {
   try {
     const res = await table().select("*").eq("invoice_id", invoiceId).eq("status", "pending");
@@ -389,6 +467,7 @@ export async function retirePendingOrders(
       .filter(
         (r) =>
           r.id !== keep.except &&
+          !keep.skip?.(r) &&
           (keep.amount === null || !amountsMatch(r.gross_amount, keep.amount)),
       );
     if (!stale.length) return 0;

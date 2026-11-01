@@ -241,6 +241,26 @@ export function pendingAgedOut(
   return Number.isFinite(exp) && t - exp > EXPIRY_GRACE_MS;
 }
 
+/**
+ * Concurrent "Bayar sekarang" starts (#124 E2E): among pending rows that are still being created
+ * (no Snap token, younger than TOKENLESS_GRACE_MS) the earliest by `(created_at, id)` wins; every
+ * request computes the same winner from the rows it sees, so at least one start succeeds instead
+ * of all of them retiring each other. null = no in-flight row visible.
+ */
+export function startWinner(
+  rows: readonly { id: string; snap_token?: string | null; created_at?: string | null }[],
+  now: Date,
+): string | null {
+  const t = now.getTime();
+  const live = rows
+    .map((r) => ({ id: r.id, at: Date.parse(r.created_at ?? "") }))
+    .filter(
+      (r, i) => !rows[i]!.snap_token && Number.isFinite(r.at) && t - r.at <= TOKENLESS_GRACE_MS,
+    )
+    .sort((a, b) => (a.at !== b.at ? a.at - b.at : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return live[0]?.id ?? null;
+}
+
 export const amountsMatch = (a: number | string, b: number | string) =>
   Math.abs(Number(a) - Number(b)) < 0.005;
 
