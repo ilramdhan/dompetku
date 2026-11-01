@@ -4,7 +4,10 @@ import {
   inNotifyScope,
   isNotifyKind,
   normalizeChatId,
+  myNotifySchema,
   notifyRecipientSchema,
+  planSelfNotify,
+  selfNotifyUserId,
   notifyScope,
   planRecipients,
   withWalletLine,
@@ -144,5 +147,44 @@ describe("v22 backup + activity", () => {
   it("labels notification activity", () => {
     expect(activityLabel("notify.update")).toBe("Notifikasi anggota diubah");
     expect(activityLabel("notify.delete")).toBe("Notifikasi anggota dihapus");
+  });
+});
+
+describe("member self-service notifications (#122)", () => {
+  const base = { send_report: true, send_reminders: false, wallets: [] as string[] };
+  it("validates the chat id; empty = stop", () => {
+    expect(myNotifySchema.parse({ ...base, chat_id: " 42 " }).chat_id).toBe("42");
+    expect(myNotifySchema.parse({ ...base, chat_id: "  " }).chat_id).toBe("");
+    expect(myNotifySchema.parse({ ...base, chat_id: "-100123" }).chat_id).toBe("-100123");
+    expect(() => myNotifySchema.parse({ ...base, chat_id: "abc" })).toThrow();
+    expect(() => myNotifySchema.parse({ ...base, chat_id: "0" })).toThrow();
+    // No user id / enabled flag can be smuggled in: zod strips unknown keys.
+    const parsed = myNotifySchema.parse({ ...base, chat_id: "1", user_id: U1, enabled: true });
+    expect(parsed).not.toHaveProperty("user_id");
+    expect(parsed).not.toHaveProperty("enabled");
+  });
+  it("plans delete / save / refuse wallets outside the fresh grants", () => {
+    const grants = { [W1]: "view" as const };
+    expect(planSelfNotify({ ...base, chat_id: "" }, grants)).toEqual({ action: "delete" });
+    expect(planSelfNotify({ ...base, chat_id: "" }, grants, { muted: true })).toEqual({
+      action: "keep",
+    });
+    expect(planSelfNotify({ ...base, chat_id: "5", wallets: [W1, W1] }, grants)).toEqual({
+      action: "save",
+      wallets: [W1],
+    });
+    expect(planSelfNotify({ ...base, chat_id: "5", wallets: [W2] }, grants)).toMatchObject({
+      action: "error",
+    });
+  });
+  it("acts only on the session's own member id", () => {
+    expect(selfNotifyUserId([W1], U1)).toBe(U1);
+    expect(selfNotifyUserId([], U1)).toBe(U1);
+    expect(() => selfNotifyUserId(null, U1)).toThrow(/TELEGRAM_ADMIN_CHAT_ID/);
+    expect(() => selfNotifyUserId([W1], null)).toThrow();
+  });
+  it("labels the self-service activity", () => {
+    expect(activityLabel("notify.self_update")).not.toBe("notify.self_update");
+    expect(activityLabel("notify.self_delete")).not.toBe("notify.self_delete");
   });
 });

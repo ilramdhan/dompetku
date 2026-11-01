@@ -14,7 +14,10 @@ import { isMissingTable, logActivity } from "./finance.server";
 import { grantsFromRows, type Level } from "./permissions";
 import {
   planRecipients,
+  planSelfNotify,
+  viewableWallets,
   withWalletLine,
+  type MyNotifyInput,
   type NotifyKind,
   type NotifyMember,
   type NotifyRecipientInput,
@@ -151,6 +154,146 @@ export async function deleteNotifySettings(userId: string) {
     throw new Error(del.error.message);
   }
   await logActivity("notify.delete", "notify_recipients", { name: row.username });
+  return { ok: true };
+}
+
+/* ---------------- Profile → Notifikasi Telegram (#122): a member's OWN row ---------------- */
+
+export type MyNotify = {
+  ready: boolean;
+  chat_id: string;
+  /** false = muted by the admin (members cannot unmute themselves). */
+  enabled: boolean;
+  send_report: boolean;
+  send_reminders: boolean;
+  wallets: string[];
+  /** Wallets the member may view right now (checklist options). */
+  options: { id: string; name: string }[];
+};
+
+/** Fresh wallet grants of a member (never the cached session, never client input). */
+async function freshGrants(userId: string): Promise<Record<string, Level> | null> {
+  const perms = await db()
+    .from("account_permissions")
+    .select("account_id, level")
+    .eq("user_id", userId);
+  if (perms.error) {
+    if (isMissingTable(perms.error)) return null;
+    throw new Error(perms.error.message);
+  }
+  return grantsFromRows(perms.data);
+}
+
+/** The signed-in member's own notification settings; `ready: false` before v22. */
+export async function getMyNotify(userId: string): Promise<MyNotify> {
+  const empty: MyNotify = {
+    ready: false,
+    chat_id: "",
+    enabled: true,
+    send_report: true,
+    send_reminders: true,
+    wallets: [],
+    options: [],
+  };
+  const grants = await freshGrants(userId);
+  if (!grants) return empty;
+  const rec = await db()
+    .from("notify_recipients")
+    .select("user_id, chat_id, enabled, send_report, send_reminders")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (rec.error) {
+    if (isMissingTable(rec.error)) return empty;
+    throw new Error(rec.error.message);
+  }
+  const wal = await db()
+    .from("notify_recipient_wallets")
+    .select("user_id, account_id")
+    .eq("user_id", userId);
+  if (wal.error) {
+    if (isMissingTable(wal.error)) return empty;
+    throw new Error(wal.error.message);
+  }
+  const view = viewableWallets(grants);
+  const names = view.length
+    ? await db().from("accounts").select("id, name").in("id", view)
+    : { data: [], error: null };
+  if (names.error) throw new Error(names.error.message);
+  const row = rec.data as RecipientRow | null;
+  return {
+    ready: true,
+    chat_id: row?.chat_id ?? "",
+    enabled: row?.enabled ?? true,
+    send_report: row?.send_report ?? true,
+    send_reminders: row?.send_reminders ?? true,
+    // Only show checked wallets the member can still view (revoked access wins).
+    wallets: (wal.data ?? [])
+      .map((w) => w.account_id)
+      .filter((id) => view.includes(id))
+      .sort(),
+    options: (names.data ?? [])
+      .map((a) => ({ id: a.id, name: a.name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
+/**
+ * Saves the signed-in member's own chat id, toggles and wallet checklist. The user id comes from
+ * the session, the checklist must stay inside their fresh grants, `enabled` (admin mute) is never
+ * changed here, and an empty chat id removes the row (stop receiving). These chat ids are never
+ * added to BOT_ALLOWED_CHAT_IDS: receiving notifications does not grant bot access.
+ */
+export async function saveMyNotify(userId: string, input: MyNotifyInput) {
+  const row = await memberOf(userId);
+  const grants = await freshGrants(row.id);
+  if (!grants) throw new Error(MISSING_V22);
+  const cur = await db()
+    .from("notify_recipients")
+    .select("user_id, enabled")
+    .eq("user_id", row.id)
+    .maybeSingle();
+  if (cur.error) {
+    if (isMissingTable(cur.error)) throw new Error(MISSING_V22);
+    throw new Error(cur.error.message);
+  }
+  const plan = planSelfNotify(input, grants, { muted: cur.data?.enabled === false });
+  if (plan.action === "error") throw new Error(plan.error);
+  if (plan.action === "keep") return { ok: true };
+  if (plan.action === "delete") {
+    const del = await db().from("notify_recipients").delete().eq("user_id", row.id);
+    if (del.error) {
+      if (isMissingTable(del.error)) throw new Error(MISSING_V22);
+      throw new Error(del.error.message);
+    }
+    await logActivity("notify.self_delete", "notify_recipients", { name: row.username });
+    return { ok: true };
+  }
+  const up = await db().from("notify_recipients").upsert(
+    {
+      user_id: row.id,
+      chat_id: input.chat_id,
+      send_report: input.send_report,
+      send_reminders: input.send_reminders,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (up.error) {
+    if (isMissingTable(up.error)) throw new Error(MISSING_V22);
+    throw new Error(up.error.message);
+  }
+  const del = await db().from("notify_recipient_wallets").delete().eq("user_id", row.id);
+  if (del.error) {
+    if (isMissingTable(del.error)) throw new Error(MISSING_V22);
+    throw new Error(del.error.message);
+  }
+  if (plan.wallets.length) {
+    const ins = await db()
+      .from("notify_recipient_wallets")
+      .insert(plan.wallets.map((account_id) => ({ user_id: row.id, account_id })));
+    if (ins.error) throw new Error(ins.error.message);
+  }
+  await logActivity("notify.self_update", "notify_recipients", { name: row.username });
   return { ok: true };
 }
 

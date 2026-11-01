@@ -67,7 +67,13 @@ vi.mock("../lib/app-settings.server", () => ({
   getAppSettings: async () => ({ timezone: "Asia/Jakarta" }),
 }));
 
-import { buildNotifications, saveNotifySettings } from "../lib/notify.server";
+import {
+  buildNotifications,
+  getMyNotify,
+  saveMyNotify,
+  saveNotifySettings,
+} from "../lib/notify.server";
+import { chatAllowed } from "../lib/bot.server";
 import { clearIntegrationsCache } from "../lib/integrations.server";
 import { reportText } from "../lib/bot.server";
 import { computeReminders, remindersText, today } from "../lib/finance.server";
@@ -250,5 +256,59 @@ describe("saveNotifySettings (v22)", () => {
     await expect(
       saveNotifySettings({ ...base, user_id: "22222222-2222-4222-8222-222222222222", wallets: [] }),
     ).rejects.toThrow(/TELEGRAM_ADMIN_CHAT_ID/);
+  });
+});
+
+describe("member self-service (#122)", () => {
+  const mine = { chat_id: "777", send_report: true, send_reminders: false, wallets: [TOKO] };
+  it("reads only the member's own row and viewable wallets", async () => {
+    const r = await getMyNotify(DINI);
+    expect(r).toMatchObject({ ready: true, chat_id: "-100555", wallets: [] });
+    expect(r.options).toEqual([{ id: TOKO, name: "Toko Sembako" }]);
+  });
+  it("saves the own row, keeps the admin's enabled flag, never touches the bot allow-list", async () => {
+    process.env["BOT_ALLOWED_CHAT_IDS"] = "111";
+    clearIntegrationsCache();
+    tables["notify_recipients"]![0].enabled = true;
+    await saveMyNotify(DINI, mine);
+    expect(tables["notify_recipients"]).toHaveLength(1);
+    expect(tables["notify_recipients"]![0]).toMatchObject({
+      user_id: DINI,
+      chat_id: "777",
+      enabled: true,
+      send_reminders: false,
+    });
+    expect(tables["notify_recipient_wallets"]).toEqual([{ user_id: DINI, account_id: TOKO }]);
+    expect(await chatAllowed("777")).toBe(false);
+    expect(await chatAllowed("111")).toBe(true);
+    expect(tables["integration_settings"] ?? []).toEqual([]);
+    delete process.env["BOT_ALLOWED_CHAT_IDS"];
+    clearIntegrationsCache();
+  });
+  it("refuses wallets outside access, the owner, and before v22", async () => {
+    await expect(saveMyNotify(DINI, { ...mine, wallets: [BCA] })).rejects.toThrow(/luar akses/);
+    tables["app_users"]!.push({
+      id: "22222222-2222-4222-8222-222222222222",
+      username: "owner",
+      role: "admin",
+      is_active: true,
+    });
+    await expect(saveMyNotify("22222222-2222-4222-8222-222222222222", mine)).rejects.toThrow(
+      /TELEGRAM_ADMIN_CHAT_ID/,
+    );
+    missing.add("notify_recipients");
+    await expect(saveMyNotify(DINI, mine)).rejects.toThrow(/v22/);
+    expect((await getMyNotify(DINI)).ready).toBe(false);
+  });
+  it("empty chat id stops notifications, but never lifts an admin mute", async () => {
+    await saveMyNotify(DINI, { ...mine, chat_id: "" });
+    expect(tables["notify_recipients"]).toEqual([]);
+    tables["notify_recipients"] = [
+      { user_id: DINI, chat_id: "5", enabled: false, send_report: true, send_reminders: true },
+    ];
+    await saveMyNotify(DINI, { ...mine, chat_id: "" });
+    expect(tables["notify_recipients"]).toHaveLength(1);
+    await saveMyNotify(DINI, mine);
+    expect(tables["notify_recipients"]![0]).toMatchObject({ chat_id: "777", enabled: false });
   });
 });

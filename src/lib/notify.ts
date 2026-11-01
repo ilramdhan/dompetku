@@ -148,3 +148,57 @@ export const notifyRecipientSchema = z.object({
   wallets: z.array(z.string().uuid()).max(500),
 });
 export type NotifyRecipientInput = z.output<typeof notifyRecipientSchema>;
+
+/**
+ * Profile → Notifikasi Telegram (#122): what a member saves for THEMSELVES. No user id (it comes
+ * from the session) and no `enabled` flag (the admin's mute stays). Empty chat id = stop receiving
+ * notifications (the row is removed).
+ */
+export const myNotifySchema = z.object({
+  chat_id: z
+    .string()
+    .max(40)
+    .refine((v) => !v.trim() || normalizeChatId(v) !== null, { message: "Chat ID tidak valid" })
+    .transform((v) => (v.trim() ? normalizeChatId(v)! : "")),
+  send_report: z.boolean(),
+  send_reminders: z.boolean(),
+  wallets: z.array(z.string().uuid()).max(500),
+});
+export type MyNotifyInput = z.output<typeof myNotifySchema>;
+
+/**
+ * What a member's own save does: an empty chat id removes their row, otherwise the row is
+ * upserted with a de-duplicated, sorted checklist. Wallets they cannot view right now (fresh
+ * grants, never client input) are refused — same rule as the admin dialog, no silent widening.
+ * A row the admin muted (`enabled = false`) is never deleted by the member (they already receive
+ * nothing, and delete + re-save would silently undo the mute): an empty chat id is then a no-op.
+ */
+export function planSelfNotify(
+  input: MyNotifyInput,
+  grants: Readonly<Record<string, Level>>,
+  opts: { muted?: boolean } = {},
+):
+  | { action: "delete" }
+  | { action: "keep" }
+  | { action: "save"; wallets: string[] }
+  | { action: "error"; error: string } {
+  if (!input.chat_id) return opts.muted ? { action: "keep" } : { action: "delete" };
+  const view = new Set(viewableWallets(grants));
+  const wallets = [...new Set(input.wallets)].sort();
+  if (wallets.some((id) => !view.has(id)))
+    return { action: "error", error: "Dompet di luar akses anggota" };
+  return { action: "save", wallets };
+}
+
+/**
+ * The user id a self-service notification fn acts on: always the session's own id, and only for a
+ * member (scope non-null). The owner (scope null = all wallets) uses TELEGRAM_ADMIN_CHAT_ID.
+ */
+export function selfNotifyUserId(
+  scope: readonly string[] | null,
+  sessionUserId: string | null | undefined,
+): string {
+  if (scope === null || !sessionUserId)
+    throw new Error("Pemilik memakai TELEGRAM_ADMIN_CHAT_ID di Pengaturan → Integrasi");
+  return sessionUserId;
+}
