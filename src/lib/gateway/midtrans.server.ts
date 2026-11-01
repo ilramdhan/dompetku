@@ -18,6 +18,7 @@ import {
   snapRequestBody,
 } from "./midtrans";
 import type { GatewayConfig, PaymentGateway, WebhookCheck } from "./types";
+import { parseMdrRules, type MdrRules } from "./mdr";
 
 const TIMEOUT_MS = 10_000;
 
@@ -27,6 +28,12 @@ const TIMEOUT_MS = 10_000;
  * (MIDTRANS_API_BASE / MIDTRANS_SNAP_BASE) are env-only, for local E2E against a mock server, and
  * are ignored in production mode.
  */
+/** Parsed MIDTRANS_FEES, or null when empty/invalid (an invalid schedule books no MDR). */
+function feeRules(raw: string | null | undefined): MdrRules | null {
+  const r = parseMdrRules(raw);
+  return r.ok && Object.keys(r.rules).length ? r.rules : null;
+}
+
 export async function midtransConfig(): Promise<GatewayConfig | null> {
   const { getIntegrations } = await import("../integrations.server");
   const v = await getIntegrations([
@@ -34,6 +41,8 @@ export async function midtransConfig(): Promise<GatewayConfig | null> {
     "MIDTRANS_SERVER_KEY",
     "MIDTRANS_CLIENT_KEY",
     "MIDTRANS_PRODUCTION",
+    "MIDTRANS_FEES",
+    "MIDTRANS_PARTIAL",
   ]);
   if (!parseBool(v.MIDTRANS_ENABLED, false)) return null;
   const serverKey = v.MIDTRANS_SERVER_KEY?.trim();
@@ -55,6 +64,8 @@ export async function midtransConfig(): Promise<GatewayConfig | null> {
     apiBase: api ?? hosts.api,
     snapBase: snap ?? hosts.snap,
     overridden: !!(api || snap),
+    fees: feeRules(v.MIDTRANS_FEES),
+    partial: parseBool(v.MIDTRANS_PARTIAL, false),
   };
 }
 

@@ -179,7 +179,14 @@ export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoiceV
     const gw = await (
       await import("./gateway/payments.server")
     ).publicGatewayFor(id, inv.data.status, pub.remaining, demo.isDemo());
-    return { ...pub, payment: { ...payment, gateway: gw.available } };
+    return {
+      ...pub,
+      payment: {
+        ...payment,
+        gateway: gw.available,
+        ...(gw.partial ? { gateway_partial: true, gateway_min: gw.min } : {}),
+      },
+    };
   } catch (e) {
     try {
       (await import("./monitoring.server")).logError("public:invoice", e);

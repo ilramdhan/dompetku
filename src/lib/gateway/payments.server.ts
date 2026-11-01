@@ -19,13 +19,17 @@
 import { randomBytes } from "crypto";
 import { db } from "../db.server";
 import { INVOICE_CATEGORY } from "../invoices";
+import { FEE_CATEGORY } from "../fees";
+import { mdrExternalId, mdrFee } from "./mdr";
 import { snapJsUrl } from "./midtrans";
 import { midtrans, midtransConfig } from "./midtrans.server";
 import {
   DEAD_STATES,
   PAID_STATES,
+  GATEWAY_MIN_PARTIAL,
   amountsMatch,
   cappedRefund,
+  chargeAmount,
   duplicateRefundOk,
   gatewayAmount,
   gatewayAvailable,
@@ -145,17 +149,22 @@ export async function publicGatewayFor(
   status: string,
   remaining: number,
   demo: boolean,
-): Promise<{ available: boolean }> {
+): Promise<{ available: boolean; partial: boolean; min: number | null }> {
+  const off = { available: false, partial: false, min: null };
   try {
-    if (demo) return { available: false };
+    if (demo) return off;
     const c = await midtransConfig();
-    if (!c) return { available: false };
+    if (!c) return off;
     const ready = await gatewayReady();
-    if (ready && (await refundHeldInvoices([invoiceId])).has(invoiceId))
-      return { available: false };
-    return { available: gatewayAvailable({ ready, configured: true, demo, status, remaining }) };
+    if (ready && (await refundHeldInvoices([invoiceId])).has(invoiceId)) return off;
+    const available = gatewayAvailable({ ready, configured: true, demo, status, remaining });
+    if (!available) return off;
+    // #124: partial amounts only when enabled and the remaining amount is above the minimum.
+    const full = gatewayAmount(remaining) ?? 0;
+    const partial = !!c.partial && full > GATEWAY_MIN_PARTIAL;
+    return { available, partial, min: partial ? GATEWAY_MIN_PARTIAL : null };
   } catch {
-    return { available: false };
+    return off;
   }
 }
 
@@ -171,13 +180,16 @@ export type PublicPayStart = {
 
 /**
  * Public "Bayar sekarang": rate limit (IP, token) → hashed token lookup → amount = remaining
- * (server) → reuse a live pending order with the same amount, else create a Snap order.
- * Throws only PAY_* messages.
+ * (server) or, with MIDTRANS_PARTIAL (#124), a requested whole-rupiah amount between the minimum
+ * and the remaining amount (`chargeAmount`, re-checked server-side) → reuse a live pending order
+ * with the same amount, else create a Snap order (other pending amounts are expired first, so one
+ * live amount per invoice). Throws only PAY_* messages.
  */
 export async function startGatewayPayment(
   rawToken: unknown,
   ip: string,
   siteOrigin: string | null,
+  requested: number | null = null,
 ): Promise<PublicPayStart> {
   const { activeShareInvoiceId, hashShareToken } = await import("../invoice-share.server");
   const { normalizeShareToken } = await import("../invoice-share");
@@ -201,7 +213,7 @@ export async function startGatewayPayment(
   if (!inv || (inv.status !== "unpaid" && inv.status !== "partial"))
     throw new Error(PAY_UNAVAILABLE);
   if ((await refundHeldInvoices([inv.id])).has(inv.id)) throw new Error(PAY_UNAVAILABLE);
-  const amount = gatewayAmount(remainingOf(inv.total, inv.paid));
+  const amount = chargeAmount(remainingOf(inv.total, inv.paid), requested, !!c.partial);
   if (amount === null) throw new Error(PAY_UNAVAILABLE);
 
   const answer = (r: { snap_token: string; redirect_url: string }): PublicPayStart => ({
@@ -504,11 +516,62 @@ async function bookOnce(row: GatewayRow, state: GatewayState) {
       throw e;
     }
   }
+  // #124: the MDR fee of this order, once (external id), before the row is linked so a crash in
+  // between retries it on the next sync (the prior-payment path above). Never fails the booking.
+  await bookMdr(row, state);
   await table()
     .update({ payment_id: paymentId, last_error: null, updated_at: new Date().toISOString() })
     .eq("id", row.id)
     .is("payment_id", null);
   return { booked, row: (await loadGatewayRow({ id: row.id })) ?? row };
+}
+
+/**
+ * Books the Midtrans MDR of a paid order as an expense in category "Biaya Admin" on the invoice's
+ * wallet, computed from MIDTRANS_FEES (Midtrans' status API has no fee field). Idempotent via
+ * `external_id = invoice_mdr:<row id>`; refunds never reverse or repeat it. Runs only while the
+ * row is being linked to its payment (never retroactively for rows booked earlier). Best effort:
+ * errors are logged, the payment booking stands. Returns the fee newly booked (0 otherwise).
+ */
+export async function bookMdr(row: GatewayRow, state: GatewayState): Promise<number> {
+  try {
+    const c = await midtransConfig();
+    const fee = mdrFee(c?.fees, state.paymentType ?? row.payment_type, row.gross_amount);
+    if (!fee) return 0;
+    const s = await import("../invoices.server");
+    const inv = await s.loadInvoice(row.invoice_id);
+    if (!inv?.account_id) return 0;
+    const f = await fin();
+    const type = state.paymentType ?? row.payment_type ?? "midtrans";
+    const res = await f.createFromExternal(
+      {
+        kind: "expense",
+        amount: fee,
+        currency: "IDR",
+        category: FEE_CATEGORY,
+        account: null,
+        to_account: null,
+        description: `Biaya MDR Midtrans · ${inv.number}`.slice(0, 200),
+        merchant: "Midtrans",
+        date: f.today(),
+        source: "web",
+        items: null,
+        notes: `Midtrans MDR ${type} · order ${row.order_id}`.slice(0, 500),
+        external_id: mdrExternalId(row.id),
+        receipt_path: null,
+        pocket: null,
+      },
+      { account_id: inv.account_id },
+    );
+    return res.duplicate ? 0 : fee;
+  } catch (e) {
+    try {
+      (await import("../monitoring.server")).logError("gateway:mdr", e);
+    } catch {
+      /* ignore */
+    }
+    return 0;
+  }
 }
 
 /**
@@ -632,13 +695,24 @@ export async function listGatewayTransactions(invoiceId: string) {
     throw new Error(res.error.message);
   }
   const c = await midtransConfig().catch(() => null);
+  const rows = (res.data ?? []) as any[];
+  // #124: booked MDR per row (by its idempotent external id); empty on any error.
+  const mdr = new Map<string, number>();
+  if (rows.length) {
+    const ids = rows.map((r) => mdrExternalId(r.id));
+    const tx = await db().from("transactions").select("external_id, amount").in("external_id", ids);
+    if (!tx.error)
+      for (const t of (tx.data ?? []) as { external_id: string | null; amount: number }[])
+        if (t.external_id) mdr.set(t.external_id, Number(t.amount));
+  }
   return {
     ready: true as const,
     configured: !!c,
-    items: ((res.data ?? []) as any[]).map((r) => ({
+    items: rows.map((r) => ({
       ...r,
       gross_amount: Number(r.gross_amount),
       refunded_amount: Number(r.refunded_amount ?? 0),
+      mdr_amount: mdr.get(mdrExternalId(r.id)) ?? 0,
     })),
   };
 }

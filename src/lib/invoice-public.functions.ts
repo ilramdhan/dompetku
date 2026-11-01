@@ -13,8 +13,14 @@ import { createServerFn } from "@tanstack/react-start";
  */
 export const getPublicInvoice = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => {
-    const token = (d as { token?: unknown } | null)?.token;
-    return { token: typeof token === "string" ? token.slice(0, 128) : "" };
+    const o = (d ?? {}) as { token?: unknown; amount?: unknown };
+    // #124: optional partial amount; only a safe integer passes, the server re-checks it against
+    // the remaining amount (chargeAmount) — never trusted as is.
+    const amount =
+      typeof o.amount === "number" && Number.isSafeInteger(o.amount) && o.amount > 0
+        ? o.amount
+        : null;
+    return { token: typeof o.token === "string" ? o.token.slice(0, 128) : "", amount };
   })
   .handler(async ({ data }) => {
     const { publicInvoiceByToken } = await import("./invoice-share.server");
@@ -93,8 +99,14 @@ export const submitInvoiceProof = createServerFn({ method: "POST" })
  */
 export const createGatewayPayment = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => {
-    const token = (d as { token?: unknown } | null)?.token;
-    return { token: typeof token === "string" ? token.slice(0, 128) : "" };
+    const o = (d ?? {}) as { token?: unknown; amount?: unknown };
+    // #124: optional partial amount; only a safe integer passes, the server re-checks it against
+    // the remaining amount (chargeAmount) — never trusted as is.
+    const amount =
+      typeof o.amount === "number" && Number.isSafeInteger(o.amount) && o.amount > 0
+        ? o.amount
+        : null;
+    return { token: typeof o.token === "string" ? o.token.slice(0, 128) : "", amount };
   })
   .handler(async ({ data }) => {
     const gw = await import("./gateway/payments.server");
@@ -108,7 +120,12 @@ export const createGatewayPayment = createServerFn({ method: "POST" })
       const { seoConfig } = await import("./seo.server");
       // Finish URL only from the configured PUBLIC_SITE_URL (never the request Host header);
       // without it Midtrans uses the Finish Redirect URL from its dashboard.
-      return await gw.startGatewayPayment(data.token, clientIp(req.headers), seoConfig().siteUrl);
+      return await gw.startGatewayPayment(
+        data.token,
+        clientIp(req.headers),
+        seoConfig().siteUrl,
+        data.amount,
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (allowed.has(msg)) throw new Error(msg);

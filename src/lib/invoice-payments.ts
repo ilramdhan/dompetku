@@ -187,6 +187,9 @@ export type PublicPayment = {
   upload_off: string | null;
   /** v25: "Bayar sekarang" (Midtrans) available. */
   gateway?: boolean;
+  /** #124: the customer may enter a partial amount (MIDTRANS_PARTIAL), from `gateway_min` up. */
+  gateway_partial?: boolean;
+  gateway_min?: number | null;
 };
 export const PUBLIC_PAYMENT_KEYS = ["methods", "pending", "upload", "upload_off"] as const;
 

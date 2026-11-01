@@ -85,6 +85,10 @@ export type GatewayConfig = {
   snapBase: string;
   /** True when a test-only base URL override is active (the browser then uses redirect_url). */
   overridden: boolean;
+  /** #124: MDR schedule from MIDTRANS_FEES (null/absent = no MDR booked). */
+  fees?: import("./mdr").MdrRules | null;
+  /** #124: MIDTRANS_PARTIAL — customers may pay part of the remaining amount. */
+  partial?: boolean;
 };
 
 export type CreatePaymentInput = {
@@ -167,6 +171,30 @@ export function gatewayAmount(remaining: number | string): number | null {
   const r = Math.round((Number(remaining) || 0) * 100) / 100;
   if (!(r >= 1) || !Number.isInteger(r) || r > 1e12) return null;
   return r;
+}
+
+/** Smallest partial gateway payment (rupiah); the last payment may be smaller (= remaining). */
+export const GATEWAY_MIN_PARTIAL = 10_000;
+
+/**
+ * Amount to charge for a "Bayar sekarang" request (issue #124). `requested` empty → the whole
+ * remaining amount. With partial payments on, a whole-rupiah amount between
+ * min(GATEWAY_MIN_PARTIAL, remaining) and the remaining amount is accepted; otherwise only the
+ * exact remaining amount. null = refused (caller answers a fixed public error).
+ */
+export function chargeAmount(
+  remaining: number | string,
+  requested: number | null | undefined,
+  partial: boolean,
+): number | null {
+  const full = gatewayAmount(remaining);
+  if (full === null) return null;
+  if (requested === null || requested === undefined) return full;
+  if (typeof requested !== "number" || !Number.isInteger(requested)) return null;
+  if (requested === full) return full;
+  if (!partial) return null;
+  if (requested > full || requested < Math.min(GATEWAY_MIN_PARTIAL, full)) return null;
+  return requested;
 }
 
 export const amountsMatch = (a: number | string, b: number | string) =>

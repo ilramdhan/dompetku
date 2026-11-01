@@ -40,6 +40,8 @@ type GatewayItem = {
   payment_id: string | null;
   last_error: string | null;
   refund_hold?: boolean;
+  /** #124: booked MDR ("Biaya Admin" expense), 0 when none. */
+  mdr_amount?: number;
   created_at: string;
 };
 
@@ -142,6 +144,13 @@ export function GatewayPanel({ invoiceId, locale }: { invoiceId: string; locale:
                 </Badge>
               </span>
             </div>
+            {g.mdr_amount ? (
+              <p className="text-xs text-muted-foreground">
+                {t("Biaya MDR")}: <span className="num">{money(g.mdr_amount)}</span> ·{" "}
+                {t("diterima bersih")}:{" "}
+                <span className="num">{money(g.gross_amount - g.mdr_amount)}</span>
+              </p>
+            ) : null}
             {g.refunded_amount > 0 ? (
               <p className="text-xs text-warning">
                 {t("Dikembalikan")}: <span className="num">{money(g.refunded_amount)}</span>

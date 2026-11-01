@@ -8,6 +8,7 @@
  * APP_TOTP_SECRET, DEMO_MODE, SENTRY_DSN, SETTINGS_ENCRYPTION_KEY) are deliberately NOT here:
  * they must exist before the database can be read, or they guard access to the settings themselves.
  */
+import { formatMdrRules, mdrRulesProblem } from "./gateway/mdr";
 
 export type IntegrationGroup = "telegram" | "ai" | "email" | "n8n" | "payment";
 export type IntegrationSource = "db" | "env" | "default" | "none";
@@ -236,6 +237,25 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
     default: "false",
     validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
   },
+  // #124: MDR schedule (Midtrans sends no fee field) and partial "Bayar sekarang" amounts.
+  {
+    key: "MIDTRANS_FEES",
+    group: "payment",
+    secret: false,
+    label: "Biaya MDR Midtrans",
+    help: 'Per metode, mis. "qris=0.7%; gopay=2%; credit_card=2.9%+2000; bank_transfer=4000; *=0" (termasuk PPN bila ada). Dicatat sebagai pengeluaran "Biaya Admin" sekali per pembayaran. Kosong = tidak dicatat.',
+    placeholder: "qris=0.7%; gopay=2%; bank_transfer=4000",
+    validate: (v) => mdrRulesProblem(v),
+  },
+  {
+    key: "MIDTRANS_PARTIAL",
+    group: "payment",
+    secret: false,
+    label: "Izinkan bayar sebagian lewat Midtrans",
+    help: "true = pelanggan boleh memasukkan jumlah (min. Rp10.000, maks. sisa tagihan) di tombol Bayar sekarang. false = selalu seluruh sisa (default).",
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
 ] as const;
 
 export type IntegrationKey =
@@ -255,7 +275,9 @@ export type IntegrationKey =
   | "MIDTRANS_ENABLED"
   | "MIDTRANS_SERVER_KEY"
   | "MIDTRANS_CLIENT_KEY"
-  | "MIDTRANS_PRODUCTION";
+  | "MIDTRANS_PRODUCTION"
+  | "MIDTRANS_FEES"
+  | "MIDTRANS_PARTIAL";
 
 export const INTEGRATION_KEYS = INTEGRATIONS.map((d) => d.key) as IntegrationKey[];
 export const INTEGRATION_GROUPS: readonly IntegrationGroup[] = [
@@ -301,8 +323,15 @@ export function validateIntegration(
   // Lists are stored normalised ("a, b" → "a,b"); BOT_TEXT_AI is case-insensitive.
   if (key === "BOT_ALLOWED_CHAT_IDS" || key === "EMAIL_TO")
     return { ok: true, value: splitList(value).join(",") };
-  if (key === "BOT_TEXT_AI" || key === "MIDTRANS_ENABLED" || key === "MIDTRANS_PRODUCTION")
+  if (
+    key === "BOT_TEXT_AI" ||
+    key === "MIDTRANS_ENABLED" ||
+    key === "MIDTRANS_PRODUCTION" ||
+    key === "MIDTRANS_PARTIAL"
+  )
     return { ok: true, value: value.toLowerCase() };
+  // MDR schedule is stored normalised: "QRIS = 0.7 %" → "qris=0.7%".
+  if (key === "MIDTRANS_FEES") return { ok: true, value: formatMdrRules(value) };
   return { ok: true, value };
 }
 

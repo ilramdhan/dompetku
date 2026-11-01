@@ -3,8 +3,11 @@ import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { CreditCard, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { createGatewayPayment } from "@/lib/invoice-public.functions";
 import { money } from "@/lib/format";
+import { chargeAmount } from "@/lib/gateway/types";
 import { useI18n } from "@/lib/i18n";
 
 /*
@@ -80,12 +83,15 @@ export function PayNowButton({
   amount,
   currency,
   returned,
+  partialMin = null,
 }: {
   token: string;
   amount: number;
   currency: string;
   /** Came back from Snap (`?gw=1`): untrusted, only shows the neutral "processing" note. */
   returned: boolean;
+  /** #124: minimum partial amount when the seller allows partial payments (null = full only). */
+  partialMin?: number | null;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -93,6 +99,11 @@ export function PayNowButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(returned);
+  const [custom, setCustom] = useState("");
+  // Empty = the whole remaining amount; the server re-validates whatever is sent.
+  const requested = partialMin !== null && custom.trim() ? Number(custom) : null;
+  const invalid = requested !== null && chargeAmount(amount, requested, true) === null;
+  const charge = requested ?? amount;
 
   useEffect(() => {
     if (returned) setProcessing(true);
@@ -102,7 +113,10 @@ export function PayNowButton({
     setBusy(true);
     setError(null);
     try {
-      const r = await start({ data: { token } });
+      if (invalid) return;
+      const r = await start({
+        data: requested !== null ? { token, amount: requested } : { token },
+      });
       const ok = r.snap_js && r.client_key ? await loadSnap(r.snap_js, r.client_key) : false;
       const snap = (window as SnapWindow).snap;
       if (ok && snap) {
@@ -135,10 +149,15 @@ export function PayNowButton({
         <p className="text-sm text-muted-foreground">
           {t("Kartu, e-wallet, QRIS, atau virtual account lewat Midtrans.")}{" "}
           <span className="num font-semibold text-foreground">
-            {money(amount, currency, { reveal: true })}
+            {money(charge, currency, { reveal: true })}
           </span>
         </p>
-        <Button type="button" onClick={() => void pay()} disabled={busy} className="shrink-0">
+        <Button
+          type="button"
+          onClick={() => void pay()}
+          disabled={busy || invalid}
+          className="shrink-0"
+        >
           {busy ? (
             <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden />
           ) : (
@@ -147,6 +166,29 @@ export function PayNowButton({
           {t("Bayar sekarang")}
         </Button>
       </div>
+      {partialMin !== null ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="paynow-amount">{t("Jumlah yang dibayar (opsional)")}</Label>
+          <Input
+            id="paynow-amount"
+            inputMode="numeric"
+            autoComplete="off"
+            className="num max-w-xs"
+            placeholder={String(amount)}
+            value={custom}
+            onChange={(e) => setCustom(e.target.value.replace(/[^0-9]/g, "").slice(0, 13))}
+            aria-invalid={invalid || undefined}
+          />
+          <p className={invalid ? "text-xs text-expense" : "text-xs text-muted-foreground"}>
+            {t("Boleh bayar sebagian: minimal")}{" "}
+            <span className="num">
+              {money(Math.min(partialMin, amount), currency, { reveal: true })}
+            </span>
+            {", "}
+            {t("maksimal sisa tagihan. Kosongkan untuk melunasi.")}
+          </p>
+        </div>
+      ) : null}
       {processing ? (
         <p
           role="status"

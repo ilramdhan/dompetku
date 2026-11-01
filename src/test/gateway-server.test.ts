@@ -68,14 +68,17 @@ vi.mock("../lib/db.server", () => ({ db: () => ({ from: (t: string) => query(t) 
 const booked: number[] = [];
 let bookGate: Promise<void> = Promise.resolve();
 let bookError: string | null = null;
+let invAccount: string | null = null;
+let payment: any = null;
 vi.mock("../lib/invoices.server", () => ({
   loadInvoice: async () => ({
     id: "inv",
     number: "INV-1",
     customer_name: "Budi",
     status: "unpaid",
+    account_id: invAccount,
   }),
-  loadPayment: async () => null,
+  loadPayment: async () => payment,
   syncInvoice: async () => ({}),
   bookPayment: async (_inv: any, p: any) => {
     await bookGate;
@@ -86,7 +89,15 @@ vi.mock("../lib/invoices.server", () => ({
     return { invoice: {}, paymentId: id };
   },
 }));
+const external: any[] = [];
 vi.mock("../lib/finance.server", () => ({
+  createFromExternal: async (t: any, opts: any) => {
+    const dup = external.find((x) => x.external_id === t.external_id);
+    if (dup) return { transaction: dup, duplicate: true };
+    const tx = { ...t, account_id: opts?.account_id ?? null };
+    external.push(tx);
+    return { transaction: tx, duplicate: false };
+  },
   isMissingTable: (e: any) => e?.code === "42P01",
   logActivity: async () => undefined,
   today: () => "2026-10-30",
@@ -98,8 +109,9 @@ vi.mock("../lib/rate-limit.server", () => ({
   subjectHash: (v: string) => v,
   rateHit: async (_r: any, s: string) => (rateCalls.push(s), true),
 }));
+let fees: any = null;
 vi.mock("../lib/gateway/midtrans.server", () => ({
-  midtransConfig: async () => ({ serverKey: "SB-Mid-server-TEST", overridden: false }),
+  midtransConfig: async () => ({ serverKey: "SB-Mid-server-TEST", overridden: false, fees }),
   midtrans: {
     verifyWebhook: (_c: any, b: any) =>
       b?.good ? { ok: true, orderId: "INV-1-a" } : { ok: false, status: 401, error: "x" },
@@ -148,6 +160,10 @@ beforeEach(() => {
   bookError = null;
   failSelect = null;
   rateCalls.length = 0;
+  external.length = 0;
+  fees = null;
+  invAccount = null;
+  payment = null;
 });
 
 describe("booking claim", () => {
@@ -236,5 +252,82 @@ describe("delete guards fail closed", () => {
     failSelect = "gateway_transactions";
     await expect(releaseInvoiceGateway("inv")).rejects.toThrow("boom");
     await expect(assertPaymentNotGateway("p")).rejects.toThrow("boom");
+  });
+});
+
+describe("MDR fee (#124)", () => {
+  const mdrRows = () => external.filter((x) => String(x.external_id).startsWith("invoice_mdr:"));
+
+  it("books nothing without a schedule (unchanged v25 behaviour)", async () => {
+    invAccount = "acc";
+    await applyState(baseRow() as any, state);
+    expect(booked).toEqual([150000]);
+    expect(mdrRows()).toEqual([]);
+  });
+
+  it("books the fee once as a Biaya Admin expense on the invoice wallet", async () => {
+    invAccount = "acc";
+    fees = { qris: { percent: 0.7, flat: 0 } };
+    let open!: () => void;
+    bookGate = new Promise((r) => (open = r));
+    const a = applyState(baseRow() as any, state);
+    const b = applyState(baseRow() as any, state);
+    await new Promise((r) => setTimeout(r, 0));
+    open();
+    await Promise.all([a, b]);
+    // Re-sync of an already linked row books nothing new.
+    await applyState({ ...tables["gateway_transactions"]![0]! } as any, state);
+    expect(booked).toEqual([150000]);
+    expect(mdrRows()).toHaveLength(1);
+    expect(mdrRows()[0]).toMatchObject({
+      kind: "expense",
+      amount: 1050,
+      category: "Biaya Admin",
+      account_id: "acc",
+      external_id: "invoice_mdr:g1",
+    });
+  });
+
+  it("retries the fee after a crash between booking and linking, without a second payment", async () => {
+    invAccount = "acc";
+    fees = { "*": { percent: 0, flat: 4000 } };
+    const g = tables["gateway_transactions"]![0]!;
+    Object.assign(g, {
+      status: "success",
+      claimed_at: new Date(Date.now() - 3_600_000).toISOString(),
+    });
+    tables["invoice_payments"]!.push({ id: "old", invoice_id: "inv", reference: "INV-1-a" });
+    await applyState({ ...g } as any, state);
+    expect(booked).toEqual([]);
+    expect(mdrRows()).toHaveLength(1);
+    expect(mdrRows()[0]!.amount).toBe(4000);
+  });
+
+  it("refunds never book, repeat or reverse the fee", async () => {
+    invAccount = "acc";
+    fees = { qris: { percent: 0.7, flat: 0 } };
+    await applyState(baseRow() as any, state);
+    payment = { id: "pay1", amount: 150000 };
+    tables["invoice_payments"]![0]!.amount = 150000;
+    const g = tables["gateway_transactions"]![0]!;
+    await applyState({ ...g } as any, {
+      ...state,
+      status: "refunded",
+      providerStatus: "refund",
+      refundedAmount: 150000,
+      refunds: [{ key: "rf-g1-1", amount: 150000, at: null }],
+    });
+    expect(mdrRows()).toHaveLength(1);
+    expect(
+      external.filter((x) => String(x.external_id).startsWith("invoice_refund:")),
+    ).toHaveLength(1);
+    expect(external.filter((x) => x.kind === "income")).toEqual([]);
+  });
+
+  it("never fails the booking when the fee cannot be booked (no wallet)", async () => {
+    fees = { qris: { percent: 0.7, flat: 0 } };
+    const r = await applyState(baseRow() as any, state);
+    expect(r.booked).toBe(true);
+    expect(mdrRows()).toEqual([]);
   });
 });

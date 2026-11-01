@@ -1546,6 +1546,22 @@ const DICT: Record<string, string> = {
   "Mode production Midtrans": "Midtrans production mode",
   "false = sandbox (uji coba, default). true = transaksi uang sungguhan; pakai key production.":
     "false = sandbox (testing, default). true = real money; use production keys.",
+  /* Midtrans MDR fees + partial payments (#124) */
+  "Biaya MDR Midtrans": "Midtrans MDR fees",
+  'Per metode, mis. "qris=0.7%; gopay=2%; credit_card=2.9%+2000; bank_transfer=4000; *=0" (termasuk PPN bila ada). Dicatat sebagai pengeluaran "Biaya Admin" sekali per pembayaran. Kosong = tidak dicatat.':
+    'Per method, e.g. "qris=0.7%; gopay=2%; credit_card=2.9%+2000; bank_transfer=4000; *=0" (include VAT where it applies). Booked once per payment as a "Biaya Admin" expense. Empty = not booked.',
+  "Izinkan bayar sebagian lewat Midtrans": "Allow partial payments through Midtrans",
+  "true = pelanggan boleh memasukkan jumlah (min. Rp10.000, maks. sisa tagihan) di tombol Bayar sekarang. false = selalu seluruh sisa (default).":
+    "true = customers may enter an amount (min. Rp10,000, max. the remaining balance) on Pay now. false = always the full remaining balance (default).",
+  "Terlalu banyak aturan biaya": "Too many fee rules",
+  "Format biaya: metode=persen%+tetap": "Fee format: method=percent%+flat",
+  "Persentase biaya harus di bawah 50%": "Fee percentage must be below 50%",
+  "Jumlah yang dibayar (opsional)": "Amount to pay (optional)",
+  "Boleh bayar sebagian: minimal": "Partial payment allowed: at least",
+  "maksimal sisa tagihan. Kosongkan untuk melunasi.":
+    "at most the remaining balance. Leave empty to pay in full.",
+  "Biaya MDR": "MDR fee",
+  "diterima bersih": "net received",
   "Payment gateway (Midtrans)": "Payment gateway (Midtrans)",
   "Butuh skema v25. Pasang Payment Notification URL di dashboard Midtrans ke":
     "Needs schema v25. Set the Payment Notification URL in the Midtrans dashboard to",
