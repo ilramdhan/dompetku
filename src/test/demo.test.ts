@@ -119,6 +119,8 @@ describe("server guards", () => {
       method: "POST",
       headers: { "x-forwarded-for": "9.9.9.9" },
     });
+    // Keyed by the connection address (`request.ip`); without one the per-IP rule is skipped.
+    Object.defineProperty(post, "ip", { value: "203.0.113.9" });
     const get = new Request("https://x/_serverFn/abc", {
       headers: { "x-forwarded-for": "9.9.9.9" },
     });

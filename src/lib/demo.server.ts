@@ -2,7 +2,7 @@
  * Server-side demo guards. Every export is a no-op unless DEMO_MODE=true, so the private
  * instance (which never sets it) is unaffected.
  */
-import { requestIp } from "./client-ip.server";
+import { ipRateSubject, requestIp } from "./client-ip.server";
 import {
   createRateLimiter,
   DEMO_CAP_REACHED,
@@ -52,7 +52,9 @@ const limiter = createRateLimiter(DEMO_RATE_LIMIT, DEMO_RATE_WINDOW_MS);
 /** Request-middleware hook: a 429 text Response when the caller's IP exceeds the write limit. */
 export function demoRateLimit(request: Request, handlerType: string): Response | null {
   if (!isDemo() || !isDemoWrite(request.method, handlerType)) return null;
-  if (limiter.hit(requestIp(request))) return null;
+  const key = ipRateSubject(requestIp(request));
+  // No known address: skip (one shared bucket would let one visitor block every demo user).
+  if (key === null || limiter.hit(key)) return null;
   return new Response(DEMO_RATE_LIMITED, {
     status: 429,
     headers: {

@@ -92,6 +92,19 @@ describe("submitProof", () => {
     await expect(submitProof(sub, "1.2.3.4")).rejects.toThrow(PROOF_RATE_LIMITED);
     expect(uploads).toEqual([]);
   });
+  it("skips only the per-IP rule when the client address is unknown (#118)", async () => {
+    const subjects: string[] = [];
+    rpc = (args) => {
+      subjects.push(JSON.stringify(args));
+      return { data: 1, error: null };
+    };
+    await expect(submitProof(sub, "unknown")).rejects.toThrow();
+    // Only the per-token rule ran (no shared "unknown" bucket).
+    expect(subjects).toHaveLength(1);
+    subjects.length = 0;
+    await expect(submitProof(sub, "1.2.3.4")).rejects.toThrow();
+    expect(subjects).toHaveLength(3); // proof:ip, proof:ip:day, proof:token
+  });
   it("rejects non-image payloads before any DB access", async () => {
     let calls = 0;
     rpc = () => {
