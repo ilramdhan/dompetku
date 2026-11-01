@@ -117,15 +117,19 @@ Dompetku menghitungnya dari tarif yang Anda isi per `payment_type`, contoh
 tercatat, biaya dibukukan **sekali** sebagai pengeluaran kategori **Biaya Admin** di dompet invoice
 (kunci `invoice_mdr:<id transaksi gateway>`), sehingga saldo = dana bersih yang diterima. Refund
 tidak mengubah atau mengulang biaya itu (Midtrans tidak mengembalikan MDR). Kosong = tidak
-dicatat. Cocokkan dengan laporan payout di dashboard Midtrans (Billings → Transfer History).
+dicatat. Gunakan titik untuk desimal (`0.7%`, bukan `0,7%`): tarif yang tidak valid tidak dicatat
+sama sekali, dicatat di log (`gateway:mdr-config`) dan ditandai di Pengaturan → Integrasi. Biaya
+dicatat di dompet invoice **saat pembayaran dibukukan**; bila dompet invoice diganti di antara
+keduanya, pindahkan transaksi "Biaya Admin" itu secara manual. Cocokkan dengan laporan payout di dashboard Midtrans (Billings → Transfer History).
 Jangan aktifkan **Automatic Fee Imposition** di Snap Preference: biaya yang dibebankan ke pelanggan
 mengubah `gross_amount`, sehingga pembayaran ditandai "Jumlah dari Midtrans tidak cocok".
 
 **Bayar sebagian (`MIDTRANS_PARTIAL`, opsional).** `true` = di halaman invoice publik pelanggan
-boleh mengisi jumlah (minimal Rp10.000, maksimal sisa tagihan; sisa di bawah Rp10.000 harus
-dilunasi sekaligus). Jumlah selalu dicek ulang di server. Setiap pembayaran parsial tercatat
+boleh mengisi jumlah (minimal Rp10.000, dan sisa tagihan setelahnya juga minimal Rp10.000; sisa
+di bawah Rp20.000 harus dilunasi sekaligus). Jumlah selalu dicek ulang di server. Setiap pembayaran parsial tercatat
 seperti biasa dan status invoice berubah **Dibayar sebagian → Lunas**. Hanya satu nominal order
-yang aktif per invoice: order tertunda dengan nominal lain otomatis dibatalkan (expire).
+yang aktif per invoice: order tertunda lain dibatalkan (expire) di Midtrans dulu; bila Midtrans
+belum bisa dihubungi, order lama tetap aktif dan pelanggan diminta mencoba lagi.
 
 Server Key disimpan terenkripsi dan tidak pernah ditampilkan lagi (hanya 4 karakter terakhir).
 Perubahan berlaku dalam ±1 menit.
@@ -361,16 +365,20 @@ computes it from the rates you enter per `payment_type`, e.g.
 (`*` = any other method; add VAT yourself where the rate excludes it). When the payment is booked,
 the fee is booked **once** as an expense in category **Biaya Admin** on the invoice's wallet (key
 `invoice_mdr:<gateway row id>`), so the balance equals the net money received. Refunds never change
-or repeat it (Midtrans does not return the MDR). Empty = not booked. Reconcile with the payout
+or repeat it (Midtrans does not return the MDR). Empty = not booked. Use a dot for decimals
+(`0.7%`, not `0,7%`): an invalid schedule books nothing, is logged (`gateway:mdr-config`) and is
+flagged in Settings → Integrations. The fee goes to the invoice's wallet **at the time the payment
+is booked**; if the invoice wallet is changed in between, move that "Biaya Admin" expense by hand. Reconcile with the payout
 report in the Midtrans dashboard (Billings → Transfer History). Do not enable **Automatic Fee
 Imposition** in Snap Preference: a customer-paid fee changes `gross_amount`, so the payment is
 flagged "Jumlah dari Midtrans tidak cocok" (amount mismatch).
 
 **Partial payments (`MIDTRANS_PARTIAL`, optional).** `true` = on the public invoice page the
-customer may enter an amount (at least Rp10,000, at most the remaining balance; a balance below
-Rp10,000 must be paid in full). The amount is always re-checked on the server. Each partial payment
+customer may enter an amount (at least Rp10,000, and the balance left afterwards must also be at
+least Rp10,000; a balance below Rp20,000 must be paid in full). The amount is always re-checked on the server. Each partial payment
 is booked as usual and the invoice moves **partial → paid**. Only one order amount is live per
-invoice: pending orders for another amount are expired automatically.
+invoice: other pending orders are expired at Midtrans first; if Midtrans cannot be reached, the old
+order stays live and the customer is asked to try again.
 
 The Server Key is stored encrypted and never shown again (only its last 4 characters). Changes
 apply within about a minute.
