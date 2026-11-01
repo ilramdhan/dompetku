@@ -12,7 +12,10 @@
  * - Reminders (due soon / overdue): customers without a recoverable link get the mail without one
  *   (payment instructions as text). De-duplicated through activity_log rows `invoices.email`
  *   (due soon once per invoice, overdue at most weekly).
- * - Every send is logged as `invoices.email` with the kind and a partially masked recipient.
+ * - Language (#123): every mail uses the invoice's v27 `lang` (missing column/null → "id");
+ *   "Kirim invoice" may pass another one, which is saved back to the invoice first.
+ * - Every send is logged as `invoices.email` with the kind, language and a partially masked
+ *   recipient.
  */
 import { db } from "./db.server";
 import { addDays } from "./dates";
@@ -22,7 +25,7 @@ import {
   EMAIL_KIND_LABEL,
   dedupeWindowDays,
   isEmailAddress,
-  langByInvoice,
+  invoiceLang,
   leadDays,
   parseEmailLang,
   maskEmail,
@@ -101,23 +104,6 @@ async function brandName(): Promise<string> {
     return (await (await import("./app-settings.server")).getAppSettings()).app_name;
   } catch {
     return "Dompetku";
-  }
-}
-
-/** Language of the last send of each invoice (activity_log); missing/unreadable → Indonesian. */
-async function langsFor(ids: readonly string[]): Promise<Map<string, EmailLang>> {
-  if (!ids.length) return new Map();
-  try {
-    const res = await db()
-      .from("activity_log")
-      .select("detail, created_at")
-      .eq("action", "invoices.email")
-      .order("created_at", { ascending: false })
-      .limit(5000);
-    if (res.error) return new Map();
-    return langByInvoice(res.data ?? []);
-  } catch {
-    return new Map();
   }
 }
 
@@ -202,7 +188,10 @@ export async function sendInvoiceLinkEmail(
   const share = await import("./invoice-share.server");
   const made = await share.createShare(inv, opts.expiresDays, false);
   const link = shareUrl(opts.origin, made.token);
-  const lang = parseEmailLang(opts.lang);
+  // Explicit choice wins and is saved back to the invoice (v27); otherwise the invoice's language.
+  const lang = opts.lang === undefined ? invoiceLang(inv) : parseEmailLang(opts.lang);
+  if (lang !== invoiceLang(inv))
+    await (await import("./invoices.server")).setInvoiceLang(inv, lang);
   const mail = await compose(inv, "invoice", { link, lang });
   const r = await deliver(inv.customer_email, mail);
   if (!r.sent) return { sent: false, reason: r.reason, link };
@@ -219,7 +208,7 @@ export async function sendPaymentConfirmation(inv: InvoiceRow, amount: number): 
     if ((await import("./demo.server")).isDemo()) return;
     if (!isEmailAddress(inv.customer_email)) return;
     if (!(await resendReady())) return;
-    const lang = (await langsFor([inv.id])).get(inv.id) ?? "id";
+    const lang = invoiceLang(inv);
     const mail = await compose(inv, "payment", {
       lang,
       paymentAmount: amount,
@@ -293,7 +282,6 @@ export async function pendingDueMails(
   }
   const mails: DueMail[] = [];
   const skipped: Skipped[] = [];
-  const langs = await langsFor(((res.data ?? []) as { id: string }[]).map((r) => r.id));
   // v25: invoices on refund hold (customer was just refunded) get no reminders until re-billed.
   const held = await (
     await import("./gateway/payments.server")
@@ -316,7 +304,7 @@ export async function pendingDueMails(
       skipped.push({ number: inv.number, reason: "already_sent" });
       continue;
     }
-    const lang = langs.get(inv.id) ?? "id";
+    const lang = invoiceLang(row);
     const mail = await compose(inv, kind, { remaining, lang });
     mails.push({
       lang,

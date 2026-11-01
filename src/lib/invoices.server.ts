@@ -11,8 +11,13 @@
  *   payment change (`syncInvoice`).
  * - Reads degrade to `{ ready: false }` before schema v21; writes throw a "run v21" message.
  * - Wallet scoping: callers pass `accountScope(ctx)` (null = owner, all wallets).
+ * - v27 `lang` (customer email language) is optional: writes drop it and retry when the column is
+ *   missing, reads default to "id".
  */
 import { db } from "./db.server";
+import { missingColumn } from "./backup";
+import type { EmailLang } from "./email";
+import { parseEmailLang } from "./invoice-email";
 import { fetchAll } from "./paginate";
 import { scopeIds } from "./permissions";
 import {
@@ -59,6 +64,8 @@ export type InvoiceRow = {
   currency: string;
   total: number;
   paid: number;
+  /** v27 customer email language (always set; "id" when the column is missing or null). */
+  lang: EmailLang;
   created_at: string;
   updated_at: string;
 };
@@ -71,6 +78,8 @@ export type InvoiceInput = {
   issue_date: string;
   due_date: string | null;
   notes: string | null;
+  /** v27 customer email language (omitted = "id" on create, unchanged on edit). */
+  lang?: EmailLang | undefined;
   items: InvoiceItem[];
   /** Create only: save as draft (default) or issue right away (status unpaid). */
   issue?: boolean | undefined;
@@ -84,7 +93,26 @@ export type PaymentInput = {
   note: string | null;
 };
 
-const num = (r: any): InvoiceRow => ({ ...r, total: Number(r.total), paid: Number(r.paid) });
+const num = (r: any): InvoiceRow => ({
+  ...r,
+  total: Number(r.total),
+  paid: Number(r.paid),
+  lang: parseEmailLang(r.lang),
+});
+
+/** Runs an invoices write; when v27 is not run, drops `lang` from the values and retries once. */
+async function withoutMissingLang<T extends { error: any }>(
+  values: Record<string, unknown>,
+  run: (v: Record<string, unknown>) => PromiseLike<T>,
+): Promise<T> {
+  const res = await run(values);
+  if (res.error && "lang" in values && missingColumn(res.error) === "lang") {
+    const { lang: _drop, ...rest } = values;
+    void _drop;
+    return run(rest);
+  }
+  return res;
+}
 
 /* ---------------- reads ---------------- */
 
@@ -259,6 +287,7 @@ export async function createInvoice(v: InvoiceInput) {
     issue_date: v.issue_date,
     due_date: v.due_date,
     notes: v.notes,
+    lang: v.lang ?? "id",
     status: (v.issue ? "unpaid" : "draft") as InvoiceStatus,
     currency: "IDR",
     total,
@@ -267,11 +296,13 @@ export async function createInvoice(v: InvoiceInput) {
   let row: InvoiceRow | null = null;
   for (let attempt = 0; attempt < 5 && !row; attempt++) {
     const number = await nextNumber(prefix, v.issue_date);
-    const res = await db()
-      .from("invoices")
-      .insert({ ...base, number })
-      .select()
-      .single();
+    const res = await withoutMissingLang({ ...base, number }, (row) =>
+      db()
+        .from("invoices")
+        .insert(row as any)
+        .select()
+        .single(),
+    );
     if (!res.error) row = num(res.data);
     else if (isDup(res.error)) continue;
     else if ((await fin()).isMissingTable(res.error)) throw new Error(V21_MISSING);
@@ -300,23 +331,27 @@ export async function updateInvoice(prev: InvoiceRow, v: InvoiceInput) {
   const total = invoiceTotal(v.items);
   const problem = editProblem(prev, { total, account_id: v.account_id });
   if (problem) throw new Error(problem);
-  const res = await db()
-    .from("invoices")
-    .update({
-      customer_name: v.customer_name.trim(),
-      customer_email: v.customer_email,
-      customer_phone: v.customer_phone,
-      account_id: v.account_id,
-      issue_date: v.issue_date,
-      due_date: v.due_date,
-      notes: v.notes,
-      total,
-      status: derivedStatus(prev.status, total, prev.paid),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", prev.id)
-    .select()
-    .single();
+  const values: Record<string, unknown> = {
+    customer_name: v.customer_name.trim(),
+    customer_email: v.customer_email,
+    customer_phone: v.customer_phone,
+    account_id: v.account_id,
+    issue_date: v.issue_date,
+    due_date: v.due_date,
+    notes: v.notes,
+    ...(v.lang ? { lang: v.lang } : {}),
+    total,
+    status: derivedStatus(prev.status, total, prev.paid),
+    updated_at: new Date().toISOString(),
+  };
+  const res = await withoutMissingLang(values, (row) =>
+    db()
+      .from("invoices")
+      .update(row as any)
+      .eq("id", prev.id)
+      .select()
+      .single(),
+  );
   if (res.error) throw new Error(res.error.message);
   await replaceItems(prev.id, v.items);
   await (
@@ -327,6 +362,20 @@ export async function updateInvoice(prev: InvoiceRow, v: InvoiceInput) {
     currency: "IDR",
   });
   return num(res.data);
+}
+
+/**
+ * Saves the customer email language chosen in "Kirim invoice" (v27). Best effort: before v27
+ * (missing column) it does nothing and the send still goes out in the chosen language.
+ */
+export async function setInvoiceLang(inv: InvoiceRow, lang: EmailLang): Promise<InvoiceRow> {
+  if (inv.lang === lang) return inv;
+  const res = await db().from("invoices").update({ lang }).eq("id", inv.id);
+  if (res.error) {
+    if (missingColumn(res.error) === "lang") return inv;
+    throw new Error(res.error.message);
+  }
+  return { ...inv, lang };
 }
 
 /** issue / cancel / reopen / unissue (see `actionTarget`). */

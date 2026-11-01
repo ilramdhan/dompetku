@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { missingColumn } from "@/lib/backup";
 import { buildInvoiceEmail, type InvoiceEmailInput } from "@/lib/email";
 import {
   dedupeWindowDays,
   isEmailAddress,
-  langByInvoice,
+  invoiceLang,
   leadDays,
   maskEmail,
   parseEmailLang,
@@ -155,16 +156,22 @@ describe("customer language (#123)", () => {
       }
     }
   });
-  it("langByInvoice takes each invoice's latest recorded language", () => {
-    const m = langByInvoice([
-      { detail: { invoice_id: "a", lang: "en" }, created_at: "2026-10-02T00:00:00Z" },
-      { detail: { invoice_id: "a", lang: "id" }, created_at: "2026-10-01T00:00:00Z" },
-      { detail: { invoice_id: "b", kind: "overdue" }, created_at: "2026-10-03T00:00:00Z" },
-      { detail: { invoice_id: "c", lang: "xx" }, created_at: "2026-10-03T00:00:00Z" },
-      { detail: null },
-    ]);
-    expect(m.get("a")).toBe("en");
-    expect(m.has("b")).toBe(false);
-    expect(m.has("c")).toBe(false);
+  it("invoiceLang reads v27 invoices.lang and defaults to Indonesian", () => {
+    expect(invoiceLang({ lang: "en" })).toBe("en");
+    expect(invoiceLang({ lang: "id" })).toBe("id");
+    expect(invoiceLang({ lang: null })).toBe("id");
+    expect(invoiceLang({})).toBe("id"); // column missing (v27 not run)
+    expect(invoiceLang({ lang: "fr" })).toBe("id");
+    expect(invoiceLang(null)).toBe("id");
+  });
+  it("the save retry recognises a missing v27 lang column", () => {
+    expect(
+      missingColumn({
+        message: "Could not find the 'lang' column of 'invoices' in the schema cache",
+      }),
+    ).toBe("lang");
+    expect(missingColumn({ message: 'column "lang" of relation "invoices" does not exist' })).toBe(
+      "lang",
+    );
   });
 });

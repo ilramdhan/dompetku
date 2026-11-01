@@ -37,6 +37,8 @@ const invoiceSchema = z.object({
   issue_date: dateStr,
   due_date: optDate,
   notes: optText(2000),
+  /** v27 customer email language (dropped server-side when the column is missing). */
+  lang: z.enum(["id", "en"]).optional(),
   items: z.array(itemSchema).min(1).max(MAX_INVOICE_ITEMS),
   issue: z.boolean().optional(),
   /** v24: payment methods shown on the public page ([] = all active; omitted = unchanged). */
