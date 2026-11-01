@@ -179,7 +179,20 @@ export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoiceV
     const gw = await (
       await import("./gateway/payments.server")
     ).publicGatewayFor(id, inv.data.status, pub.remaining, demo.isDemo());
-    return { ...pub, payment: { ...payment, gateway: gw.available } };
+    // v26: unique code for bank-notification matching (null when off / before v26 / not open).
+    const signals = await import("./payment-signals.server");
+    const { transferAmount } = await import("./bank-notify");
+    const open = inv.data.status === "unpaid" || inv.data.status === "partial";
+    const code = open && pub.remaining > 0 ? await signals.ensureUniqueCode(id) : null;
+    return {
+      ...pub,
+      payment: {
+        ...payment,
+        gateway: gw.available,
+        unique_code: code,
+        transfer_amount: code ? transferAmount(pub.remaining, code) : null,
+      },
+    };
   } catch (e) {
     try {
       (await import("./monitoring.server")).logError("public:invoice", e);

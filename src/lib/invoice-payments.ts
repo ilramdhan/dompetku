@@ -187,6 +187,10 @@ export type PublicPayment = {
   upload_off: string | null;
   /** v25: "Bayar sekarang" (Midtrans) available. */
   gateway?: boolean;
+  /** v26: unique code (1–999) added to the transfer, or null when MacroDroid matching is off. */
+  unique_code?: number | null;
+  /** v26: remaining + unique code (what to transfer), or null without a code. */
+  transfer_amount?: number | null;
 };
 export const PUBLIC_PAYMENT_KEYS = ["methods", "pending", "upload", "upload_off"] as const;
 
