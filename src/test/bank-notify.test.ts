@@ -511,8 +511,10 @@ describe("v26 wiring", () => {
   it("backs up formats, never signals, and strips unique codes", () => {
     expect(RESTORE_TABLES).toContain("payment_notify_formats");
     expect((RESTORE_TABLES as readonly string[]).includes("payment_signals")).toBe(false);
-    expect(EPHEMERAL_COLUMNS.invoices).toEqual(["unique_code"]);
-    expect(stripSecrets("invoices", [{ id: "1", unique_code: 5 }])).toEqual([{ id: "1" }]);
+    expect(EPHEMERAL_COLUMNS.invoices).toEqual(["unique_code", "unique_code_released_at"]);
+    expect(
+      stripSecrets("invoices", [{ id: "1", unique_code: 5, unique_code_released_at: "x" }]),
+    ).toEqual([{ id: "1" }]);
   });
 
   it("classifies the new server fns as admin and labels activities", () => {

@@ -112,13 +112,18 @@ export const confirmSignalFn = createServerFn({ method: "POST" })
     const { remainingOf } = await import("./invoices");
     const signal = await s.loadSignal(data.id);
     if (!signal) throw new Error("Notifikasi tidak ditemukan");
-    const remaining = remainingOf(inv.total, inv.paid);
-    // Unique code part only when the admin books the whole notification amount.
-    const split =
-      signal.amount && Math.abs(data.amount - signal.amount) < 0.005
-        ? splitSignalAmount(signal.amount, remaining, inv.unique_code)
-        : { pay: data.amount, extra: 0 };
-    const r = await s.confirmSignal(signal, inv, split.pay, split.extra, data.paid_at, "admin");
+    // Planned on the invoice as re-read under the claim. Unique code part only when the admin
+    // books the whole notification amount.
+    const r = await s.confirmSignal(
+      signal,
+      inv.id,
+      (cur) =>
+        signal.amount && Math.abs(data.amount - signal.amount) < 0.005
+          ? splitSignalAmount(signal.amount, remainingOf(cur.total, cur.paid), cur.unique_code)
+          : { pay: data.amount, extra: 0 },
+      data.paid_at,
+      "admin",
+    );
     return r.invoice as any;
   });
 

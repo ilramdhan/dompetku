@@ -94,6 +94,8 @@ export async function createShare(
     if ((await fin()).isMissingTable(res.error)) throw new Error(V23_MISSING);
     throw new Error(res.error.message);
   }
+  // v26: the customer will see the transfer amount, so assign the unique code now (never throws).
+  await (await import("./payment-signals.server")).ensureUniqueCode(inv.id);
   await (
     await fin()
   ).logActivity("invoice_shares.create", "invoice_shares", {
@@ -179,11 +181,13 @@ export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoiceV
     const gw = await (
       await import("./gateway/payments.server")
     ).publicGatewayFor(id, inv.data.status, pub.remaining, demo.isDemo());
-    // v26: unique code for bank-notification matching (null when off / before v26 / not open).
+    // v26: unique code for bank-notification matching. Read only — codes are assigned on admin
+    // actions (share, email, detail view), never by this public GET; null when off / before v26 /
+    // not open / on refund hold.
     const signals = await import("./payment-signals.server");
     const { transferAmount } = await import("./bank-notify");
     const open = inv.data.status === "unpaid" || inv.data.status === "partial";
-    const code = open && pub.remaining > 0 ? await signals.ensureUniqueCode(id) : null;
+    const code = open && pub.remaining > 0 ? await signals.peekUniqueCode(id) : null;
     return {
       ...pub,
       payment: {

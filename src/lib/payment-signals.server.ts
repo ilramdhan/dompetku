@@ -9,19 +9,34 @@
  *   block the real phone; a valid device is limited per token hash.
  * - A notification is only a hint. Default: a single exact match (remaining + unique code) marks the
  *   invoice "Menunggu verifikasi" and the admin confirms it. Auto-confirm is opt-in
- *   (`MACRODROID_AUTO_CONFIRM`) because any app on the phone can post a look-alike notification.
+ *   (`MACRODROID_AUTO_CONFIRM`) and only books notifications parsed by a saved format whose app list
+ *   names the exact package (`autoConfirmable`): any app on the phone can post a look-alike
+ *   notification with a bank's name, and the generic format matches every app.
+ * - Invoices on v25 refund hold are never booked from a notification (manual or auto) and show no
+ *   unique code until "Tagih ulang".
  * - Booking is claimed atomically (`claimed_at` set where `payment_id is null and claimed_at is
  *   null`), so a retry, a second request or a double click can never book twice; a crash between
- *   booking and linking is recovered through the payment reference `signal:<id8>`.
+ *   booking and linking is recovered through the payment reference `signal:<id8>`. Bookings of one
+ *   invoice are serialised by the partial unique index `payment_signals_invoice_claim_idx` (one
+ *   claim per invoice): a request that finds the invoice busy backs off and retries, then re-reads
+ *   the invoice, so parallel notifications book once and the rest are marked superseded.
+ * - Unique codes are assigned only on admin actions (share link, invoice email, detail view), never
+ *   by the public page, and a released code stays reserved for 48 h (`unique_code_released_at`) so a
+ *   late notification can never match a newer invoice.
  * - Stored text is minimised (`minimiseText`: one ≤300-char line, long digit runs masked); the raw
  *   body is never stored. Re-sent notifications are deduplicated by a SHA-256 `hash` (unique).
  */
 import { createHash, timingSafeEqual } from "crypto";
 import { db } from "./db.server";
 import {
+  CLAIM_RETRIES,
+  CONFIRM_PROBLEM,
   NOTIFY_LIMITS,
   OPEN_SIGNAL_STATUSES,
   MAX_FORMATS,
+  SIGNAL_REASON,
+  UNIQUE_CODE_COOLDOWN_MS,
+  claimBackoffMs,
   cleanLine,
   confirmProblem,
   formatProblems,
@@ -36,6 +51,7 @@ import {
   postedAt,
   signalReference,
   splitSignalAmount,
+  transferAmount,
   type MatchCandidate,
   type NotifyFormat,
   type SignalStatus,
@@ -113,42 +129,108 @@ export function tokenMatches(given: string, expected: string): boolean {
   return timingSafeEqual(digest(given), digest(expected));
 }
 
-/** `Authorization: Bearer <token>` or `X-Device-Token: <token>`. */
+/** `X-Device-Token: <token>` or `Authorization: Bearer <token>`; an empty header is ignored. */
 export function tokenFrom(headers: Headers): string {
   return (
-    headers.get("x-device-token")?.trim() ??
+    headers.get("x-device-token")?.trim() ||
     headers
       .get("authorization")
       ?.replace(/^Bearer\s+/i, "")
-      .trim() ??
+      .trim() ||
     ""
   );
 }
 
+/** v25 refund hold of one invoice (false before v25 / on error). */
+async function onRefundHold(invoiceId: string): Promise<boolean> {
+  try {
+    const { refundHeldInvoices } = await import("./gateway/payments.server");
+    return (await refundHeldInvoices([invoiceId])).has(invoiceId);
+  } catch {
+    return false;
+  }
+}
+
 /* ---------------- unique codes ---------------- */
 
+const isOpen = (status: string) => status === "unpaid" || status === "partial";
+const missingColumn = (e: { message?: string; code?: string } | null | undefined) =>
+  /unique_code_released_at|42703|PGRST204/i.test(`${e?.message ?? ""} ${e?.code ?? ""}`);
+
 /**
- * The invoice's unique code, assigned on first use (open invoice, v26 present, MacroDroid token
- * configured). Returns null when any of those is missing. Never throws.
+ * Read-only: the unique code the customer should add, or null (MacroDroid off, pre-v26, invoice not
+ * open, refund hold, no code assigned yet). Used by the public page, which never writes. Never throws.
  */
-export async function ensureUniqueCode(invoiceId: string): Promise<number | null> {
+export async function peekUniqueCode(invoiceId: string): Promise<number | null> {
   try {
     if (!(await notifyConfig())) return null;
     const cur = await db()
       .from("invoices")
-      .select("id, status, unique_code" as any)
+      .select("status, unique_code" as any)
       .eq("id", invoiceId)
       .maybeSingle();
-    if (cur.error || !cur.data) return null;
     const row = cur.data as any;
-    if (row.status !== "unpaid" && row.status !== "partial") return null;
-    if (isUniqueCode(row.unique_code)) return row.unique_code;
-    // Free codes held by invoices that are no longer open (best-effort sweep).
-    await (db() as any)
-      .from("invoices")
+    if (cur.error || !row || !isOpen(row.status) || !isUniqueCode(row.unique_code)) return null;
+    return (await onRefundHold(invoiceId)) ? null : row.unique_code;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Codes of invoices that are no longer open: start their 48 h cooldown, and free the ones whose
+ * cooldown is over. Best effort (pre-v26 / older v26 without the column: codes are just freed).
+ */
+async function sweepCodes(now: number) {
+  const inv = () => (db() as any).from("invoices");
+  const started = await inv()
+    .update({ unique_code_released_at: new Date(now).toISOString() })
+    .not("unique_code", "is", null)
+    .is("unique_code_released_at", null)
+    .not("status", "in", "(unpaid,partial)");
+  if (started.error && missingColumn(started.error)) {
+    await inv()
       .update({ unique_code: null })
       .not("unique_code", "is", null)
       .not("status", "in", "(unpaid,partial)");
+    return;
+  }
+  await inv()
+    .update({ unique_code: null, unique_code_released_at: null })
+    .not("unique_code", "is", null)
+    .not("status", "in", "(unpaid,partial)")
+    .lt("unique_code_released_at", new Date(now - UNIQUE_CODE_COOLDOWN_MS).toISOString());
+}
+
+/**
+ * The invoice's unique code, assigned on first use by an admin action (share link, invoice email,
+ * detail view) while the invoice is open, v26 is present, the MacroDroid token is configured and
+ * the invoice is not on refund hold. Codes held by closed invoices (also during their 48 h
+ * cooldown) are never handed out. Returns null otherwise, and logs when all 999 codes are taken.
+ * Never throws.
+ */
+export async function ensureUniqueCode(
+  invoiceId: string,
+  now = Date.now(),
+): Promise<number | null> {
+  try {
+    if (!(await notifyConfig())) return null;
+    const cur = await db().from("invoices").select("*").eq("id", invoiceId).maybeSingle();
+    if (cur.error || !cur.data) return null;
+    const row = cur.data as any;
+    if (!isOpen(row.status)) return null;
+    if (await onRefundHold(invoiceId)) return null;
+    if (isUniqueCode(row.unique_code)) {
+      // Reopened within the cooldown: it keeps its own code.
+      if (row.unique_code_released_at)
+        await (db() as any)
+          .from("invoices")
+          .update({ unique_code_released_at: null })
+          .eq("id", invoiceId);
+      return row.unique_code;
+    }
+    if (!("unique_code" in row)) return null; // pre-v26
+    await sweepCodes(now);
     for (let attempt = 0; attempt < 5; attempt++) {
       const used = await (db() as any)
         .from("invoices")
@@ -157,7 +239,13 @@ export async function ensureUniqueCode(invoiceId: string): Promise<number | null
         .limit(1000);
       if (used.error) return null;
       const code = pickUniqueCode(((used.data ?? []) as any[]).map((r) => r.unique_code));
-      if (code === null) return null;
+      if (code === null) {
+        await logErr(
+          "notify:unique-codes-exhausted",
+          new Error("All 999 unique codes are in use or cooling down"),
+        );
+        return null;
+      }
       const upd = await (db() as any)
         .from("invoices")
         .update({ unique_code: code })
@@ -175,7 +263,7 @@ export async function ensureUniqueCode(invoiceId: string): Promise<number | null
           .maybeSingle();
         return isUniqueCode(again.data?.unique_code) ? again.data.unique_code : null;
       }
-      if (!isDup(upd.error)) return null; // missing column (pre-v26) or other error
+      if (!isDup(upd.error)) return null; // missing column or other error
     }
     return null;
   } catch {
@@ -183,19 +271,49 @@ export async function ensureUniqueCode(invoiceId: string): Promise<number | null
   }
 }
 
-/** Clears the unique code of an invoice that is no longer open (paid/cancelled/draft). Never throws. */
+/**
+ * An invoice that is no longer open (paid/cancelled/draft) gives its code back after a 48 h
+ * cooldown: the code stays on the row with `unique_code_released_at` so no other invoice gets it
+ * (the sweep in `ensureUniqueCode` frees it later). Never throws.
+ */
 export async function releaseUniqueCode(inv: { id: string; status: string }) {
-  if (inv.status === "unpaid" || inv.status === "partial") return;
+  if (isOpen(inv.status)) return;
   try {
-    await (db() as any)
+    const res = await (db() as any)
       .from("invoices")
-      .update({ unique_code: null })
+      .update({ unique_code_released_at: new Date().toISOString() })
       .eq("id", inv.id)
-      .not("unique_code", "is", null);
+      .not("unique_code", "is", null)
+      .is("unique_code_released_at", null);
+    if (res.error && missingColumn(res.error))
+      await (db() as any)
+        .from("invoices")
+        .update({ unique_code: null })
+        .eq("id", inv.id)
+        .not("unique_code", "is", null);
   } catch {
     /* pre-v26 or transient: the next assignment sweeps it */
   }
 }
+
+/**
+ * External ids of the "Kode unik" incomes booked with these invoice payments, so deleting a
+ * payment (or its invoice) also removes them. Empty before v26 / on error. Never throws.
+ */
+export async function uniqueCodeExternalIds(paymentIds: readonly string[]): Promise<string[]> {
+  if (!paymentIds.length) return [];
+  try {
+    const res = await signals()
+      .select("id")
+      .in("payment_id", [...paymentIds]);
+    if (res.error) return [];
+    return ((res.data ?? []) as { id: string }[]).map((r) => uniqueCodeExternalId(r.id));
+  } catch {
+    return [];
+  }
+}
+
+export const uniqueCodeExternalId = (signalId: string) => `invoice_code:${signalId}`;
 
 /* ---------------- formats (admin) ---------------- */
 
@@ -269,15 +387,19 @@ export async function deleteFormat(id: string) {
 
 export type NotifyOutcome = { status: number; body: Record<string, unknown> };
 
-/** Hash for dedupe: the notification content + its own timestamp (or a 10-minute bucket). */
+/**
+ * Hash for dedupe: the notification content + its own timestamp. Without `posted_at` the receive
+ * time (ms) is used, so two real transfers with the same text are never merged — such requests are
+ * simply not deduplicated.
+ */
 export function signalHash(
   n: { package: string; app: string; title: string; text: string },
   posted: number | null,
   receivedMs: number,
 ): string {
-  const when = posted ?? Math.floor(receivedMs / 600_000);
+  const when = posted ?? receivedMs;
   return createHash("sha256")
-    .update(JSON.stringify([n.package || n.app, n.title, n.text, posted ? "t" : "b", when]))
+    .update(JSON.stringify([n.package || n.app, n.title, n.text, posted ? "t" : "r", when]))
     .digest("hex");
 }
 
@@ -332,6 +454,7 @@ export async function ingestNotification(
 
     let row: Record<string, unknown>;
     let invoiceId: string | null = null;
+    let autoOk = false;
     if (posted !== null && !isFresh(posted, now)) {
       row = { ...base, status: "ignored", reason: "Waktu notifikasi di luar jendela 48 jam" };
     } else {
@@ -354,6 +477,12 @@ export async function ingestNotification(
           accountId: parsed.format.account_id ?? null,
         });
         invoiceId = m.status === "matched" ? m.invoiceId : null;
+        // A held invoice stays "matched" for the admin; auto-confirm needs a trusted format.
+        let reason: string | null =
+          m.status === "unmatched" ? "Tidak ada invoice dengan nominal ini" : null;
+        if (invoiceId && (await onRefundHold(invoiceId))) reason = SIGNAL_REASON.held;
+        else if (invoiceId && c.autoConfirm && !parsed.trusted) reason = SIGNAL_REASON.untrusted;
+        else autoOk = !!invoiceId && c.autoConfirm;
         row = {
           ...base,
           amount: parsed.amount,
@@ -361,7 +490,7 @@ export async function ingestNotification(
           status: m.status,
           invoice_id: invoiceId,
           candidate_ids: m.status === "ambiguous" ? m.invoiceIds.slice(0, 20) : [],
-          reason: m.status === "unmatched" ? "Tidak ada invoice dengan nominal ini" : null,
+          reason,
         };
       }
     }
@@ -382,26 +511,33 @@ export async function ingestNotification(
     });
 
     let status = String(row["status"]);
-    if (status === "matched" && c.autoConfirm && invoiceId) {
+    if (status === "matched" && autoOk && invoiceId) {
+      const amount = Number(row["amount"]);
       try {
-        const s = await import("./invoices.server");
-        const inv = await s.loadInvoice(invoiceId);
-        if (inv) {
-          const split = splitSignalAmount(
-            Number(row["amount"]),
-            remainingOf(inv.total, inv.paid),
-            (inv as any).unique_code,
-          );
-          const r = await confirmSignal(ins.data, inv, split.pay, split.extra, null, "auto");
-          if (r.booked) status = "confirmed";
-        }
+        const r = await confirmSignal(
+          { ...ins.data, amount },
+          invoiceId,
+          (inv) => {
+            // Only the exact transfer amount of the CURRENT invoice is booked automatically.
+            const remaining = remainingOf(inv.total, inv.paid);
+            const code = (inv as any).unique_code;
+            if (Math.abs(transferAmount(remaining, code) - amount) >= 0.005) return null;
+            return splitSignalAmount(amount, remaining, code);
+          },
+          null,
+          "auto",
+        );
+        status = r.status;
       } catch (e) {
         // Stays "matched" (Menunggu verifikasi) with last_error; the admin confirms by hand.
         await signals()
           .update({ last_error: (e instanceof Error ? e.message : "error").slice(0, 300) })
           .eq("id", ins.data.id)
-          .is("payment_id", null);
-        await logErr("notify:auto-confirm", e);
+          .is("payment_id", null)
+          .in("status", [...OPEN_SIGNAL_STATUSES]);
+        const now = await signals().select("status").eq("id", ins.data.id).maybeSingle();
+        if (now.data?.status) status = String(now.data.status);
+        if (status === "matched") await logErr("notify:auto-confirm", e);
       }
     }
     return { status: 200, body: { ok: true, status } };
@@ -471,51 +607,114 @@ export async function loadSignal(id: string): Promise<SignalRow | null> {
     : null;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export const INVOICE_BUSY = "Invoice sedang memproses pembayaran lain, coba lagi";
+
+/** What to book for the freshly re-read invoice, or null to leave the signal for the admin. */
+export type ConfirmPlan = (inv: InvoiceRow) => { pay: number; extra: number } | null;
+
 /**
- * Books a signal for `inv` exactly once: `pay` as an invoice payment (bookPayment, income
- * "Invoice"), `extra` (the unique code part) as its own small income on the same wallet, then a
- * best-effort payment confirmation email. Claim protocol as in gateway/payments.server.ts.
+ * Books a signal for invoice `invoiceId` exactly once: `pay` as an invoice payment (bookPayment,
+ * income "Invoice"), `extra` (the unique code part) as its own small income on the same wallet,
+ * then a best-effort payment confirmation email. Claim protocol as in gateway/payments.server.ts,
+ * plus one claim per invoice (partial unique index): a busy invoice is retried with backoff, and
+ * the invoice is re-read AFTER the claim so the plan, the refund hold and the remaining amount are
+ * always current. Auto-confirm on an invoice that is no longer open marks the signal superseded;
+ * once an invoice is no longer open, its other matched signals are superseded too.
  */
 export async function confirmSignal(
   signal: SignalRow,
-  inv: InvoiceRow,
-  pay: number,
-  extra: number,
+  invoiceId: string,
+  plan: ConfirmPlan,
   paidAt: string | null,
   by: "auto" | "admin",
-): Promise<{ booked: boolean; invoice: InvoiceRow }> {
-  const problem = confirmProblem(signal, inv, pay);
-  if (problem) throw new Error(problem);
+): Promise<{ booked: boolean; invoice: InvoiceRow | null; status: SignalStatus }> {
+  if (!OPEN_SIGNAL_STATUSES.includes(signal.status) || signal.payment_id)
+    throw new Error(CONFIRM_PROBLEM.done);
   const now = Date.now();
-  if (signal.claimed_at && now - Date.parse(signal.claimed_at) > STALE_CLAIM_MS)
-    await signals()
-      .update({ claimed_at: null })
-      .eq("id", signal.id)
-      .eq("claimed_at", signal.claimed_at)
-      .is("payment_id", null);
-  const mine = new Date(now).toISOString();
-  const claim = await signals()
-    .update({ claimed_at: mine, last_error: null })
+  const stale = new Date(now - STALE_CLAIM_MS).toISOString();
+  // Abandoned claims (crash) on this signal or on this invoice may be retried.
+  await signals()
+    .update({ claimed_at: null })
     .eq("id", signal.id)
-    .is("payment_id", null)
-    .is("claimed_at", null)
-    .in("status", [...OPEN_SIGNAL_STATUSES])
-    .select("id")
-    .maybeSingle();
-  if (claim.error) throw new Error(claim.error.message);
-  if (!claim.data) throw new Error("Notifikasi ini sedang atau sudah diproses");
+    .lt("claimed_at", stale)
+    .is("payment_id", null);
+  await signals()
+    .update({ claimed_at: null })
+    .eq("invoice_id", invoiceId)
+    .lt("claimed_at", stale)
+    .is("payment_id", null);
+
+  let mine = "";
+  for (let attempt = 0; ; attempt++) {
+    mine = new Date(Date.now()).toISOString();
+    const claim = await signals()
+      .update({ claimed_at: mine, last_error: null, invoice_id: invoiceId })
+      .eq("id", signal.id)
+      .is("payment_id", null)
+      .is("claimed_at", null)
+      .in("status", [...OPEN_SIGNAL_STATUSES])
+      .select("id")
+      .maybeSingle();
+    if (claim.error && isDup(claim.error)) {
+      // Another signal is booking this invoice right now.
+      if (attempt >= CLAIM_RETRIES) throw new Error(INVOICE_BUSY);
+      await sleep(claimBackoffMs(attempt));
+      continue;
+    }
+    if (claim.error) throw new Error(claim.error.message);
+    if (!claim.data) throw new Error("Notifikasi ini sedang atau sudah diproses");
+    break;
+  }
 
   const release = (patch: Record<string, unknown> = {}) =>
     signals()
-      .update({ claimed_at: null, ...patch })
+      .update({ claimed_at: null, invoice_id: signal.invoice_id ?? null, ...patch })
       .eq("id", signal.id)
       .eq("claimed_at", mine)
       .is("payment_id", null);
 
   const s = await import("./invoices.server");
+  let inv: InvoiceRow | null;
+  let held: boolean;
+  try {
+    inv = await s.loadInvoice(invoiceId);
+    held = inv ? await onRefundHold(invoiceId) : false;
+  } catch (e) {
+    await release({ last_error: (e instanceof Error ? e.message : "error").slice(0, 300) });
+    throw e;
+  }
+  if (!inv) {
+    await release();
+    throw new Error("Invoice tidak ditemukan");
+  }
+  if (by === "auto" && !isOpen(inv.status)) {
+    await signals()
+      .update({
+        status: "ignored",
+        reason: SIGNAL_REASON.superseded,
+        claimed_at: null,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", signal.id)
+      .eq("claimed_at", mine)
+      .is("payment_id", null);
+    return { booked: false, invoice: inv, status: "ignored" };
+  }
+  const p = plan(inv);
+  if (!p) {
+    await release({ last_error: "Nominal tidak lagi sama dengan sisa tagihan + kode unik" });
+    return { booked: false, invoice: inv, status: signal.status };
+  }
+  const problem = confirmProblem(signal, inv, p.pay, held);
+  if (problem) {
+    await release({ last_error: problem });
+    throw new Error(problem);
+  }
+
   const ref = signalReference(signal.id);
   let paymentId: string | null = null;
-  let invoice = inv;
+  let invoice: InvoiceRow = inv;
   let booked = false;
   try {
     // Crash recovery: a payment already booked under this signal's reference is linked, not re-booked.
@@ -529,7 +728,7 @@ export async function confirmSignal(
     paymentId = prior.data?.[0]?.id ?? null;
     if (!paymentId) {
       const res = await s.bookPayment(inv, {
-        amount: pay,
+        amount: p.pay,
         paid_at: paidAt,
         method: "transfer",
         reference: ref,
@@ -551,19 +750,21 @@ export async function confirmSignal(
       status: "confirmed",
       payment_id: paymentId,
       invoice_id: inv.id,
+      claimed_at: null,
       reviewed_at: new Date().toISOString(),
       last_error: null,
     })
     .eq("id", signal.id)
     .is("payment_id", null);
+  if (!isOpen(invoice.status)) await supersedeSiblings(inv.id, signal.id);
 
   const f = await fin();
-  if (booked && extra > 0 && inv.account_id) {
+  if (booked && p.extra > 0 && inv.account_id) {
     try {
       await f.createFromExternal(
         {
           kind: "income",
-          amount: extra,
+          amount: p.extra,
           currency: "IDR",
           category: INVOICE_CATEGORY,
           account: null,
@@ -574,7 +775,7 @@ export async function confirmSignal(
           source: "web",
           items: null,
           notes: `Ref: ${ref}`,
-          external_id: `invoice_code:${signal.id}`,
+          external_id: uniqueCodeExternalId(signal.id),
           receipt_path: null,
           pocket: null,
         },
@@ -587,13 +788,32 @@ export async function confirmSignal(
   if (booked) {
     await f.logActivity("payment_signals.confirm", "payment_signals", {
       name: `${inv.number} · ${inv.customer_name}`,
-      amount: pay + extra,
+      amount: p.pay + p.extra,
       currency: "IDR",
       by,
     });
-    await (await import("./invoice-email.server")).sendPaymentConfirmation(invoice, pay);
+    await (await import("./invoice-email.server")).sendPaymentConfirmation(invoice, p.pay);
   }
-  return { booked, invoice };
+  return { booked, invoice, status: "confirmed" };
+}
+
+/** Other matched (unclaimed) signals of an invoice that is no longer open → ignored. Never throws. */
+async function supersedeSiblings(invoiceId: string, exceptId: string) {
+  try {
+    await signals()
+      .update({
+        status: "ignored",
+        reason: SIGNAL_REASON.superseded,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("invoice_id", invoiceId)
+      .eq("status", "matched")
+      .neq("id", exceptId)
+      .is("payment_id", null)
+      .is("claimed_at", null);
+  } catch {
+    /* best effort: the admin can still ignore them */
+  }
 }
 
 export async function ignoreSignal(id: string, reason: string | null) {

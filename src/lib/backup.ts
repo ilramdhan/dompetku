@@ -35,7 +35,8 @@ import { z } from "zod";
  * the unknown column on restore (missing-column retry).
  * v26: payment_notify_formats (→ accounts) is backed up (admin configuration). payment_signals is
  * NOT: it holds excerpts of bank notifications (kept minimal, pruned) and is review state only; the
- * payments it booked are ordinary invoice_payments. invoices.unique_code is an EPHEMERAL column
+ * payments it booked are ordinary invoice_payments. invoices.unique_code (+ unique_code_released_at,
+ * its 48 h cooldown stamp) is EPHEMERAL
  * (stripped on export and restore) so a merge restore can never collide with the codes of the
  * current open invoices; codes are re-assigned on demand.
  */
@@ -176,7 +177,7 @@ export const SECRET_COLUMNS: Partial<Record<RestoreTable, string[]>> = {
  * them could collide with the partial unique index of the current open invoices).
  */
 export const EPHEMERAL_COLUMNS: Partial<Record<RestoreTable, string[]>> = {
-  invoices: ["unique_code"],
+  invoices: ["unique_code", "unique_code_released_at"],
 };
 
 /** Tables whose rows are kept in "replace" mode (deleting them would reset the password to env). */

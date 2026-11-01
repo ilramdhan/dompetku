@@ -892,12 +892,15 @@ notify pgrst, 'reload schema';
 -- 503, kartu "Format notifikasi" & antrean "Notifikasi bank" hanya menampilkan petunjuk, dan invoice tidak
 -- punya kode unik. Panduan: docs/MACRODROID.md.
 -- unique_code: 1–999 rupiah yang ditambahkan ke nominal transfer agar transfer dengan nominal sama bisa
--- dibedakan. Diberikan saat invoice terbuka (unpaid/partial) ditampilkan dan MACRODROID_TOKEN aktif;
--- dikosongkan lagi saat invoice lunas/batal/draft (dan disapu ulang setiap kali kode baru diberikan), jadi
--- kode yang terisi praktis hanya ada di invoice terbuka. Indeks unik parsial atas kode yang terisi: tanpa
--- syarat status, agar mengubah status invoice tidak pernah gagal karena bentrok kode.
+-- dibedakan. Diberikan saat admin membagikan tautan, mengirim email invoice atau membuka detail invoice
+-- terbuka (unpaid/partial) dan MACRODROID_TOKEN aktif — tidak pernah oleh halaman publik. Saat invoice
+-- lunas/batal/draft, unique_code_released_at diisi: kode tetap "dipegang" 48 jam (masa tenang) agar
+-- notifikasi yang terlambat tidak cocok dengan invoice lain, lalu dikosongkan saat kode baru diberikan.
+-- Indeks unik parsial atas kode yang terisi: tanpa syarat status, agar mengubah status invoice tidak
+-- pernah gagal karena bentrok kode.
 alter table public.invoices add column if not exists unique_code smallint
   check (unique_code is null or unique_code between 1 and 999);
+alter table public.invoices add column if not exists unique_code_released_at timestamptz;
 create unique index if not exists invoices_unique_code_open_idx on public.invoices (unique_code)
   where unique_code is not null;
 
@@ -931,7 +934,9 @@ alter table public.payment_notify_formats enable row level security;
 -- (+ waktu notifikasi) untuk dedupe: kiriman ulang yang sama tidak membuat baris baru.
 -- Status: unmatched (tidak ada invoice cocok), matched (satu invoice cocok → "Menunggu verifikasi"),
 -- ambiguous (lebih dari satu kandidat), confirmed (pembayaran dicatat, payment_id), ignored (bukan uang
--- masuk / diabaikan admin). claimed_at: klaim atomik pencatatan (auto-confirm / tombol Konfirmasi).
+-- masuk / diabaikan admin). claimed_at: klaim atomik pencatatan (auto-confirm / tombol Konfirmasi);
+-- indeks unik parsial payment_signals_invoice_claim_idx: hanya satu notifikasi per invoice yang boleh
+-- sedang dicatat, jadi notifikasi paralel untuk invoice yang sama dicatat bergantian (bukan bentrok).
 -- Tidak ikut dicadangkan; baris ignored/unmatched lebih dari 90 hari dibersihkan sesekali.
 create table if not exists public.payment_signals (
   id uuid primary key default gen_random_uuid(),
@@ -956,6 +961,12 @@ create table if not exists public.payment_signals (
 );
 create index if not exists payment_signals_status_idx on public.payment_signals (status, received_at desc);
 create index if not exists payment_signals_invoice_idx on public.payment_signals (invoice_id, status);
+-- Klaim yang sudah selesai atau ditinggalkan (>10 menit) tidak menahan invoice (aman diulang; perlu sebelum
+-- indeks unik di bawah).
+update public.payment_signals set claimed_at = null
+  where claimed_at is not null and (payment_id is not null or claimed_at < now() - interval '10 minutes');
+create unique index if not exists payment_signals_invoice_claim_idx on public.payment_signals (invoice_id)
+  where claimed_at is not null;
 revoke all on public.payment_signals from anon, authenticated;
 grant all on public.payment_signals to service_role;
 alter table public.payment_signals enable row level security;

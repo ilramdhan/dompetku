@@ -1196,6 +1196,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           unique_code?: number | null;
+          unique_code_released_at?: string | null;
         };
         Insert: {
           id?: string;
@@ -1214,6 +1215,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           unique_code?: number | null;
+          unique_code_released_at?: string | null;
         };
         Update: {
           id?: string;
@@ -1232,6 +1234,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           unique_code?: number | null;
+          unique_code_released_at?: string | null;
         };
         Relationships: [
           {

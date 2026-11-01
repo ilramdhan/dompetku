@@ -184,6 +184,12 @@ async function pendingReviews(ids: readonly string[]): Promise<Map<string, numbe
 /** One invoice with its items and payments (detail view / edit form). */
 export async function getInvoice(inv: InvoiceRow) {
   const ip = await import("./invoice-payments.server");
+  // v26: the admin sees (and may forward) the transfer amount, so make sure an open invoice has its
+  // unique code; null (shown without a code) when MacroDroid is off, pre-v26 or on refund hold.
+  if (inv.status === "unpaid" || inv.status === "partial") {
+    const code = await (await import("./payment-signals.server")).ensureUniqueCode(inv.id);
+    inv = { ...inv, unique_code: code };
+  }
   const [items, pays, today, pending, methodIds] = await Promise.all([
     db().from("invoice_items").select("*").eq("invoice_id", inv.id).order("position"),
     db()
@@ -376,7 +382,11 @@ export async function deleteInvoice(inv: InvoiceRow) {
     .eq("invoice_id", inv.id);
   if (pays.error) throw new Error(pays.error.message);
   const txIds = (pays.data ?? []).map((p) => p.transaction_id).filter((x): x is string => !!x);
-  const extIds = (pays.data ?? []).map((p) => paymentExternalId(p.id));
+  // v26: "Kode unik" incomes booked with these payments go too (read before the cascade).
+  const codeIds = await (
+    await import("./payment-signals.server")
+  ).uniqueCodeExternalIds((pays.data ?? []).map((p) => p.id));
+  const extIds = [...(pays.data ?? []).map((p) => paymentExternalId(p.id)), ...codeIds];
   // v25: refuse while a Midtrans order is pending/paid (history must not vanish); drop dead ones.
   await (await import("./gateway/payments.server")).releaseInvoiceGateway(inv.id);
   // v24: proof images live in Storage; the rows go with the invoice (cascade).
@@ -533,15 +543,23 @@ export async function loadPayment(id: string) {
   return res.data ?? null;
 }
 
-/** Deletes a payment and its income transaction, then recomputes paid/status. */
+/**
+ * Deletes a payment and its income transaction (plus the v26 "Kode unik" income booked with it),
+ * then recomputes paid/status.
+ */
 export async function deletePayment(
   inv: InvoiceRow,
   payment: { id: string; amount: number | string; transaction_id: string | null },
 ) {
+  // Read before the delete: payment_signals.payment_id is set to null by the FK.
+  const codeIds = await (
+    await import("./payment-signals.server")
+  ).uniqueCodeExternalIds([payment.id]);
   const del = await db().from("invoice_payments").delete().eq("id", payment.id);
   if (del.error) throw new Error(del.error.message);
   await removePaymentTransactions(payment.transaction_id ? [payment.transaction_id] : [], [
     paymentExternalId(payment.id),
+    ...codeIds,
   ]);
   const updated = await syncInvoice(inv.id);
   await (
