@@ -183,6 +183,13 @@ export function NotifyFormatsCard() {
             </Badge>
             {data!.generic ? <Badge variant="outline">{t("Format generik aktif")}</Badge> : null}
           </div>
+          {data!.auto_confirm ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t(
+                "Konfirmasi otomatis hanya untuk format yang kolom Aplikasi-nya berisi nama paket persis (mis. com.bca). Format generik dan format dengan nama aplikasi saja tetap menunggu verifikasi.",
+              )}
+            </p>
+          ) : null}
           {!data!.configured ? (
             <p className="mt-2 text-xs text-muted-foreground">
               {t(
@@ -326,6 +333,11 @@ function SampleTester({
               <span className="num font-semibold">
                 {money(result.amount, "IDR", { reveal: true })}
               </span>
+              <span className="block text-xs text-muted-foreground">
+                {result.trusted
+                  ? t("Bisa dikonfirmasi otomatis (nama paket cocok).")
+                  : t("Selalu menunggu verifikasi (bukan nama paket persis atau format generik).")}
+              </span>
             </>
           ) : (
             <>
@@ -417,7 +429,7 @@ function FormatDialog({
           {field(
             "app_match",
             "Aplikasi",
-            "Potongan nama paket atau nama aplikasi, pisahkan dengan koma (mis. com.bca, BCA). Kosong = semua aplikasi.",
+            "Nama paket (mis. com.bca, cocok juga com.bca.x) atau kata dari nama aplikasi (mis. BCA), pisahkan dengan koma. Kosong = semua aplikasi. Konfirmasi otomatis hanya untuk nama paket.",
             NOTIFY_LIMITS.match,
           )}
           <div className="col-span-2 space-y-1.5 sm:col-span-1">

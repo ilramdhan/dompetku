@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLAIM_RETRIES,
   DEFAULT_AMOUNT_REGEX,
   REGEX_PROBLEM,
+  UNIQUE_CODE_COOLDOWN_MS,
+  autoConfirmable,
+  claimBackoffMs,
+  packageMatches,
   GENERIC_FORMAT,
   MAX_SCAN_CHARS,
   NOTIFY_PRESETS,
@@ -262,6 +267,50 @@ describe("parseNotification", () => {
     expect(appMatches({ app_match: "dana" }, note("", "", "ovo.id", "OVO"))).toBe(false);
     expect(appMatches({ app_match: null }, note("", ""))).toBe(true);
   });
+
+  it("appMatches never matches bare substrings (security review #1 no. 2)", () => {
+    // "bca" ⊂ "com.abcapp" / "ABCApp" must not match
+    expect(appMatches({ app_match: "bca" }, note("", "", "com.abcapp", "ABCApp"))).toBe(false);
+    expect(appMatches({ app_match: "com.bca" }, note("", "", "com.bcafake", "x"))).toBe(false);
+    expect(appMatches({ app_match: "com.bca" }, note("", "", "evil.com.bca", "x"))).toBe(false);
+    expect(appMatches({ app_match: "com.bca" }, note("", "", "com.bca.mobile", "x"))).toBe(true);
+    expect(appMatches({ app_match: "bca" }, note("", "", "com.bca", "m"))).toBe(true);
+    expect(appMatches({ app_match: "livin mandiri" }, note("", "", "x", "Livin' Mandiri"))).toBe(
+      true,
+    );
+    expect(appMatches({ app_match: "mandiri" }, note("", "", "x", "Mandirisyariah"))).toBe(false);
+    expect(appMatches({ app_match: "by mandiri" }, note("", "", "x", "Livin' by Mandiri"))).toBe(
+      true,
+    );
+  });
+
+  it("packageMatches is exact or a dot-segment prefix", () => {
+    expect(packageMatches("com.bca", "com.bca")).toBe(true);
+    expect(packageMatches("COM.BCA", "com.bca.x")).toBe(true);
+    expect(packageMatches("com.bca", "com.bcax")).toBe(false);
+    expect(packageMatches("", "com.bca")).toBe(false);
+    expect(packageMatches("com.bca", "")).toBe(false);
+  });
+
+  it("auto-confirm only trusts a saved format pinned to the notifying package", () => {
+    const pkg = { package: "com.bca" };
+    expect(autoConfirmable({ app_match: "com.bca, BCA" }, false, pkg)).toBe(true);
+    expect(autoConfirmable({ app_match: "BCA" }, false, pkg)).toBe(false);
+    expect(autoConfirmable({ app_match: null }, false, pkg)).toBe(false);
+    expect(autoConfirmable({ app_match: "com.bca" }, true, pkg)).toBe(false);
+    expect(autoConfirmable({ app_match: "com.bca" }, false, { package: "com.fake" })).toBe(false);
+    // the parse result carries it
+    const bca = fmt({ name: "BCA", app_match: "com.bca" });
+    const r = parseNotification([bca], note("Dana Masuk", "Rp 1.000 dari X"));
+    expect(r).toMatchObject({ kind: "amount", trusted: true });
+    const g = parseNotification([], note("Dana Masuk", "Rp 1.000 dari X"), { generic: true });
+    expect(g).toMatchObject({ kind: "amount", generic: true, trusted: false });
+    const byName = parseNotification(
+      [fmt({ app_match: "bca" })],
+      note("Dana Masuk", "Rp 1.000 dari X"),
+    );
+    expect(byName).toMatchObject({ kind: "amount", trusted: false });
+  });
 });
 
 describe("formats", () => {
@@ -306,6 +355,32 @@ describe("notification normalisation & minimisation", () => {
     expect(m).toContain("••••••210");
     expect(m).toContain("••••567");
     expect(minimiseText({ title: "", text: "x".repeat(1000) }).length).toBe(300);
+  });
+
+  it("masks numbers split by -, . or spaces (security review #1 no. 7)", () => {
+    const m = minimiseText({
+      title: "Dana masuk",
+      text: "Rp 1.250.000 dari 0812-3456-7890, rek 123 456 7890, ref 12.34.56.78, kartu 4111 1111 1111 1111",
+    });
+    for (const leak of ["0812", "3456", "123 456", "12.34.56", "4111"])
+      expect(m, leak).not.toContain(leak);
+    expect(m).toContain("Rp 1.250.000");
+    expect(m).toContain("••••••890");
+    expect(m).toContain("•••••678");
+    expect(m).toContain("••••••111");
+  });
+
+  it("keeps amounts, short numbers and thousands groupings readable", () => {
+    expect(
+      minimiseText({
+        title: "",
+        text: "IDR1,250,000.00 · Rp150.000,00 · total 1.250.000 · jam 12 34",
+      }),
+    ).toBe("IDR1,250,000.00 · Rp150.000,00 · total 1.250.000 · jam 12 34");
+    // an amount followed by a long number keeps the amount and masks the rest
+    expect(minimiseText({ title: "", text: "Rp 10.000 0812 3456 7890" })).toBe(
+      "Rp 10.000 ••••••890",
+    );
   });
 
   it("reads timestamps and checks freshness", () => {
@@ -405,6 +480,9 @@ describe("unique codes & matching", () => {
     );
     expect(confirmProblem(open, i, 1001)).toBe("Pembayaran melebihi sisa tagihan");
     expect(confirmProblem(open, i, 0)).toBe("Jumlah harus lebih dari 0");
+    expect(confirmProblem(open, i, 1000, true)).toBe(
+      "Invoice ditahan karena refund; klik Tagih ulang dulu",
+    );
   });
 });
 
@@ -471,5 +549,23 @@ describe("v26 wiring", () => {
       payment_amount: 1,
     });
     expect(paid.text).not.toContain("kode unik");
+  });
+});
+
+describe("serialised booking & code cooldown", () => {
+  it("claim backoff grows, is jittered and capped", () => {
+    expect(claimBackoffMs(0, () => 0)).toBe(40);
+    expect(claimBackoffMs(0, () => 1)).toBe(80);
+    expect(claimBackoffMs(3, () => 0)).toBe(320);
+    expect(claimBackoffMs(20, () => 1)).toBe(1_000);
+    expect(CLAIM_RETRIES).toBeGreaterThanOrEqual(5);
+    // total worst-case wait stays a few seconds (MacroDroid HTTP timeout)
+    let total = 0;
+    for (let i = 0; i < CLAIM_RETRIES; i++) total += claimBackoffMs(i, () => 1);
+    expect(total).toBeLessThan(6_000);
+  });
+
+  it("a released unique code is held for 48 h (the signal age window)", () => {
+    expect(UNIQUE_CODE_COOLDOWN_MS).toBe(SIGNAL_MAX_AGE_MS);
   });
 });

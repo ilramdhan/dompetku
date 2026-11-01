@@ -607,12 +607,52 @@ function textMatches(value: string, pattern: string | null, mode: MatchMode): bo
   return v.toLowerCase().includes(p.toLowerCase());
 }
 
-/** App filter: any listed substring in the package or the app name (case-insensitive). */
+/** `com.bca` matches the package `com.bca` or `com.bca.mobile` (whole dot segments only). */
+export function packageMatches(entry: string, pkg: string): boolean {
+  const e = entry.trim().toLowerCase();
+  const p = pkg.trim().toLowerCase();
+  return !!e && !!p && (p === e || p.startsWith(`${e}.`));
+}
+
+const words = (s: string) =>
+  s
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+
+/**
+ * App filter. An entry with a dot is a package name (whole dot segments, see `packageMatches`);
+ * an entry without a dot is a word of the app name or one segment of the package
+ * (case-insensitive). Never a bare substring: "bca" does not match `com.abcapp`. Empty = any app.
+ */
 export function appMatches(f: Pick<NotifyFormat, "app_match">, n: NotificationInput): boolean {
   const list = keywords(f.app_match);
   if (!list.length) return true;
-  const hay = `${n.package}\n${n.app}`.toLowerCase();
-  return list.some((k) => hay.includes(k));
+  const segs = n.package.toLowerCase().split(".");
+  const appWords = words(n.app);
+  return list.some((k) => {
+    if (k.includes(".")) return packageMatches(k, n.package);
+    const kw = words(k);
+    if (!kw.length) return false;
+    if (kw.length === 1 && segs.includes(kw[0]!)) return true;
+    // multi-word entry ("livin mandiri") = consecutive words of the app name
+    return appWords.some((_, i) => kw.every((w, j) => appWords[i + j] === w));
+  });
+}
+
+/**
+ * Whether a parsed notification may be booked by auto-confirm: only a saved, non-generic format
+ * whose app list names a package (an entry with a dot) that equals the notifying package. App
+ * names and the generic fallback can be posted by any app on the phone, so they always wait for
+ * the admin.
+ */
+export function autoConfirmable(
+  f: Pick<NotifyFormat, "app_match">,
+  generic: boolean,
+  n: Pick<NotificationInput, "package">,
+): boolean {
+  if (generic) return false;
+  return keywords(f.app_match).some((k) => k.includes(".") && packageMatches(k, n.package));
 }
 
 /** Amount from the format's regex: named group `amount`, else the first group, else the match. */
@@ -626,7 +666,14 @@ export function extractAmount(regex: string, text: string): number | null {
 }
 
 export type ParseResult =
-  | { kind: "amount"; amount: number; format: NotifyFormat; generic: boolean }
+  | {
+      kind: "amount";
+      amount: number;
+      format: NotifyFormat;
+      generic: boolean;
+      /** May be booked by auto-confirm (see `autoConfirmable`). */
+      trusted: boolean;
+    }
   | { kind: "ignored"; reason: string; format: NotifyFormat | null }
   | { kind: "none"; reason: string };
 
@@ -668,17 +715,37 @@ export function parseNotification(
     return { kind: "ignored", reason: PARSE_REASON.noKeyword, format: f };
   const amount = extractAmount(f.amount_regex, text);
   if (amount === null) return { kind: "ignored", reason: PARSE_REASON.noAmount, format: f };
-  return { kind: "amount", amount, format: f, generic };
+  return { kind: "amount", amount, format: f, generic, trusted: autoConfirmable(f, generic, n) };
 }
 
 /**
- * What is stored of a notification: one line, ≤ NOTIFY_LIMITS.excerpt, digit runs of 6+ (account,
- * card or reference numbers) masked except the last 3 digits. Amounts with separators survive.
+ * What is stored of a notification: one line, ≤ NOTIFY_LIMITS.excerpt, numbers of 6+ digits
+ * (account, card, phone or reference numbers — also when written in groups joined by `-`, `.` or
+ * spaces, e.g. "0812-3456-7890", "123 456 7890") masked except the last 3 digits. Amounts survive:
+ * a number right after Rp/IDR, or one in thousands grouping ("1.250.000", "1,250,000.00").
  */
 export function minimiseText(n: Pick<NotificationInput, "title" | "text">): string {
   return `${n.title}${n.title && n.text ? " · " : ""}${n.text}`
-    .replace(/\d{6,}/g, (d) => `${"•".repeat(Math.min(6, d.length - 3))}${d.slice(-3)}`)
+    .replace(
+      /((?:rp\.?|idr)\s?)?(\d+(?:[-., ]\d+)*)/gi,
+      (_, pre: string | undefined, run: string) => {
+        if (!pre) return maskNumber(run);
+        const amount = /^\d[\d.,]*/.exec(run)![0].replace(/[.,]$/, "");
+        return `${pre}${amount}${maskNumber(run.slice(amount.length))}`;
+      },
+    )
     .slice(0, NOTIFY_LIMITS.excerpt);
+}
+
+/** A digit run (possibly with `-`/`.`/`,`/space separators): kept when short or thousands-grouped. */
+function maskNumber(run: string): string {
+  const lead = /^\D*/.exec(run)![0];
+  const body = run.slice(lead.length);
+  const digits = body.replace(/\D/g, "");
+  if (digits.length < 6) return run;
+  if (/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$|^\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(body))
+    return run;
+  return `${lead}${"•".repeat(Math.min(6, digits.length - 3))}${digits.slice(-3)}`;
 }
 
 /** Notification time from MacroDroid's `{not_timestamp}` (ms epoch) or an ISO string; else null. */
@@ -800,17 +867,50 @@ export const SIGNAL_STATUS_LABEL: Record<SignalStatus, string> = {
 /** Payment reference of a booked signal (also used for crash recovery). */
 export const signalReference = (id: string) => `signal:${id.slice(0, 8)}`;
 
-/** Problem with confirming a signal for an invoice (i18n key) or null. */
+export const CONFIRM_PROBLEM = {
+  done: "Notifikasi ini sudah diproses",
+  closed: "Invoice ini tidak bisa menerima pembayaran",
+  held: "Invoice ditahan karena refund; klik Tagih ulang dulu",
+  zero: "Jumlah harus lebih dari 0",
+  over: "Pembayaran melebihi sisa tagihan",
+} as const;
+
+/**
+ * Problem with confirming a signal for an invoice (i18n key) or null. `held` = the invoice is on
+ * v25 refund hold (the customer was just refunded; nothing is booked until "Tagih ulang").
+ */
 export function confirmProblem(
   signal: { status: string; payment_id?: string | null },
   inv: { status: string; total: number | string; paid: number | string },
   pay: number,
+  held = false,
 ): string | null {
   if (!OPEN_SIGNAL_STATUSES.includes(signal.status as SignalStatus) || signal.payment_id)
-    return "Notifikasi ini sudah diproses";
-  if (inv.status !== "unpaid" && inv.status !== "partial")
-    return "Invoice ini tidak bisa menerima pembayaran";
-  if (!(pay > 0)) return "Jumlah harus lebih dari 0";
-  if (pay > Number(inv.total) - Number(inv.paid) + EPS) return "Pembayaran melebihi sisa tagihan";
+    return CONFIRM_PROBLEM.done;
+  if (inv.status !== "unpaid" && inv.status !== "partial") return CONFIRM_PROBLEM.closed;
+  if (held) return CONFIRM_PROBLEM.held;
+  if (!(pay > 0)) return CONFIRM_PROBLEM.zero;
+  if (pay > Number(inv.total) - Number(inv.paid) + EPS) return CONFIRM_PROBLEM.over;
   return null;
 }
+
+/**
+ * Bookings of one invoice are serialised: only one signal per invoice may hold a claim
+ * (`payment_signals_invoice_claim_idx`). A request that finds the invoice busy waits and retries
+ * this many times, with a jittered, growing delay (`claimBackoffMs`).
+ */
+export const CLAIM_RETRIES = 8;
+export function claimBackoffMs(attempt: number, rand: () => number = Math.random): number {
+  const base = Math.min(1_000, 80 * 2 ** Math.max(0, attempt));
+  return Math.round(base / 2 + base * Math.max(0, Math.min(1, rand())) * 0.5);
+}
+
+/** A released unique code stays reserved this long before another invoice may get it. */
+export const UNIQUE_CODE_COOLDOWN_MS = SIGNAL_MAX_AGE_MS;
+
+/** Reason stored on matched signals that auto-confirm skipped or later superseded. */
+export const SIGNAL_REASON = {
+  untrusted: "Tidak dikonfirmasi otomatis: format tanpa nama paket aplikasi atau format generik",
+  held: "Invoice ditahan karena refund; klik Tagih ulang dulu",
+  superseded: "Invoice sudah lunas atau tidak terbuka lagi",
+} as const;

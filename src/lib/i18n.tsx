@@ -1694,8 +1694,6 @@ const DICT: Record<string, string> = {
   "Minimal 32 karakter (huruf, angka, - atau _)":
     "At least 32 characters (letters, digits, - or _)",
   "Konfirmasi otomatis": "Auto-confirm",
-  "false (default) = notifikasi yang cocok hanya ditandai Menunggu verifikasi. true = langsung dicatat lunas; notifikasi bisa dipalsukan aplikasi lain di HP, aktifkan dengan hati-hati.":
-    "false (default) = a matching notification only marks the invoice Awaiting verification. true = booked as paid right away; other apps on the phone can fake notifications, enable with care.",
   "Format generik (Rupiah)": "Generic format (Rupiah)",
   "true = notifikasi yang tidak cocok dengan format mana pun tetap dicoba dengan pola nominal Rupiah umum + kata kunci uang masuk.":
     "true = notifications matching no format are still tried with a common Rupiah amount pattern + incoming-money keywords.",
@@ -1717,8 +1715,6 @@ const DICT: Record<string, string> = {
     "Regex may be slow (nested quantifiers), simplify the pattern",
   "Regex berisiko lambat (terlalu banyak * atau +), sederhanakan polanya":
     "Regex may be slow (too many * or +), simplify the pattern",
-  "Regex berisiko lambat (dua pengulangan bisa mencocokkan karakter yang sama), sederhanakan polanya":
-    "Regex may be slow (two repetitions can match the same characters), simplify the pattern",
   "Nama format wajib diisi": "Format name is required",
   "Nama format terlalu panjang": "Format name is too long",
   "Teks pencocokan terlalu panjang": "Match text is too long",
@@ -1739,8 +1735,6 @@ const DICT: Record<string, string> = {
   "Waktu notifikasi di luar jendela 48 jam": "Notification time outside the 48-hour window",
   "Tidak ada invoice dengan nominal ini": "No invoice with this amount",
   "Diabaikan admin": "Ignored by admin",
-  "Potongan nama paket atau nama aplikasi, pisahkan dengan koma (mis. com.bca, BCA). Kosong = semua aplikasi.":
-    "Part of the package or app name, comma-separated (e.g. com.bca, BCA). Empty = all apps.",
   "Opsional. Kosong = judul apa saja.": "Optional. Empty = any title.",
   "Opsional. Kosong = teks apa saja.": "Optional. Empty = any text.",
   "Wajib mengandung salah satu": "Must contain one of",
@@ -1753,6 +1747,26 @@ const DICT: Record<string, string> = {
   "Notifikasi bank diterima": "Bank notification received",
   "Notifikasi bank dikonfirmasi": "Bank notification confirmed",
   "Notifikasi bank diabaikan": "Bank notification ignored",
+  "Nama paket (mis. com.bca, cocok juga com.bca.x) atau kata dari nama aplikasi (mis. BCA), pisahkan dengan koma. Kosong = semua aplikasi. Konfirmasi otomatis hanya untuk nama paket.":
+    "Package name (e.g. com.bca, also matches com.bca.x) or a word of the app name (e.g. BCA), comma-separated. Empty = all apps. Auto-confirm only works with package names.",
+  "false (default) = notifikasi yang cocok hanya ditandai Menunggu verifikasi. true = langsung dicatat, tetapi hanya untuk format dengan nama paket aplikasi persis (bukan format generik atau nama aplikasi saja); notifikasi bisa dipalsukan aplikasi lain di HP, aktifkan dengan hati-hati.":
+    "false (default) = matching notifications are only marked Awaiting verification. true = booked right away, but only for formats with an exact app package name (not the generic format or app names only); other apps on the phone can fake notifications, enable with care.",
+  "Konfirmasi otomatis hanya untuk format yang kolom Aplikasi-nya berisi nama paket persis (mis. com.bca). Format generik dan format dengan nama aplikasi saja tetap menunggu verifikasi.":
+    "Auto-confirm only applies to formats whose App field holds an exact package name (e.g. com.bca). The generic format and formats with app names only still wait for verification.",
+  "Bisa dikonfirmasi otomatis (nama paket cocok).": "Can be auto-confirmed (package name matches).",
+  "Selalu menunggu verifikasi (bukan nama paket persis atau format generik).":
+    "Always waits for verification (no exact package name, or the generic format).",
+  "Regex berisiko lambat (dua pengulangan bisa mencocokkan karakter yang sama), sederhanakan polanya":
+    "Regex may be slow (two repetitions can match the same characters), simplify the pattern",
+  "Invoice ditahan karena refund; klik Tagih ulang dulu":
+    "Invoice is on hold after a refund; click Bill again first",
+  "Tidak dikonfirmasi otomatis: format tanpa nama paket aplikasi atau format generik":
+    "Not auto-confirmed: format without an app package name, or the generic format",
+  "Invoice sudah lunas atau tidak terbuka lagi": "Invoice is already paid or no longer open",
+  "Invoice sedang memproses pembayaran lain, coba lagi":
+    "The invoice is processing another payment, try again",
+  "Nominal tidak lagi sama dengan sisa tagihan + kode unik":
+    "The amount no longer equals the amount due + unique code",
 };
 
 const LangContext = createContext<{

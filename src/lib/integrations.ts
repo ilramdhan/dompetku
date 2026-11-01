@@ -251,7 +251,7 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
     group: "macrodroid",
     secret: false,
     label: "Konfirmasi otomatis",
-    help: "false (default) = notifikasi yang cocok hanya ditandai Menunggu verifikasi. true = langsung dicatat lunas; notifikasi bisa dipalsukan aplikasi lain di HP, aktifkan dengan hati-hati.",
+    help: "false (default) = notifikasi yang cocok hanya ditandai Menunggu verifikasi. true = langsung dicatat, tetapi hanya untuk format dengan nama paket aplikasi persis (bukan format generik atau nama aplikasi saja); notifikasi bisa dipalsukan aplikasi lain di HP, aktifkan dengan hati-hati.",
     default: "false",
     validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
   },
