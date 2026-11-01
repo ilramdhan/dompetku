@@ -13,7 +13,7 @@ so you can follow along even if you are new to web development.
 - [Tech stack](#tech-stack)
 - [System diagram](#system-diagram)
 - [Directory structure](#directory-structure)
-- [Database schema sections (v1–v25)](#database-schema-sections-v1v25)
+- [Database schema sections (v1–v27)](#database-schema-sections-v1v27)
 - [Key flows](#key-flows)
 - [Conventions and contributor rules](#conventions-and-contributor-rules)
 - [Testing and CI](#testing-and-ci)
@@ -128,7 +128,7 @@ collapsed. Lovable planning drafts in `.lovable/` are omitted.
 │   ├── icons/                     # PWA icons (collapsed)
 │   ├── manifest.webmanifest       # PWA manifest (no service worker)
 │   └── (robots.txt and sitemap.xml are server routes in src/routes)
-├── supabase/schema.sql            # Full database schema, sections v1–v25, safe to re-run
+├── supabase/schema.sql            # Full database schema, sections v1–v27, safe to re-run
 ├── src/
 │   ├── server.ts                  # Server entry wrapper: catches SSR errors → logError + error page
 │   ├── start.ts                   # Global request middleware: security headers, error page, CSRF
@@ -208,7 +208,7 @@ File-name suffixes tell you where code may run:
 | `i18n.tsx`                                                                    | `LanguageProvider` / `useI18n`, ID→EN dictionary.                                                                      |
 | `dates.ts`, `head.ts`, `utils.ts`                                             | Date helpers, page `<head>` helper, `cn()` class merge.                                                                |
 
-## Database schema sections (v1–v25)
+## Database schema sections (v1–v27)
 
 `supabase/schema.sql` is one file, organised in sections that are **safe to re-run** (`if not
 exists` everywhere). A fresh install runs the whole file once. Existing installs run any newer
@@ -242,6 +242,7 @@ the section is run.
 | v23     | Public invoice link: `invoice_shares` (invoice_id PK cascade, `token_hash` unique SHA-256 hex, created_at, expires_at, revoked_at). Not backed up. (v22 is reserved for another section.)                                                                                                                                                                                                                                                |
 | v24     | Invoice payments: `payment_methods` (bank/qris, label, bank fields, `qris_image` data URL, optional `account_id`, active, position), `invoice_payment_methods` (invoice × method), `invoice_proofs` (file_path, claimed_amount, payer, note, status `pending`/`approved`/`rejected`, reject_reason, ip_hash, payment_id), `rate_limits` + `dk_rate_hit()` (not backed up).                                                               |
 | v25     | Payment gateway: `gateway_transactions` (invoice_id → invoices **on delete restrict**, provider, `order_id` unique, `gateway_tx_id` unique, status `pending`/`success`/`failed`/`expired`/`refunded`/`partial_refund`, gross/refunded amount, payment_type, `payment_id` → invoice_payments set null, snap_token/redirect_url (stripped from backups), expires_at, claimed_at, last_error, filtered `raw`), `invoice_payments.refunded`. |
+| v27     | Invoice email language: optional `invoices.lang` (`id`/`en`, null = `id`) used by the invoice email, payment confirmations and due reminders; saves drop it and retry when the section is not run.                                                                                                                                                                                                                                       |
 
 ## Key flows
 
