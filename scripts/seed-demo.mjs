@@ -178,7 +178,7 @@ async function wipeReceipts() {
 
 /** True when `table` (and optionally `column`) exists; optional schema sections may not be run. */
 async function hasTable(table, column = "id") {
-  const { error } = await sb.from(table).select(column, { head: true }).limit(1);
+  const { error } = await sb.from(table).select(column).limit(1);
   return !error;
 }
 
