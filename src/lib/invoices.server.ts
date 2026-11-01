@@ -24,7 +24,8 @@ import {
   invoiceTotal,
   nextInvoiceNumber,
   paidSum,
-  paymentOvershoots,
+  overshootDecision,
+  stillOvershoots,
   paymentExternalId,
   paymentProblem,
   remainingOf,
@@ -441,6 +442,20 @@ export async function recordPayment(inv: InvoiceRow, p: PaymentInput) {
   return (await bookPayment(inv, p)).invoice;
 }
 
+/** Wait before the "recheck" re-read, so a racing later payment can finish its rollback. */
+export const OVERSHOOT_RECHECK_MS = 1500;
+
+async function overshoots(inv: InvoiceRow, paymentId: string): Promise<boolean> {
+  const read = () => db().from("invoice_payments").select("*").eq("invoice_id", inv.id);
+  const after = await read();
+  if (after.error) return false;
+  const d = overshootDecision(after.data ?? [], inv.total, paymentId);
+  if (d !== "recheck") return d === "rollback";
+  await new Promise((r) => setTimeout(r, OVERSHOOT_RECHECK_MS));
+  const again = await read();
+  return again.error ? true : stillOvershoots(again.data ?? [], inv.total);
+}
+
 /** `recordPayment` that also returns the new payment id (v24 proof approval links it). */
 export async function bookPayment(
   inv: InvoiceRow,
@@ -465,10 +480,10 @@ export async function bookPayment(
     .single();
   if (ins.error) throw new Error(ins.error.message);
   const pay = ins.data;
-  // Re-check against concurrent payments: roll back this one only when it is the one that
-  // overshoots in (created_at, id) order, so the earliest of two racing payments is kept.
-  const after = await db().from("invoice_payments").select("*").eq("invoice_id", inv.id);
-  if (!after.error && paymentOvershoots(after.data ?? [], inv.total, pay.id)) {
+  // Re-check against concurrent payments: the later one of a racing pair (created_at, id) rolls
+  // back at once; the earlier one waits for it and still rolls back if the overshoot remains
+  // (created_at/commit inversion fails safe), see overshootDecision.
+  if (await overshoots(inv, pay.id)) {
     await db().from("invoice_payments").delete().eq("id", pay.id);
     throw new Error("Pembayaran melebihi sisa tagihan");
   }

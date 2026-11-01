@@ -85,24 +85,38 @@ export function paidSum(payments: readonly InvoicePaymentLike[]): number {
 }
 
 /**
- * Overshoot re-check after inserting payment `ownId` (concurrent bookings, review L2 of #124):
- * payments are ordered by `created_at, id` and only a payment whose running net sum exceeds the
- * total overshoots, so of two concurrent payments that together exceed the total the earliest is
- * kept and only the later one rolls back (previously both could). Missing `ownId` = no overshoot.
+ * Overshoot re-check after inserting payment `ownId` (concurrent bookings, reviews L2/L4 of #124):
+ * - "keep": the net sum of every payment fits the total;
+ * - "rollback": this payment's running net sum in `(created_at, id)` order overshoots, so it is
+ *   the later one of a racing pair;
+ * - "recheck": the sum overshoots only because of payments that sort AFTER this one. They are
+ *   expected to roll back, but `created_at` is the transaction start, not the commit, so a later
+ *   row may already have kept itself (it re-read before this one committed). The caller waits
+ *   briefly, re-reads, and rolls back unless the overshoot is gone. It fails safe like the old
+ *   "roll back on any overshoot" rule; at worst both roll back and the next sync re-books one.
  */
-export function paymentOvershoots(
+export function overshootDecision(
   payments: readonly (InvoicePaymentLike & { id: string; created_at?: string | null })[],
   total: number | string,
   ownId: string,
-): boolean {
+): "keep" | "rollback" | "recheck" {
+  if (!(paidSum(payments) > Number(total) + EPS)) return "keep";
   const sorted = [...payments].sort((a, b) => {
     const ta = Date.parse(a.created_at ?? "") || 0;
     const tb = Date.parse(b.created_at ?? "") || 0;
     return ta !== tb ? ta - tb : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
   const i = sorted.findIndex((p) => p.id === ownId);
-  if (i < 0) return false;
-  return paidSum(sorted.slice(0, i + 1)) > Number(total) + EPS;
+  if (i < 0) return "rollback";
+  return paidSum(sorted.slice(0, i + 1)) > Number(total) + EPS ? "rollback" : "recheck";
+}
+
+/** Final word after the "recheck" wait: true = this payment must roll back (still overshoots). */
+export function stillOvershoots(
+  payments: readonly InvoicePaymentLike[],
+  total: number | string,
+): boolean {
+  return paidSum(payments) > Number(total) + EPS;
 }
 
 /** Amount still to pay (never negative). */
