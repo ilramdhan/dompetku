@@ -420,9 +420,14 @@ User guide: [PAYMENT-GATEWAY.md](PAYMENT-GATEWAY.md).
 User guide: [MACRODROID.md](MACRODROID.md).
 
 - **Layers.** `src/lib/bank-notify.ts` (pure, client-safe, shared by Settings and the server):
-  `parseRupiah`, `regexProblem`/`compileRegex` (≤200 chars, must compile, rejects
-  backreferences, lookbehind, quantified groups containing an unbounded quantifier or an
-  alternation, > 3 unbounded quantifiers; regexes only see `MAX_SCAN_CHARS` = 600 chars),
+  `parseRupiah`, `regexProblem`/`compileRegex` (≤200 chars, must compile; a small parser accepts
+  only shapes that backtrack at most linearly: no backreferences/lookbehind, no quantified group
+  containing any variable quantifier or an alternation, no variable-length item followed — before
+  a mandatory disjoint item — by another variable item that can start with one of its characters
+  (character sets compared on probe characters), ≤ 3 small ambiguities, ≤ 3 unbounded
+  quantifiers; regexes only see `MAX_SCAN_CHARS` = 300 chars, the browser tester uses the same
+  code), `appMatches` (dot entries = package exact/dot-segment, others = whole app-name words or a
+  package segment, never substrings), `autoConfirmable`,
   `parseNotification` (first enabled format whose app/title/text filter matches, then optional
   generic fallback; ignore → must-contain → amount), presets, `minimiseText`, `pickUniqueCode`,
   `matchSignal`, `splitSignalAmount`. I/O in `payment-signals.server.ts`; admin fns in
@@ -433,21 +438,35 @@ User guide: [MACRODROID.md](MACRODROID.md).
   `rateHit` (`notify:bad`, 401/429) → 503 without v26 → per-device-hash limit → body ≤ 16 KB JSON.
   Body fields `app`, `package`, `title`, `text`, `big_text`, `sub_text`, `posted_at`
   (`{not_timestamp}`), `device`; unresolved magic text is dropped. Deduplicated by
-  `sha256(package|app, title, text, posted_at or 10-min bucket)`; > 48 h old → `ignored`.
+  `sha256(package|app, title, text, posted_at or the receive time in ms)` — without `posted_at`
+  there is effectively no dedupe, so two real transfers are never merged; > 48 h old → `ignored`.
 - **Matching.** Open invoices whose `remaining + unique_code` equals the amount (and created before
   the notification ± 10 min, optional format wallet): 1 → `matched` (display status `verifying`,
   "Menunggu verifikasi", added to pending proofs), > 1 → `ambiguous` (candidate ids), 0 →
-  `unmatched`. Codes are assigned lazily by `ensureUniqueCode()` (public page, invoice email) only
-  while the token is set, conditional on `unique_code is null`, retried on a unique violation, and
-  released by `syncInvoice`/`invoiceAction` when the invoice is no longer open.
+  `unmatched`. A match on a v25 refund-held invoice stays `matched` with a reason and is never
+  booked. Codes are assigned by `ensureUniqueCode()` only on admin actions (`createShare`,
+  invoice email, `getInvoice`), never by the public GET (read-only `peekUniqueCode()`), only while
+  the token is set and not on refund hold, conditional on `unique_code is null`, retried on a
+  unique violation, logged when all 999 are taken. `syncInvoice`/`invoiceAction` stamp
+  `unique_code_released_at` when the invoice is no longer open; the code stays reserved for 48 h
+  (`UNIQUE_CODE_COOLDOWN_MS` = signal age window) and is freed by the next assignment's sweep.
 - **Booking.** Default = admin queue (Invoice → Notifikasi bank: confirm with an editable amount
-  / ignore). `MACRODROID_AUTO_CONFIRM=true` books a single match immediately. Both go through
-  `confirmSignal()`: stale-claim release, atomic `claimed_at` claim (`payment_id is null and
-claimed_at is null`, open statuses), crash recovery via payment reference `signal:<id8>`,
-  `bookPayment()` for the remaining amount, the unique code as its own "Invoice" income
-  (`invoice_code:<signal id>`) and a best-effort `sendPaymentConfirmation`. Failures release the
-  claim and set `last_error`.
-- **Privacy.** Only a one-line excerpt (≤ 300 chars, digit runs ≥ 6 masked) is stored, never the
+  / ignore). `MACRODROID_AUTO_CONFIRM=true` books a single match immediately only when the parse
+  is `trusted` (`autoConfirmable`: saved non-generic format whose app list has a package entry
+  equal to / a dot-parent of the notifying package); otherwise it stays `matched` with a reason.
+  Both go through `confirmSignal(signal, invoiceId, plan, …)`: stale-claim release (signal and
+  invoice), atomic `claimed_at` claim (`payment_id is null and claimed_at is null`, open statuses)
+  that also sets `invoice_id`, so the partial unique index `payment_signals_invoice_claim_idx`
+  (one claim per invoice) serialises bookings of one invoice — a 23505 backs off
+  (`claimBackoffMs`, `CLAIM_RETRIES`) and retries. Under the claim the invoice and its refund hold
+  are re-read and `plan(inv)` computes pay/extra on the fresh remaining amount (auto: only an
+  exact remaining + code match; a no-longer-open invoice → signal `ignored` "superseded"). Then
+  crash recovery via payment reference `signal:<id8>`, `bookPayment()`, the unique code as its own
+  "Invoice" income (`invoice_code:<signal id>`, removed by `deletePayment`/`deleteInvoice` via
+  `uniqueCodeExternalIds`), sibling `matched` signals of a now-closed invoice → `ignored`, and a
+  best-effort `sendPaymentConfirmation`. Failures release the claim and set `last_error`.
+- **Privacy.** Only a one-line excerpt (≤ 300 chars, numbers ≥ 6 digits masked, also when grouped
+  with `-`/`.`/spaces; Rp/IDR amounts and thousands groupings kept) is stored, never the
   raw body; ignored/unmatched rows older than 90 days are pruned; `payment_signals` is not backed up.
 
 ### Users and wallet-level access (RBAC, v18)

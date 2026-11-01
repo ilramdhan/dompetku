@@ -9,7 +9,8 @@ lalu mencocokkannya dengan invoice yang belum lunas. HP meneruskan notifikasi le
 > **Penting.** Notifikasi bisa dipalsukan oleh aplikasi lain di HP, atau oleh siapa pun yang tahu
 > token perangkat. Karena itu, notifikasi yang cocok **hanya menandai** invoice sebagai
 > **Menunggu verifikasi**. Anda yang menekan **Konfirmasi**. Konfirmasi otomatis tersedia, tetapi
-> mati secara default.
+> mati secara default, dan hanya berlaku untuk format yang kolom **Aplikasi**-nya berisi **nama paket**
+> persis (mis. `com.bca`).
 
 ## Daftar isi
 
@@ -39,10 +40,14 @@ Pelanggan transfer ─► Aplikasi bank di HP ─► notifikasi "Dana masuk Rp 1
 
 **Kode unik.** Setiap invoice terbuka mendapat angka 1–999 rupiah. Angka ini ditambahkan ke
 jumlah transfer, misalnya sisa Rp 150.000 + kode 123 = **Rp 150.123**. Dengan begitu, dua
-pelanggan dengan tagihan sama tetap bisa dibedakan. Kode dan jumlah transfer tampil di halaman
-invoice publik (`/i/<token>`) dan di email invoice. Saat dikonfirmasi, sisa tagihan dicatat
-sebagai pembayaran invoice, sedangkan kode unik dicatat sebagai pemasukan kecil terpisah di
-kategori "Invoice".
+pelanggan dengan tagihan sama tetap bisa dibedakan. Kode diberikan saat Anda membagikan tautan,
+mengirim email invoice, atau membuka detail invoice, lalu tampil di halaman invoice publik
+(`/i/<token>`) dan di email invoice. Saat dikonfirmasi, sisa tagihan dicatat sebagai pembayaran
+invoice, sedangkan kode unik dicatat sebagai pemasukan kecil terpisah di kategori "Invoice"
+(ikut terhapus bila pembayarannya dihapus). Setelah invoice lunas atau batal, kodenya ditahan
+48 jam sebelum boleh dipakai invoice lain, supaya notifikasi yang terlambat tidak salah cocok.
+Invoice yang ditahan karena refund (Midtrans) tidak menampilkan kode dan tidak dicatat dari
+notifikasi sampai Anda klik **Tagih ulang**.
 
 ## 2. Yang perlu disiapkan
 
@@ -57,11 +62,11 @@ kategori "Invoice".
 
 Masuk sebagai admin, lalu buka **Pengaturan → Integrasi → Notifikasi bank (MacroDroid)**:
 
-| Pengaturan                | Isi                                                                                                                                                     |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MACRODROID_TOKEN`        | Token acak minimal 32 karakter (huruf, angka, `-`, `_`). Contoh: jalankan `openssl rand -hex 24`. Disimpan terenkripsi, tidak pernah tampil lagi.       |
-| `MACRODROID_AUTO_CONFIRM` | `false` (disarankan). Pilih `true` hanya jika Anda menerima risikonya, karena notifikasi palsu bisa langsung tercatat sebagai pembayaran.               |
-| `MACRODROID_GENERIC`      | `true` = notifikasi yang tidak cocok dengan format mana pun tetap dicoba dengan pola "Rp …" + kata uang masuk. Bagus untuk mulai, tetapi lebih longgar. |
+| Pengaturan                | Isi                                                                                                                                                                                                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MACRODROID_TOKEN`        | Token acak minimal 32 karakter (huruf, angka, `-`, `_`). Contoh: jalankan `openssl rand -hex 24`. Disimpan terenkripsi, tidak pernah tampil lagi.                                                                                                                                   |
+| `MACRODROID_AUTO_CONFIRM` | `false` (disarankan). Dengan `true`, hanya notifikasi dari format dengan nama paket persis yang langsung tercatat; format generik dan nama aplikasi saja tetap menunggu verifikasi. Aplikasi lain bisa memalsukan notifikasi, jadi pilih `true` hanya jika Anda menerima risikonya. |
+| `MACRODROID_GENERIC`      | `true` = notifikasi yang tidak cocok dengan format mana pun tetap dicoba dengan pola "Rp …" + kata uang masuk. Bagus untuk mulai, tetapi lebih longgar.                                                                                                                             |
 
 Tanpa token, endpoint menjawab **503** dan kode unik tidak dibuat.
 
@@ -73,9 +78,13 @@ diperbarui. Karena itu, format **diatur sendiri** di **Pengaturan → Format not
 1. Pilih contoh (BCA, Mandiri, BRI, BNI, DANA, OVO, GoPay, ShopeePay), lalu klik **Tambah contoh**.
    Contoh ini **belum diverifikasi** dengan notifikasi asli. Sesuaikan dengan notifikasi Anda.
 2. Klik ✏️ pada format untuk mengubah isiannya:
-   - **Aplikasi**: potongan nama paket atau nama aplikasi, dipisah koma (mis. `com.bca, BCA`).
-     Nama paket bisa dilihat di MacroDroid, di daftar aplikasi pada trigger Notifikasi, atau di
-     log sistem MacroDroid setelah notifikasi masuk.
+   - **Aplikasi**: nama paket atau kata dari nama aplikasi, dipisah koma (mis. `com.bca, BCA`).
+     Isian dengan titik adalah nama paket: cocok bila sama persis atau sub-paketnya
+     (`com.bca` cocok dengan `com.bca.mobile`, tidak dengan `com.bcafake`). Isian tanpa titik harus
+     sama dengan satu kata nama aplikasi atau satu bagian nama paket, bukan potongan kata
+     (`bca` tidak cocok dengan `com.abcapp`). **Konfirmasi otomatis hanya untuk nama paket.** Nama
+     paket bisa dilihat di MacroDroid, di daftar aplikasi pada trigger Notifikasi, atau di log
+     sistem MacroDroid setelah notifikasi masuk.
    - **Judul / Teks notifikasi** (opsional): harus _mengandung_ teks tertentu, atau cocok dengan
      _regex_.
    - **Regex nominal**: pola untuk mengambil nominal. Isi dengan grup bernama `(?<amount>…)` atau
@@ -93,8 +102,16 @@ ini berjalan di browser dan tidak mengirim apa pun. Kotak yang sama juga ada di 
 untuk menguji satu format saja.
 
 **Batas regex (demi keamanan server):** maksimal 200 karakter, harus valid, dan tanpa
-backreference/lookbehind. Pola bersarang seperti `(a+)+` atau `(a|b)*` ditolak, begitu pula lebih
-dari 3 `*`/`+`. Regex hanya dijalankan pada 600 karakter pertama notifikasi.
+backreference/lookbehind. Siapa pun bisa mengirim SMS/chat yang muncul sebagai notifikasi, jadi
+hanya pola yang tidak bisa "macet" yang diterima:
+
+- tidak boleh ada pengulangan di dalam grup yang diulang: `(a+)+`, `(a?){25}`, `(\d{1,30}){1,30}`,
+  `(a|b)*` ditolak;
+- dua pengulangan berdampingan yang bisa mencocokkan karakter yang sama ditolak: `\d*\d*`,
+  `\d+.*`, `\w+\d+`. Yang aman: `Rp\.?\s?\d[\d.,]*` atau `Rp ([\d.]+),\d{2}`;
+- maksimal 3 `*`/`+`.
+
+Regex hanya dijalankan pada 300 karakter pertama notifikasi.
 
 ## 5. Buat makro di MacroDroid
 
@@ -170,23 +187,27 @@ Di **Invoice → Notifikasi bank** (filter _Perlu dicek_):
 
 Konfirmasi mencatat pembayaran invoice (pemasukan kategori "Invoice", referensi `signal:…`),
 mencatat kode unik sebagai pemasukan tambahan bila nominalnya pas, lalu mengirim email konfirmasi
-ke pelanggan (bila Resend aktif). Klik ganda atau dua tab tidak pernah mencatat dua kali.
+ke pelanggan (bila Resend aktif). Klik ganda atau dua tab tidak pernah mencatat dua kali. Beberapa
+notifikasi untuk invoice yang sama dicatat bergantian: satu tercatat, dan notifikasi lain untuk
+invoice yang sudah lunas otomatis ditandai **Diabaikan** ("Invoice sudah lunas atau tidak terbuka
+lagi").
 
 ## 8. Pemecahan masalah
 
-| Gejala                                           | Penyebab / solusi                                                                                                                                                   |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Jawaban **401**                                  | Token salah. Header harus `Authorization: Bearer <token>` (dengan spasi) atau `X-Device-Token: <token>`. Terlalu banyak token salah dari satu IP → **429**.         |
-| Jawaban **503**                                  | `MACRODROID_TOKEN` belum diatur, v26 belum dijalankan, atau gangguan sementara (MacroDroid boleh mencoba lagi).                                                     |
-| Jawaban **403**                                  | Instance demo; fitur ini mati di demo.                                                                                                                              |
-| Jawaban **400**                                  | Body bukan JSON yang valid (tanda kutip/baris baru di notifikasi; pakai cara `{lvjson=payload}`) atau judul dan teks kosong.                                        |
-| Jawaban **413**                                  | Body lebih dari 16 KB.                                                                                                                                              |
-| Status **ignored** "Tidak ada format yang cocok" | Tambah/ubah format, cek isian **Aplikasi**, atau aktifkan `MACRODROID_GENERIC`.                                                                                     |
-| "Tidak ada kata kunci uang masuk"                | Tambah kata dari notifikasi Anda ke **Wajib mengandung salah satu**.                                                                                                |
-| "Nominal tidak ditemukan"                        | Sesuaikan **Regex nominal**; uji dengan **Uji teks contoh**.                                                                                                        |
-| Selalu **Tidak cocok**                           | Pelanggan tidak mentransfer jumlah persis (sisa + kode unik), atau invoice dibuat setelah notifikasi. Pilih invoice manual saat konfirmasi.                         |
-| Makro tidak jalan                                | Izin Notification Access, optimasi baterai, atau notifikasi bank disembunyikan Android (Android 15 bisa menyembunyikan konten sensitif). Cek log sistem MacroDroid. |
-| Notifikasi sama terkirim dua kali                | Aman: notifikasi dengan isi dan waktu sama di-dedupe (`duplicate: true`).                                                                                           |
+| Gejala                                           | Penyebab / solusi                                                                                                                                                                                                      |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Jawaban **401**                                  | Token salah. Header harus `Authorization: Bearer <token>` (dengan spasi) atau `X-Device-Token: <token>`. Terlalu banyak token salah dari satu IP → **429**.                                                            |
+| Jawaban **503**                                  | `MACRODROID_TOKEN` belum diatur, v26 belum dijalankan, atau gangguan sementara (MacroDroid boleh mencoba lagi).                                                                                                        |
+| Jawaban **403**                                  | Instance demo; fitur ini mati di demo.                                                                                                                                                                                 |
+| Jawaban **400**                                  | Body bukan JSON yang valid (tanda kutip/baris baru di notifikasi; pakai cara `{lvjson=payload}`) atau judul dan teks kosong.                                                                                           |
+| Jawaban **413**                                  | Body lebih dari 16 KB.                                                                                                                                                                                                 |
+| Status **ignored** "Tidak ada format yang cocok" | Tambah/ubah format, cek isian **Aplikasi**, atau aktifkan `MACRODROID_GENERIC`.                                                                                                                                        |
+| "Tidak ada kata kunci uang masuk"                | Tambah kata dari notifikasi Anda ke **Wajib mengandung salah satu**.                                                                                                                                                   |
+| "Nominal tidak ditemukan"                        | Sesuaikan **Regex nominal**; uji dengan **Uji teks contoh**.                                                                                                                                                           |
+| Selalu **Tidak cocok**                           | Pelanggan tidak mentransfer jumlah persis (sisa + kode unik), atau invoice dibuat setelah notifikasi. Pilih invoice manual saat konfirmasi.                                                                            |
+| Makro tidak jalan                                | Izin Notification Access, optimasi baterai, atau notifikasi bank disembunyikan Android (Android 15 bisa menyembunyikan konten sensitif). Cek log sistem MacroDroid.                                                    |
+| Notifikasi sama terkirim dua kali                | Aman bila body berisi `posted_at` (`{not_timestamp}`): notifikasi dengan isi dan waktu sama di-dedupe (`duplicate: true`). Tanpa `posted_at` tidak ada dedupe, agar dua transfer asli dengan teks sama tidak digabung. |
+| Konfirmasi otomatis tidak jalan                  | Alasan "Tidak dikonfirmasi otomatis": isi kolom **Aplikasi** dengan nama paket persis (mis. `com.bca`). Format generik tidak pernah dikonfirmasi otomatis.                                                             |
 
 ## 9. Keamanan dan privasi
 
@@ -195,7 +216,8 @@ ke pelanggan (bila Resend aktif). Klik ganda atau dua tab tidak pernah mencatat 
   memblokir HP Anda. Perangkat yang sah dibatasi 120 permintaan/jam dan 1500/hari. Ganti token
   (rotate) di Pengaturan bila HP hilang.
 - Dompetku **tidak menyimpan** payload mentah. Yang disimpan hanya cuplikan satu baris (≤300
-  karakter) dengan deretan angka ≥6 digit disamarkan, plus nominal, aplikasi, waktu, dan status.
+  karakter) dengan nomor ≥6 digit disamarkan (juga bila dipisah `-`, `.` atau spasi, mis. nomor HP
+  atau rekening), plus nominal, aplikasi, waktu, dan status.
   Notifikasi yang diabaikan atau tidak cocok dihapus otomatis setelah ±90 hari. Data ini tidak ikut
   backup.
 - Notifikasi lebih lama dari 48 jam (dari `{not_timestamp}`) diabaikan.
@@ -250,8 +272,10 @@ In **Settings → Integrations → Bank notifications (MacroDroid)**:
 - **`MACRODROID_TOKEN`**: a random token of 32+ characters (letters, digits, `-`, `_`), e.g. from
   `openssl rand -hex 24`. It is stored encrypted and never shown again. Without it the endpoint
   answers 503 and no unique codes are created.
-- **`MACRODROID_AUTO_CONFIRM`**: `false` (recommended). With `true`, a faked notification is
-  booked as paid immediately.
+- **`MACRODROID_AUTO_CONFIRM`**: `false` (recommended). With `true`, notifications parsed by a
+  format whose **App** field holds an exact package name (e.g. `com.bca`) are booked immediately;
+  the generic format and app-name-only formats still wait for you. Another app can still fake a
+  notification, so accept that risk first.
 - **`MACRODROID_GENERIC`**: with `true`, notifications that match no format are still tried with
   a generic "Rp …" pattern plus incoming-money keywords.
 
@@ -263,7 +287,10 @@ Manage formats in **Settings → Format notifikasi bank** (Bank notification for
 1. Pick an example (BCA, Mandiri, BRI, BNI, DANA, OVO, GoPay, ShopeePay) → **Add example**. These
    are **unverified examples**: adjust them to your real notifications.
 2. Edit a format to set:
-   - **App**: package or app name parts, comma-separated.
+   - **App**: package names or app-name words, comma-separated. An entry with a dot is a package
+     name and matches exactly or a sub-package (`com.bca` matches `com.bca.mobile`, not
+     `com.bcafake`); an entry without a dot must equal a whole word of the app name or one package
+     segment (`bca` does not match `com.abcapp`). **Auto-confirm only works with package names.**
    - Optional **title/text** filter: _contains_ or _regex_.
    - **Amount regex**: a named group `(?<amount>…)` or the first group holds the amount. The
      default pattern reads `Rp 1.250.000,00`, `IDR1,250,000.00` and `Rp. 50.000`.
@@ -281,7 +308,10 @@ matched format and the parsed amount right away. This runs in your browser and s
 - no backreferences or lookbehind;
 - nested or alternating quantified groups like `(a+)+` are rejected;
 - at most 3 `*`/`+`;
-- patterns only run on the first 600 characters of a notification.
+- no repetition inside a repeated group: `(a+)+`, `(a?){25}`, `(\d{1,30}){1,30}` are rejected;
+- no two neighbouring repetitions that can match the same character: `\d*\d*`, `\d+.*`,
+  `\w+\d+` are rejected (`Rp\.?\s?\d[\d.,]*` is fine);
+- patterns only run on the first 300 characters of a notification.
 
 ### 5. The macro
 
@@ -328,8 +358,14 @@ In **Invoice → Bank notifications**:
 - **Ignore** anything that is not an invoice payment.
 
 Confirming books the payment once: a double click or a second tab never books twice. It also
-books the unique code as extra income when the amount is exact, and sends the customer a
-confirmation email (best effort).
+books the unique code as extra income when the amount is exact (removed again with the payment),
+and sends the customer a confirmation email (best effort). Several notifications for one invoice
+are booked one at a time; once it is paid, the others are marked _Ignored_ automatically.
+
+Unique codes are assigned when you share the link, send the invoice email or open the invoice,
+and are held for 48 hours after the invoice is paid or cancelled before another invoice may get
+them. Invoices on a refund hold show no code and are never booked from a notification until you
+click **Tagih ulang** (Bill again).
 
 ### 8. Troubleshooting
 
@@ -343,6 +379,8 @@ confirmation email (best effort).
 | "No incoming-money keyword" | Add your bank's wording to **Must contain one of**.                                                                         |
 | "Amount not found"          | Adjust the **Amount regex**, test with **Test with sample text**.                                                           |
 | Always "No match"           | The customer did not transfer the exact amount due + code; pick the invoice by hand.                                        |
+| Not auto-confirmed          | Put the exact package name (e.g. `com.bca`) in the format's **App** field; the generic format is never auto-confirmed.      |
+| Duplicates                  | Send `posted_at` (`{not_timestamp}`); without it nothing is deduplicated so two real transfers are never merged.            |
 | Macro does not fire         | Notification Access, battery optimisation, Android 15 hiding sensitive notification content; check MacroDroid's system log. |
 
 ### 9. Security and privacy
@@ -353,7 +391,8 @@ confirmation email (best effort).
   device is limited to 120 requests/hour and 1500/day. Rotate the token in Settings if the phone
   is lost.
 - The raw payload is **never stored**. Dompetku keeps only:
-  - a one-line excerpt (≤ 300 characters) with digit runs of 6+ masked;
+  - a one-line excerpt (≤ 300 characters) with numbers of 6+ digits masked, also when split by
+    `-`, `.` or spaces (phone or account numbers);
   - the amount, app, time and status.
 - Ignored and unmatched rows are pruned after about 90 days, and none of this is backed up.
 - Notifications older than 48 hours are ignored.
