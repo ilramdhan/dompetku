@@ -983,6 +983,8 @@ const DICT: Record<string, string> = {
     "The stored value cannot be decrypted (key changed) — re-enter it. Using env meanwhile.",
   "Nilai tersimpan tidak valid — sementara memakai env.":
     "The stored value is invalid — using env meanwhile.",
+  "Nilai env tidak valid — periksa formatnya atau simpan nilai di sini.":
+    "The env value is invalid — check its format or save a value here.",
   "Tersimpan — ketik untuk mengganti": "Saved — type to replace",
   "Aktif:": "Active:",
   "Nilai aktif:": "Active value:",

@@ -148,7 +148,9 @@ function Field({
             ? t(
                 "Nilai tersimpan tidak bisa didekripsi (kunci berubah) — masukkan ulang. Sementara memakai env.",
               )
-            : t("Nilai tersimpan tidak valid — sementara memakai env.")}
+            : s.problem === "env"
+              ? t("Nilai env tidak valid — periksa formatnya atau simpan nilai di sini.")
+              : t("Nilai tersimpan tidak valid — sementara memakai env.")}
         </p>
       ) : null}
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row">

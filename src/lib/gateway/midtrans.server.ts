@@ -19,6 +19,7 @@ import {
 } from "./midtrans";
 import type { GatewayConfig, PaymentGateway, WebhookCheck } from "./types";
 import { parseMdrRules, type MdrRules } from "./mdr";
+import { logError } from "../monitoring.server";
 
 const TIMEOUT_MS = 10_000;
 
@@ -28,10 +29,26 @@ const TIMEOUT_MS = 10_000;
  * (MIDTRANS_API_BASE / MIDTRANS_SNAP_BASE) are env-only, for local E2E against a mock server, and
  * are ignored in production mode.
  */
-/** Parsed MIDTRANS_FEES, or null when empty/invalid (an invalid schedule books no MDR). */
-function feeRules(raw: string | null | undefined): MdrRules | null {
+/** Last invalid MIDTRANS_FEES value already logged (log once per distinct value, not per call). */
+let loggedBadFees: string | null = null;
+
+/**
+ * Parsed MIDTRANS_FEES, or null when empty/invalid (an invalid schedule books no MDR). A non-empty
+ * schedule that fails to parse (typically an env value, which bypasses `validateIntegration`, e.g.
+ * the decimal comma in `qris=0,7%`) is reported once via `logError("gateway:mdr-config")` without
+ * the value itself; Settings → Integrasi also flags it.
+ */
+export function feeRules(raw: string | null | undefined): MdrRules | null {
   const r = parseMdrRules(raw);
-  return r.ok && Object.keys(r.rules).length ? r.rules : null;
+  if (!r.ok) {
+    const v = (raw ?? "").trim();
+    if (v && v !== loggedBadFees) {
+      loggedBadFees = v;
+      logError("gateway:mdr-config", new Error(`MIDTRANS_FEES: ${r.error}`));
+    }
+    return null;
+  }
+  return Object.keys(r.rules).length ? r.rules : null;
 }
 
 export async function midtransConfig(): Promise<GatewayConfig | null> {

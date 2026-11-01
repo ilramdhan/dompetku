@@ -375,8 +375,11 @@ export type IntegrationStatus = {
   /** True when a DB row exists (so "remove" falls back to env). */
   stored: boolean;
   updated_at: string | null;
-  /** "decrypt" = stored secret cannot be decrypted (key rotated) → env used; "invalid" = bad DB value. */
-  problem: "decrypt" | "invalid" | null;
+  /**
+   * "decrypt" = stored secret cannot be decrypted (key rotated) → env used; "invalid" = bad DB
+   * value; "env" = the env value in use does not pass validation (it may be ignored by the feature).
+   */
+  problem: "decrypt" | "invalid" | "env" | null;
 };
 
 /* ---------------- Ciphertext format ---------------- */
