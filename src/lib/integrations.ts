@@ -9,7 +9,7 @@
  * they must exist before the database can be read, or they guard access to the settings themselves.
  */
 
-export type IntegrationGroup = "telegram" | "ai" | "email" | "n8n" | "payment";
+export type IntegrationGroup = "telegram" | "ai" | "email" | "n8n" | "payment" | "macrodroid";
 export type IntegrationSource = "db" | "env" | "default" | "none";
 
 export type IntegrationDef = {
@@ -236,6 +236,34 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
     default: "false",
     validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
   },
+  // v26 (#96): bank notifications forwarded by MacroDroid + unique codes. Off without a token.
+  {
+    key: "MACRODROID_TOKEN",
+    group: "macrodroid",
+    secret: true,
+    label: "Token perangkat MacroDroid",
+    help: "Minimal 32 karakter acak; dikirim MacroDroid di header Authorization: Bearer. Kosong = endpoint notifikasi dan kode unik nonaktif.",
+    validate: (v) =>
+      /^[A-Za-z0-9_-]{32,200}$/.test(v) ? null : "Minimal 32 karakter (huruf, angka, - atau _)",
+  },
+  {
+    key: "MACRODROID_AUTO_CONFIRM",
+    group: "macrodroid",
+    secret: false,
+    label: "Konfirmasi otomatis",
+    help: "false (default) = notifikasi yang cocok hanya ditandai Menunggu verifikasi. true = langsung dicatat lunas; notifikasi bisa dipalsukan aplikasi lain di HP, aktifkan dengan hati-hati.",
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
+  {
+    key: "MACRODROID_GENERIC",
+    group: "macrodroid",
+    secret: false,
+    label: "Format generik (Rupiah)",
+    help: "true = notifikasi yang tidak cocok dengan format mana pun tetap dicoba dengan pola nominal Rupiah umum + kata kunci uang masuk.",
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
 ] as const;
 
 export type IntegrationKey =
@@ -255,7 +283,10 @@ export type IntegrationKey =
   | "MIDTRANS_ENABLED"
   | "MIDTRANS_SERVER_KEY"
   | "MIDTRANS_CLIENT_KEY"
-  | "MIDTRANS_PRODUCTION";
+  | "MIDTRANS_PRODUCTION"
+  | "MACRODROID_TOKEN"
+  | "MACRODROID_AUTO_CONFIRM"
+  | "MACRODROID_GENERIC";
 
 export const INTEGRATION_KEYS = INTEGRATIONS.map((d) => d.key) as IntegrationKey[];
 export const INTEGRATION_GROUPS: readonly IntegrationGroup[] = [
@@ -264,6 +295,7 @@ export const INTEGRATION_GROUPS: readonly IntegrationGroup[] = [
   "email",
   "n8n",
   "payment",
+  "macrodroid",
 ];
 
 /** Never manageable from the UI (bootstrap / security values). */
@@ -301,7 +333,13 @@ export function validateIntegration(
   // Lists are stored normalised ("a, b" → "a,b"); BOT_TEXT_AI is case-insensitive.
   if (key === "BOT_ALLOWED_CHAT_IDS" || key === "EMAIL_TO")
     return { ok: true, value: splitList(value).join(",") };
-  if (key === "BOT_TEXT_AI" || key === "MIDTRANS_ENABLED" || key === "MIDTRANS_PRODUCTION")
+  if (
+    key === "BOT_TEXT_AI" ||
+    key === "MIDTRANS_ENABLED" ||
+    key === "MIDTRANS_PRODUCTION" ||
+    key === "MACRODROID_AUTO_CONFIRM" ||
+    key === "MACRODROID_GENERIC"
+  )
     return { ok: true, value: value.toLowerCase() };
   return { ok: true, value };
 }

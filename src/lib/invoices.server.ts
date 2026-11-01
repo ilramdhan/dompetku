@@ -61,6 +61,8 @@ export type InvoiceRow = {
   paid: number;
   created_at: string;
   updated_at: string;
+  /** v26 (#96): 1–999 rupiah added to the transfer amount (null/absent before v26 or when unset). */
+  unique_code?: number | null;
 };
 
 export type InvoiceInput = {
@@ -137,10 +139,8 @@ export async function listInvoices(o: ListOptions, scope: Scope) {
     throw new Error((list.error ?? open.error)!.message);
   }
   const rows = ((list.data ?? []) as any[]).map(num);
-  // v24: "Menunggu verifikasi" while proofs are pending (empty map without v24).
-  const pending = await (
-    await import("./invoice-payments.server")
-  ).pendingProofCounts(
+  // v24/v26: "Menunggu verifikasi" while proofs or matched bank notifications are pending.
+  const pending = await pendingReviews(
     rows.filter((r) => r.status === "unpaid" || r.status === "partial").map((r) => r.id),
   );
   const items = rows.map((r) => ({
@@ -167,6 +167,20 @@ export async function loadInvoice(id: string): Promise<InvoiceRow | null> {
   return res.data ? num(res.data) : null;
 }
 
+/**
+ * Pending reviews per invoice: v24 proofs + v26 matched bank notifications (empty maps before
+ * those schema sections). Drives the "Menunggu verifikasi" display status.
+ */
+async function pendingReviews(ids: readonly string[]): Promise<Map<string, number>> {
+  const [proofs, signals] = await Promise.all([
+    import("./invoice-payments.server").then((m) => m.pendingProofCounts(ids)),
+    import("./payment-signals.server").then((m) => m.matchedSignalCounts(ids)),
+  ]);
+  const out = new Map(proofs);
+  for (const [id, n] of signals) out.set(id, (out.get(id) ?? 0) + n);
+  return out;
+}
+
 /** One invoice with its items and payments (detail view / edit form). */
 export async function getInvoice(inv: InvoiceRow) {
   const ip = await import("./invoice-payments.server");
@@ -179,7 +193,7 @@ export async function getInvoice(inv: InvoiceRow) {
       .order("paid_at")
       .order("created_at"),
     fin().then((f) => f.today()),
-    ip.pendingProofCounts([inv.id]),
+    pendingReviews([inv.id]),
     ip.invoiceMethodIds(inv.id),
   ]);
   if (items.error) throw new Error(items.error.message);
@@ -343,6 +357,7 @@ export async function invoiceAction(inv: InvoiceRow, action: InvoiceAction) {
   if (res.error) throw new Error(res.error.message);
   if (!res.data) throw new Error("Invoice berubah, muat ulang halaman");
   await retireGatewayOrders(num(res.data));
+  await (await import("./payment-signals.server")).releaseUniqueCode(num(res.data));
   await (
     await fin()
   ).logActivity("invoices.update", "invoices", {
@@ -416,6 +431,8 @@ export async function syncInvoice(id: string): Promise<InvoiceRow> {
   if (res.error) throw new Error(res.error.message);
   const out = num(res.data);
   await retireGatewayOrders(out);
+  // v26: a paid/cancelled invoice gives its unique code back.
+  await (await import("./payment-signals.server")).releaseUniqueCode(out);
   return out;
 }
 
