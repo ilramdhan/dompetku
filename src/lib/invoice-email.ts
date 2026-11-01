@@ -5,7 +5,7 @@
  * invoice-email.server.ts). Unit-tested in src/test/invoice-email.test.ts.
  */
 import { diffDays } from "./dates";
-import type { InvoiceEmailKind } from "./email";
+import type { EmailLang, InvoiceEmailKind } from "./email";
 
 export const EMAIL_KIND_LABEL: Record<InvoiceEmailKind, string> = {
   invoice: "Invoice",
@@ -63,4 +63,34 @@ export function reminderStage(
  */
 export function dedupeWindowDays(kind: "reminder_due" | "overdue"): number {
   return kind === "overdue" ? 7 : MAX_LEAD_DAYS + 1;
+}
+
+/* ---------------- customer language (#123, no schema) ---------------- */
+
+export const EMAIL_LANGS = ["id", "en"] as const;
+export const DEFAULT_EMAIL_LANG: EmailLang = "id";
+
+/** Anything but "en" is Indonesian (the default). */
+export function parseEmailLang(v: unknown): EmailLang {
+  return v === "en" ? "en" : DEFAULT_EMAIL_LANG;
+}
+
+/**
+ * Language chosen at the last send of each invoice, read from `invoices.email` activity rows
+ * (any order; rows are `{ detail, created_at }`). Reminders and payment confirmations follow it;
+ * invoices never sent with a choice stay Indonesian (absent from the map).
+ */
+export function langByInvoice(
+  rows: readonly { detail?: unknown; created_at?: string | null }[],
+): Map<string, EmailLang> {
+  const best = new Map<string, { at: number; lang: EmailLang }>();
+  for (const r of rows) {
+    const d = (r.detail ?? {}) as Record<string, unknown>;
+    const id = d["invoice_id"];
+    if (typeof id !== "string" || (d["lang"] !== "id" && d["lang"] !== "en")) continue;
+    const at = Date.parse(String(r.created_at ?? "")) || 0;
+    const prev = best.get(id);
+    if (!prev || at >= prev.at) best.set(id, { at, lang: d["lang"] });
+  }
+  return new Map([...best].map(([k, v]) => [k, v.lang]));
 }

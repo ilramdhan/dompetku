@@ -16,13 +16,15 @@
  */
 import { db } from "./db.server";
 import { addDays } from "./dates";
-import { buildInvoiceEmail, type InvoiceEmailKind } from "./email";
+import { buildInvoiceEmail, type EmailLang, type InvoiceEmailKind } from "./email";
 import {
   DEFAULT_LEAD_DAYS,
   EMAIL_KIND_LABEL,
   dedupeWindowDays,
   isEmailAddress,
+  langByInvoice,
   leadDays,
+  parseEmailLang,
   maskEmail,
   reminderStage,
 } from "./invoice-email";
@@ -102,11 +104,29 @@ async function brandName(): Promise<string> {
   }
 }
 
+/** Language of the last send of each invoice (activity_log); missing/unreadable → Indonesian. */
+async function langsFor(ids: readonly string[]): Promise<Map<string, EmailLang>> {
+  if (!ids.length) return new Map();
+  try {
+    const res = await db()
+      .from("activity_log")
+      .select("detail, created_at")
+      .eq("action", "invoices.email")
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    if (res.error) return new Map();
+    return langByInvoice(res.data ?? []);
+  } catch {
+    return new Map();
+  }
+}
+
 async function logSend(
   inv: Pick<InvoiceRow, "id" | "number">,
   kind: InvoiceEmailKind,
   to: string,
   via: string,
+  lang: EmailLang = "id",
 ) {
   await (
     await fin()
@@ -115,6 +135,7 @@ async function logSend(
     invoice_id: inv.id,
     kind,
     via,
+    lang,
   });
 }
 
@@ -134,7 +155,12 @@ type MailInv = Pick<
 async function compose(
   inv: MailInv,
   kind: InvoiceEmailKind,
-  o: { link?: string | null; paymentAmount?: number | null; remaining?: number },
+  o: {
+    link?: string | null;
+    paymentAmount?: number | null;
+    remaining?: number;
+    lang?: EmailLang;
+  },
 ) {
   const [{ today }, ip, brand] = await Promise.all([
     fin(),
@@ -144,6 +170,7 @@ async function compose(
   const methods = kind === "payment" ? [] : await ip.emailMethodsFor(inv.id);
   return buildInvoiceEmail({
     kind,
+    lang: o.lang ?? "id",
     brand,
     number: inv.number,
     customer_name: inv.customer_name,
@@ -165,7 +192,7 @@ async function compose(
  */
 export async function sendInvoiceLinkEmail(
   inv: InvoiceRow,
-  opts: { origin: string; expiresDays: number | null },
+  opts: { origin: string; expiresDays: number | null; lang?: unknown },
 ): Promise<{ sent: boolean; reason?: string; link?: string; to?: string }> {
   const demo = await import("./demo.server");
   demo.assertNotDemo();
@@ -175,10 +202,11 @@ export async function sendInvoiceLinkEmail(
   const share = await import("./invoice-share.server");
   const made = await share.createShare(inv, opts.expiresDays, false);
   const link = shareUrl(opts.origin, made.token);
-  const mail = await compose(inv, "invoice", { link });
+  const lang = parseEmailLang(opts.lang);
+  const mail = await compose(inv, "invoice", { link, lang });
   const r = await deliver(inv.customer_email, mail);
   if (!r.sent) return { sent: false, reason: r.reason, link };
-  await logSend(inv, "invoice", inv.customer_email, "web");
+  await logSend(inv, "invoice", inv.customer_email, "web", lang);
   return { sent: true, link, to: maskEmail(inv.customer_email) };
 }
 
@@ -191,12 +219,14 @@ export async function sendPaymentConfirmation(inv: InvoiceRow, amount: number): 
     if ((await import("./demo.server")).isDemo()) return;
     if (!isEmailAddress(inv.customer_email)) return;
     if (!(await resendReady())) return;
+    const lang = (await langsFor([inv.id])).get(inv.id) ?? "id";
     const mail = await compose(inv, "payment", {
+      lang,
       paymentAmount: amount,
       remaining: Math.max(0, Number(inv.total) - Number(inv.paid)),
     });
     const r = await deliver(inv.customer_email, mail);
-    if (r.sent) await logSend(inv, "payment", inv.customer_email, "web");
+    if (r.sent) await logSend(inv, "payment", inv.customer_email, "web", lang);
   } catch (e) {
     try {
       (await import("./monitoring.server")).logError("invoice:email-payment", e);
@@ -215,6 +245,7 @@ export type DueMail = {
   kind: "reminder_due" | "overdue";
   due_date: string;
   remaining: number;
+  lang: EmailLang;
   subject: string;
   text: string;
   html: string;
@@ -262,6 +293,7 @@ export async function pendingDueMails(
   }
   const mails: DueMail[] = [];
   const skipped: Skipped[] = [];
+  const langs = await langsFor(((res.data ?? []) as { id: string }[]).map((r) => r.id));
   // v25: invoices on refund hold (customer was just refunded) get no reminders until re-billed.
   const held = await (
     await import("./gateway/payments.server")
@@ -284,8 +316,10 @@ export async function pendingDueMails(
       skipped.push({ number: inv.number, reason: "already_sent" });
       continue;
     }
-    const mail = await compose(inv, kind, { remaining });
+    const lang = langs.get(inv.id) ?? "id";
+    const mail = await compose(inv, kind, { remaining, lang });
     mails.push({
+      lang,
       invoice_id: inv.id,
       number: inv.number,
       to: inv.customer_email,
@@ -321,7 +355,7 @@ export async function runDueMails(
   const base = { ready: p.ready, mode, count: p.mails.length, skipped: p.skipped };
   if (mode === "payload") {
     for (const m of p.mails)
-      await logSend({ id: m.invoice_id, number: m.number }, m.kind, m.to, "n8n");
+      await logSend({ id: m.invoice_id, number: m.number }, m.kind, m.to, "n8n", m.lang);
     return { ...base, sent: 0, failed: 0, mails: p.mails };
   }
   if (p.mails.length && !(await resendReady()))
@@ -332,7 +366,7 @@ export async function runDueMails(
     const r = await deliver(m.to, m);
     if (r.sent) {
       sent++;
-      await logSend({ id: m.invoice_id, number: m.number }, m.kind, m.to, "n8n");
+      await logSend({ id: m.invoice_id, number: m.number }, m.kind, m.to, "n8n", m.lang);
     } else failed++;
   }
   return { ...base, sent, failed };

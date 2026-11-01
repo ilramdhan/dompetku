@@ -69,6 +69,7 @@ export function InvoiceSharePanel({
   const revoke = useServerFn(revokeInvoiceShareFn);
   const sendMail = useServerFn(sendInvoiceEmailFn);
   const [days, setDays] = useState("0");
+  const [mailLang, setMailLang] = useState<"id" | "en">("id");
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -137,7 +138,9 @@ export function InvoiceSharePanel({
       return;
     setBusy(true);
     try {
-      const r = await sendMail({ data: { id: invoice.id, expires_days: Number(days) || null } });
+      const r = await sendMail({
+        data: { id: invoice.id, expires_days: Number(days) || null, lang: mailLang },
+      });
       if (r.link) setLink(r.link);
       await invalidateFor(qc, "invoice_shares");
       if (r.sent) toast.success(`${t("Email terkirim ke")} ${r.to}`);
@@ -247,6 +250,20 @@ export function InvoiceSharePanel({
                   {d === 0 ? t("Tanpa kedaluwarsa") : `${d} ${t("hari")}`}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`mail-lang-${invoice.id}`} className="text-xs">
+            {t("Bahasa email")}
+          </Label>
+          <Select value={mailLang} onValueChange={(v) => setMailLang(v === "en" ? "en" : "id")}>
+            <SelectTrigger id={`mail-lang-${invoice.id}`} className="h-9 w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="id">Indonesia</SelectItem>
+              <SelectItem value="en">English</SelectItem>
             </SelectContent>
           </Select>
         </div>

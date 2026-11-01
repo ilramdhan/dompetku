@@ -3,8 +3,10 @@ import { buildInvoiceEmail, type InvoiceEmailInput } from "@/lib/email";
 import {
   dedupeWindowDays,
   isEmailAddress,
+  langByInvoice,
   leadDays,
   maskEmail,
+  parseEmailLang,
   reminderStage,
 } from "@/lib/invoice-email";
 
@@ -129,5 +131,40 @@ describe("invoice-email helpers", () => {
   it("dedupes overdue weekly and due-soon once", () => {
     expect(dedupeWindowDays("overdue")).toBe(7);
     expect(dedupeWindowDays("reminder_due")).toBeGreaterThan(30);
+  });
+});
+
+describe("customer language (#123)", () => {
+  it("parseEmailLang defaults to Indonesian", () => {
+    expect(parseEmailLang("en")).toBe("en");
+    expect(parseEmailLang("id")).toBe("id");
+    expect(parseEmailLang(undefined)).toBe("id");
+    expect(parseEmailLang("fr")).toBe("id");
+  });
+  it("subject, body and payment methods share the chosen language for every kind", () => {
+    for (const kind of ["invoice", "payment", "reminder_due", "overdue"] as const) {
+      const en = buildInvoiceEmail({ ...base, kind, lang: "en", payment_amount: 1000 });
+      const id = buildInvoiceEmail({ ...base, kind, lang: parseEmailLang(undefined) });
+      expect(en.text).toContain("Thank");
+      expect(en.text).not.toContain("Terima kasih");
+      expect(id.text).toContain("Terima kasih");
+      expect(id.text).not.toContain("Thank");
+      if (kind !== "payment") {
+        expect(en.text).toContain("a/n Toko");
+        expect(id.text).toContain("a.n. Toko");
+      }
+    }
+  });
+  it("langByInvoice takes each invoice's latest recorded language", () => {
+    const m = langByInvoice([
+      { detail: { invoice_id: "a", lang: "en" }, created_at: "2026-10-02T00:00:00Z" },
+      { detail: { invoice_id: "a", lang: "id" }, created_at: "2026-10-01T00:00:00Z" },
+      { detail: { invoice_id: "b", kind: "overdue" }, created_at: "2026-10-03T00:00:00Z" },
+      { detail: { invoice_id: "c", lang: "xx" }, created_at: "2026-10-03T00:00:00Z" },
+      { detail: null },
+    ]);
+    expect(m.get("a")).toBe("en");
+    expect(m.has("b")).toBe(false);
+    expect(m.has("c")).toBe(false);
   });
 });
