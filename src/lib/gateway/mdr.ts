@@ -40,7 +40,13 @@ export function parseMdrRules(
       .trim()
       .replace(/\s+/g, "");
     const m = VALUE.exec(val);
-    if (!KEY.test(key) || RESERVED.has(key) || !val || !m || (m[1] === undefined && m[2] === undefined))
+    if (
+      !KEY.test(key) ||
+      RESERVED.has(key) ||
+      !val ||
+      !m ||
+      (m[1] === undefined && m[2] === undefined)
+    )
       return { ok: false, error: "Format biaya: metode=persen%+tetap" };
     const percent = m[1] === undefined ? 0 : Number(m[1]);
     if (percent >= 50) return { ok: false, error: "Persentase biaya harus di bawah 50%" };
