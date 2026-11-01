@@ -445,10 +445,14 @@ export async function recordPayment(inv: InvoiceRow, p: PaymentInput) {
 /** Wait before the "recheck" re-read, so a racing later payment can finish its rollback. */
 export const OVERSHOOT_RECHECK_MS = 1500;
 
-async function overshoots(inv: InvoiceRow, paymentId: string): Promise<boolean> {
+export async function overshoots(
+  inv: Pick<InvoiceRow, "id" | "total">,
+  paymentId: string,
+): Promise<boolean> {
   const read = () => db().from("invoice_payments").select("*").eq("invoice_id", inv.id);
   const after = await read();
-  if (after.error) return false;
+  // Fail closed like the recheck (review I9): an unreadable re-check rolls this payment back.
+  if (after.error) return true;
   const d = overshootDecision(after.data ?? [], inv.total, paymentId);
   if (d !== "recheck") return d === "rollback";
   await new Promise((r) => setTimeout(r, OVERSHOOT_RECHECK_MS));
