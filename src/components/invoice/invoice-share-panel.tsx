@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Copy, ExternalLink, Link2, Link2Off, Mail, MessageCircle, RefreshCw } from "lucide-react";
@@ -53,6 +53,8 @@ export function InvoiceSharePanel({
     customer_name: string;
     customer_phone?: string | null;
     customer_email?: string | null;
+    /** v27 customer email language ("id" before v27). */
+    lang?: "id" | "en" | null;
     remaining: number;
   };
   locale: string;
@@ -69,7 +71,10 @@ export function InvoiceSharePanel({
   const revoke = useServerFn(revokeInvoiceShareFn);
   const sendMail = useServerFn(sendInvoiceEmailFn);
   const [days, setDays] = useState("0");
-  const [mailLang, setMailLang] = useState<"id" | "en">("id");
+  // Preselects the invoice's language; a different choice is saved back on send.
+  const savedLang = invoice.lang === "en" ? "en" : "id";
+  const [mailLang, setMailLang] = useState<"id" | "en">(savedLang);
+  useEffect(() => setMailLang(savedLang), [savedLang]);
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -142,7 +147,7 @@ export function InvoiceSharePanel({
         data: { id: invoice.id, expires_days: Number(days) || null, lang: mailLang },
       });
       if (r.link) setLink(r.link);
-      await invalidateFor(qc, "invoice_shares");
+      await invalidateFor(qc, "invoice_shares"); // also refreshes the invoice (saved language)
       if (r.sent) toast.success(`${t("Email terkirim ke")} ${r.to}`);
       else
         toast.error(
