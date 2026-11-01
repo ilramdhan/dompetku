@@ -28,6 +28,7 @@ import { WalletFilter } from "@/components/wallet-filter";
 import { InvoiceSharePanel } from "@/components/invoice/invoice-share-panel";
 import { ProofQueue } from "@/components/invoice/proof-queue";
 import { GatewayPanel } from "@/components/invoice/gateway-panel";
+import { SignalQueue } from "@/components/invoice/signal-queue";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -321,6 +322,7 @@ function InvoicesPage() {
         </Card>
       </div>
       <ProofQueue locale={locale} />
+      <SignalQueue locale={locale} />
       <div className="no-print mb-3 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
         <WalletFilter
           value={account}
@@ -585,6 +587,13 @@ function InvoiceDetail({
         </li>
       </ul>
       {d.notes ? <p className="whitespace-pre-wrap break-words">{d.notes}</p> : null}
+      {d.unique_code && (d.status === "unpaid" || d.status === "partial") ? (
+        <p className="text-xs text-muted-foreground">
+          {t("Kode unik")} <span className="num font-semibold">{d.unique_code}</span> ·{" "}
+          {t("Jumlah transfer")}{" "}
+          <span className="num">{money(Number(d.remaining) + Number(d.unique_code))}</span>
+        </p>
+      ) : null}
       <div>
         <p className="mb-1 font-medium">{t("Riwayat pembayaran")}</p>
         {d.payments.length ? (
