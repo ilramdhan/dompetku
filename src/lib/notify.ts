@@ -148,3 +148,129 @@ export const notifyRecipientSchema = z.object({
   wallets: z.array(z.string().uuid()).max(500),
 });
 export type NotifyRecipientInput = z.output<typeof notifyRecipientSchema>;
+
+/**
+ * Profile → Notifikasi Telegram (#122): what a member saves for THEMSELVES. No user id (it comes
+ * from the session) and no `enabled` flag (the admin's mute stays). Empty chat id = stop receiving
+ * notifications (the row is removed).
+ */
+export const myNotifySchema = z.object({
+  chat_id: z
+    .string()
+    .max(40)
+    .refine((v) => !v.trim() || normalizeChatId(v) !== null, { message: "Chat ID tidak valid" })
+    .transform((v) => (v.trim() ? normalizeChatId(v)! : "")),
+  send_report: z.boolean(),
+  send_reminders: z.boolean(),
+  wallets: z.array(z.string().uuid()).max(500),
+});
+export type MyNotifyInput = z.output<typeof myNotifySchema>;
+
+/**
+ * What a member's own save does: an empty chat id removes their row, otherwise the row is
+ * upserted with a de-duplicated, sorted checklist. Wallets they cannot view right now (fresh
+ * grants, never client input) are refused — same rule as the admin dialog, no silent widening.
+ * A row the admin muted (`enabled = false`) is never deleted by the member (they already receive
+ * nothing, and delete + re-save would silently undo the mute): an empty chat id is then a no-op.
+ */
+export function planSelfNotify(
+  input: MyNotifyInput,
+  grants: Readonly<Record<string, Level>>,
+  opts: { muted?: boolean } = {},
+):
+  | { action: "delete" }
+  | { action: "keep" }
+  | { action: "save"; wallets: string[] }
+  | { action: "error"; error: string } {
+  if (!input.chat_id) return opts.muted ? { action: "keep" } : { action: "delete" };
+  const view = new Set(viewableWallets(grants));
+  const wallets = [...new Set(input.wallets)].sort();
+  if (wallets.some((id) => !view.has(id)))
+    return { action: "error", error: "Dompet di luar akses anggota" };
+  return { action: "save", wallets };
+}
+
+/**
+ * The user id a self-service notification fn acts on: always the session's own id, and only for a
+ * member (scope non-null). The owner (scope null = all wallets) uses TELEGRAM_ADMIN_CHAT_ID.
+ */
+export function selfNotifyUserId(
+  scope: readonly string[] | null,
+  sessionUserId: string | null | undefined,
+): string {
+  if (scope === null || !sessionUserId)
+    throw new Error("Pemilik memakai TELEGRAM_ADMIN_CHAT_ID di Pengaturan → Integrasi");
+  return sessionUserId;
+}
+
+/**
+ * Masked chat id for admin display and the activity log (#122 L1): sign + last 4 digits, so an
+ * admin can recognise a member-set chat without the full id being repeated everywhere.
+ */
+export function maskChatId(raw: string | null | undefined): string {
+  const s = normalizeChatId(raw ?? "");
+  if (!s) return "";
+  const sign = s.startsWith("-") ? "-" : "";
+  const digits = s.replace(/^-/, "");
+  return `${sign}•••${digits.slice(digits.length > 4 ? -4 : -1)}`;
+}
+
+export type NotifySetBy = "member" | "admin";
+
+/**
+ * Who last saved each member's notification row, from activity log rows (newest first):
+ * `notify.self_update` = member, `notify.update` = admin. Rows carry `user_id` (newer) or the
+ * immutable username (`name`). Unverified member-set chat ids are flagged in the admin dialog.
+ */
+export function notifySetByMap(
+  rows: readonly { action: string; detail: unknown }[],
+  users: readonly { user_id: string; username?: string | null }[],
+): Record<string, NotifySetBy> {
+  const out: Record<string, NotifySetBy> = {};
+  for (const r of rows) {
+    const by =
+      r.action === "notify.self_update" ? "member" : r.action === "notify.update" ? "admin" : null;
+    if (!by || !r.detail || typeof r.detail !== "object") continue;
+    const d = r.detail as { user_id?: unknown; name?: unknown };
+    const u = users.find(
+      (x) =>
+        (typeof d.user_id === "string" && d.user_id === x.user_id) ||
+        (typeof d.user_id !== "string" &&
+          typeof d.name === "string" &&
+          !!x.username &&
+          d.name.toLowerCase() === x.username.toLowerCase()),
+    );
+    if (u && !(u.user_id in out)) out[u.user_id] = by;
+  }
+  return out;
+}
+
+/**
+ * True when a member's own save would change nothing (#122 L3): same chat id, toggles and wallet
+ * set as the stored row. Unchanged saves skip every write and the activity log entry.
+ */
+export function sameSelfNotify(
+  cur: {
+    chat_id: string;
+    send_report: boolean;
+    send_reminders: boolean;
+    wallets: readonly string[];
+  } | null,
+  next: {
+    chat_id: string;
+    send_report: boolean;
+    send_reminders: boolean;
+    wallets: readonly string[];
+  },
+): boolean {
+  if (!cur) return false;
+  const a = [...new Set(cur.wallets)].sort();
+  const b = [...new Set(next.wallets)].sort();
+  return (
+    cur.chat_id === next.chat_id &&
+    cur.send_report === next.send_report &&
+    cur.send_reminders === next.send_reminders &&
+    a.length === b.length &&
+    a.every((id, i) => id === b[i])
+  );
+}

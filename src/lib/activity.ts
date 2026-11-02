@@ -15,6 +15,7 @@ const ENTITY: Record<string, string> = {
   invoices: "Invoice",
   invoice_payments: "Pembayaran invoice",
   payment_methods: "Metode pembayaran",
+  payment_notify_formats: "Format notifikasi",
 };
 
 const VERB: Record<string, string> = {
@@ -59,6 +60,8 @@ const SPECIAL: Record<string, string> = {
   "permission.update": "Akses dompet diubah",
   "notify.update": "Notifikasi anggota diubah",
   "notify.delete": "Notifikasi anggota dihapus",
+  "notify.self_update": "Anggota mengatur notifikasi Telegram sendiri",
+  "notify.self_delete": "Anggota berhenti menerima notifikasi Telegram",
   "invoices.email": "Email invoice dikirim",
   "invoice_shares.create": "Tautan publik invoice dibuat",
   "invoice_shares.delete": "Tautan publik invoice dicabut",
@@ -69,6 +72,9 @@ const SPECIAL: Record<string, string> = {
   "invoices.gateway": "Pembayaran Midtrans diterima",
   "invoices.gateway_refund": "Refund Midtrans dicatat",
   "invoices.gateway_rebill": "Invoice ditagih ulang setelah refund",
+  "payment_signals.create": "Notifikasi bank diterima",
+  "payment_signals.confirm": "Notifikasi bank dikonfirmasi",
+  "payment_signals.ignore": "Notifikasi bank diabaikan",
 };
 
 export function activityLabel(action: string, t: (s: string) => string = (s) => s): string {

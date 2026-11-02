@@ -15,6 +15,7 @@ import { displayNameOf } from "@/lib/users";
 import { AppSettingsCard } from "@/components/app-settings-card";
 import { IntegrationsCard } from "@/components/integrations-card";
 import { PaymentMethodsCard } from "@/components/invoice/payment-methods-card";
+import { NotifyFormatsCard } from "@/components/invoice/notify-formats-card";
 import { AboutCard } from "@/components/about-card";
 import { DemoDisabled } from "@/components/demo";
 import { RowActions, useCrudDialog } from "@/components/crud-page";
@@ -288,6 +289,9 @@ function SettingsPage() {
 
       {/* v24: bank/QRIS for invoices. Demo: capped rows, QRIS image upload refused. */}
       <PaymentMethodsCard />
+
+      {/* v26: bank/e-wallet notification formats for MacroDroid matching (demo: endpoint is 403). */}
+      <NotifyFormatsCard />
 
       <DemoDisabled>
         <IntegrationsCard />

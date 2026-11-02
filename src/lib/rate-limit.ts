@@ -66,3 +66,16 @@ export function withinLimit(count: number | null | undefined, limit: number): bo
   const n = Number(count);
   return Number.isFinite(n) && n >= 1 && n <= limit;
 }
+
+/**
+ * v26 (#96) MacroDroid notifications: per device token hash (valid token) — a phone rarely gets
+ * more than a few bank notifications per minute — and per IP for requests with a WRONG token only,
+ * so a spoofed X-Forwarded-For can never block the real device.
+ */
+export const NOTIFY_RATE_RULES = {
+  device: [
+    { name: "notify:device", limit: 120, windowMs: HOUR },
+    { name: "notify:device:day", limit: 1500, windowMs: 24 * HOUR },
+  ],
+  bad: [{ name: "notify:bad", limit: 60, windowMs: HOUR }],
+} as const satisfies Record<string, readonly RateRule[]>;

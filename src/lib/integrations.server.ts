@@ -112,6 +112,9 @@ export async function readIntegrations(): Promise<{
         : r.source !== "db"
           ? "invalid"
           : null;
+    // An env value bypasses validateIntegration: flag it so a typo is not silently ignored.
+    const envBad =
+      !problem && r.source === "env" && !!r.value && !validateIntegration(key, r.value).ok;
     return {
       key,
       group: d.group,
@@ -122,7 +125,7 @@ export async function readIntegrations(): Promise<{
       hint: d.secret ? maskHint(r.value) : null,
       stored: !!row,
       updated_at: row?.updated_at ?? null,
-      problem,
+      problem: envBad ? "env" : problem,
     };
   });
   return { ready: s.ready, canEncrypt: settingsKey() !== null, items };

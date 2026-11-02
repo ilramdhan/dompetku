@@ -87,6 +87,9 @@ point it at a database you care about. The public demo uses the same script dail
   for today and yesterday.
 - **Receivables:** one partially repaid, one fully repaid, one unlinked; money moves as `Piutang`
   transactions.
+- **Invoices (v21/v24):** five fictional invoices (paid, partial, two unpaid, one draft) with items,
+  payments booked as `Invoice` income (`external_id = invoice_pay:<id>`) and two fake bank payment
+  methods. No public share links or gateway rows are seeded. Skipped when the schema section is missing.
 - **Kantong (v19):** GoPay has `Makan` and `Transport` (monthly) and Tunai a running `Parkir`
   envelope; the last three months of matching GoPay food/ride expenses and the parking rows carry
   `pocket_id`. Allocations fit inside the wallet balance, and `Transport` sits below its threshold

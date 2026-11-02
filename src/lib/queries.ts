@@ -26,6 +26,7 @@ import {
 import { getRecurring } from "./recurring.functions";
 import { getAccountReport, getReconcileTransactions } from "./account-report.functions";
 import { getProfile } from "./profile.functions";
+import { getMyNotifyFn } from "./notify.functions";
 import { getAccountPockets, getPocketOptions, getPocketWarnings } from "./pockets.functions";
 import {
   getInvoiceFn,
@@ -36,6 +37,7 @@ import {
   getPaymentMethodsFn,
 } from "./invoices.functions";
 import { getInvoicePayments, getInvoiceReport, getOpenInvoices } from "./invoice-report.functions";
+import { getNotifyFormatsFn, getPaymentSignalsFn } from "./payment-signals.functions";
 import type { PaymentSort } from "./invoice-report";
 import type { InvoiceFilter, InvoiceSort } from "./invoices";
 import type { CrudTable } from "./schemas";
@@ -53,6 +55,9 @@ export const rowsQuery = (table: CrudTable) =>
 export const usersQueryKey = ["users"] as const;
 /** Settings → Pengguna → Notifikasi (v22, admin only). */
 export const notifyQueryKey = ["notify"] as const;
+/** Profile → Notifikasi Telegram (#122, members only): the member's own v22 row. */
+export const myNotifyQuery = () =>
+  queryOptions({ queryKey: ["notify", "me"], queryFn: () => getMyNotifyFn() });
 /** Logged-in user's profile (v17); also feeds the header avatar. */
 export const profileQuery = () =>
   queryOptions({ queryKey: ["profile"], queryFn: () => getProfile(), staleTime: 5 * 60_000 });
@@ -265,6 +270,20 @@ export const invoiceProofsQuery = (status: ProofFilter, offset = 0, limit = 20) 
     queryFn: () => getInvoiceProofsFn({ data: { status, offset, limit } }),
   });
 
+export type SignalFilter = "open" | "confirmed" | "ignored" | "all";
+/** v26 MacroDroid notification formats (Settings). */
+export const notifyFormatsQuery = () =>
+  queryOptions({
+    queryKey: ["notify-formats"],
+    queryFn: () => getNotifyFormatsFn(),
+  });
+/** v26 bank-notification review queue. */
+export const paymentSignalsQuery = (filter: SignalFilter, offset = 0, limit = 10) =>
+  queryOptions({
+    queryKey: ["payment-signals", filter, offset, limit],
+    queryFn: () => getPaymentSignalsFn({ data: { filter, offset, limit } }),
+  });
+
 /** v23 public link status of one invoice (invalidated with the "invoices" key). */
 /** v25 Midtrans orders of one invoice (under the "invoices" key, so payment changes refresh it). */
 export const gatewayTxQuery = (id: string) =>
@@ -341,6 +360,9 @@ const AFFECTS: Record<string, string[]> = {
   invoice_proofs: [...MONEY, "invoices", "invoice-proofs"],
   // v25: status checks / refunds book payments and reversing expenses (money).
   gateway_transactions: [...MONEY, "invoices", "gateway"],
+  // v26: formats feed Settings; confirming a bank notification books a payment (money).
+  payment_notify_formats: ["notify-formats", "activity"],
+  payment_signals: [...MONEY, "invoices", "payment-signals"],
 };
 
 export function invalidateFor(qc: QueryClient, table: string) {
