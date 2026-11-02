@@ -248,7 +248,7 @@ export const sendInvoiceEmailFn = createServerFn({ method: "POST" })
     (await import("./demo.server")).assertNotDemo();
     const { getRequest } = await import("@tanstack/react-start/server");
     const { seoConfig } = await import("./seo.server");
-    const origin = seoConfig().siteUrl ?? new URL(getRequest().url).origin;
+    const origin = (await seoConfig()).siteUrl ?? new URL(getRequest().url).origin;
     const mail = await import("./invoice-email.server");
     return mail.sendInvoiceLinkEmail(inv, {
       origin,

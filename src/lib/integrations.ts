@@ -10,7 +10,8 @@
  */
 import { formatMdrRules, mdrRulesProblem } from "./gateway/mdr";
 
-export type IntegrationGroup = "telegram" | "ai" | "email" | "n8n" | "payment" | "macrodroid";
+export type IntegrationGroup =
+  "site" | "telegram" | "ai" | "email" | "n8n" | "payment" | "macrodroid";
 export type IntegrationSource = "db" | "env" | "default" | "none";
 
 export type IntegrationDef = {
@@ -63,6 +64,35 @@ function isHttpUrl(v: string): boolean {
   }
 }
 
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const SITE_PATH = /^(\/[A-Za-z0-9._~-]+)*\/?$/;
+
+/**
+ * PUBLIC_SITE_URL saved from Settings (#117): https (http only for localhost), no credentials,
+ * query or fragment, optional plain base path. Returns an i18n error key or null.
+ */
+export function siteUrlError(v: string): string | null {
+  // Raw checks first: URL() would silently resolve dot segments (`/a/../b`, `%2e%2e`).
+  if (v.length > 200 || /[?#\s%\\]/.test(v) || /\/\.{1,2}(\/|$)/.test(v))
+    return "URL situs tidak valid";
+  let u: URL;
+  try {
+    u = new URL(v);
+  } catch {
+    return "URL situs tidak valid";
+  }
+  if (u.protocol === "http:" ? !LOCAL_HOSTS.has(u.hostname) : u.protocol !== "https:")
+    return "URL situs harus https:// (http hanya untuk localhost)";
+  if (u.username || u.password || !SITE_PATH.test(u.pathname)) return "URL situs tidak valid";
+  return null;
+}
+
+/** Valid site URL → origin + base path without a trailing slash (the stored form). */
+export function normalizeSiteUrlSetting(v: string): string {
+  const u = new URL(v);
+  return `${u.origin}${u.pathname}`.replace(/\/+$/, "");
+}
+
 /** `Name <a@b.c>` or `a@b.c`. */
 export function isEmailSender(v: string): boolean {
   const m = v.match(/^(.*)<([^<>]+)>$/);
@@ -70,6 +100,17 @@ export function isEmailSender(v: string): boolean {
 }
 
 export const INTEGRATIONS: readonly IntegrationDef[] = [
+  // #117: public address for canonical/og:url, sitemap, invoice/email links and the Midtrans
+  // finish URL. Not a secret; demo instances refuse writes like every integration.
+  {
+    key: "PUBLIC_SITE_URL",
+    group: "site",
+    secret: false,
+    label: "URL situs publik",
+    help: "Alamat publik instance ini. Dipakai untuk canonical, sitemap, tautan invoice/email dan URL kembali Midtrans. Kosong = env PUBLIC_SITE_URL.",
+    placeholder: "https://dompetku.example.com",
+    validate: siteUrlError,
+  },
   {
     key: "TELEGRAM_BOT_TOKEN",
     group: "telegram",
@@ -287,6 +328,7 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
 ] as const;
 
 export type IntegrationKey =
+  | "PUBLIC_SITE_URL"
   | "TELEGRAM_BOT_TOKEN"
   | "BOT_ALLOWED_CHAT_IDS"
   | "TELEGRAM_ADMIN_CHAT_ID"
@@ -312,6 +354,7 @@ export type IntegrationKey =
 
 export const INTEGRATION_KEYS = INTEGRATIONS.map((d) => d.key) as IntegrationKey[];
 export const INTEGRATION_GROUPS: readonly IntegrationGroup[] = [
+  "site",
   "telegram",
   "ai",
   "email",
@@ -355,6 +398,7 @@ export function validateIntegration(
   // Lists are stored normalised ("a, b" → "a,b"); BOT_TEXT_AI is case-insensitive.
   if (key === "BOT_ALLOWED_CHAT_IDS" || key === "EMAIL_TO")
     return { ok: true, value: splitList(value).join(",") };
+  if (key === "PUBLIC_SITE_URL") return { ok: true, value: normalizeSiteUrlSetting(value) };
   if (
     key === "BOT_TEXT_AI" ||
     key === "MIDTRANS_ENABLED" ||
