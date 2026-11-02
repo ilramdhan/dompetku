@@ -886,3 +886,88 @@ do $$ begin
     check (refunded >= 0 and refunded <= amount);
 exception when duplicate_object then null; end $$;
 notify pgrst, 'reload schema';
+
+-- ============ v26: invoice — notifikasi bank via MacroDroid + kode unik (aman dijalankan ulang) ============
+-- Opsional, butuh v21 + v24 (rate_limits). Tanpa bagian ini endpoint /api/public/payments/notify menjawab
+-- 503, kartu "Format notifikasi" & antrean "Notifikasi bank" hanya menampilkan petunjuk, dan invoice tidak
+-- punya kode unik. Panduan: docs/MACRODROID.md.
+-- unique_code: 1–999 rupiah yang ditambahkan ke nominal transfer agar transfer dengan nominal sama bisa
+-- dibedakan. Diberikan saat admin membagikan tautan, mengirim email invoice atau membuka detail invoice
+-- terbuka (unpaid/partial) dan MACRODROID_TOKEN aktif — tidak pernah oleh halaman publik. Saat invoice
+-- lunas/batal/draft, unique_code_released_at diisi: kode tetap "dipegang" 48 jam (masa tenang) agar
+-- notifikasi yang terlambat tidak cocok dengan invoice lain, lalu dikosongkan saat kode baru diberikan.
+-- Indeks unik parsial atas kode yang terisi: tanpa syarat status, agar mengubah status invoice tidak
+-- pernah gagal karena bentrok kode.
+alter table public.invoices add column if not exists unique_code smallint
+  check (unique_code is null or unique_code between 1 and 999);
+alter table public.invoices add column if not exists unique_code_released_at timestamptz;
+create unique index if not exists invoices_unique_code_open_idx on public.invoices (unique_code)
+  where unique_code is not null;
+
+-- Format notifikasi (diatur admin di Pengaturan): aplikasi (potongan nama paket/nama aplikasi), filter
+-- judul/teks (contains atau regex), regex nominal (grup bernama "amount" atau grup pertama) dan kata kunci
+-- wajib/abaikan. Regex divalidasi di aplikasi (panjang, pola berisiko lambat) dan hanya dijalankan pada
+-- teks yang dipotong. account_id (opsional): hanya invoice ke dompet ini yang dicocokkan.
+create table if not exists public.payment_notify_formats (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (length(trim(name)) between 1 and 60),
+  app_match text check (app_match is null or length(app_match) <= 200),
+  title_match text check (title_match is null or length(title_match) <= 200),
+  text_match text check (text_match is null or length(text_match) <= 200),
+  match_mode text not null default 'contains' check (match_mode in ('contains','regex')),
+  amount_regex text not null check (length(amount_regex) between 1 and 200),
+  must_contain text check (must_contain is null or length(must_contain) <= 300),
+  ignore_contains text check (ignore_contains is null or length(ignore_contains) <= 300),
+  account_id uuid references public.accounts(id) on delete set null,
+  enabled boolean not null default true,
+  position int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists payment_notify_formats_pos_idx on public.payment_notify_formats (enabled, position);
+revoke all on public.payment_notify_formats from anon, authenticated;
+grant all on public.payment_notify_formats to service_role;
+alter table public.payment_notify_formats enable row level security;
+
+-- payment_signals: satu baris per notifikasi yang diterima. Teks disimpan seminimal mungkin (excerpt ≤300
+-- karakter, deretan angka ≥6 digit disamarkan), tidak ada payload mentah. hash = SHA-256 isi notifikasi
+-- (+ waktu notifikasi) untuk dedupe: kiriman ulang yang sama tidak membuat baris baru.
+-- Status: unmatched (tidak ada invoice cocok), matched (satu invoice cocok → "Menunggu verifikasi"),
+-- ambiguous (lebih dari satu kandidat), confirmed (pembayaran dicatat, payment_id), ignored (bukan uang
+-- masuk / diabaikan admin). claimed_at: klaim atomik pencatatan (auto-confirm / tombol Konfirmasi);
+-- indeks unik parsial payment_signals_invoice_claim_idx: hanya satu notifikasi per invoice yang boleh
+-- sedang dicatat, jadi notifikasi paralel untuk invoice yang sama dicatat bergantian (bukan bentrok).
+-- Tidak ikut dicadangkan; baris ignored/unmatched lebih dari 90 hari dibersihkan sesekali.
+create table if not exists public.payment_signals (
+  id uuid primary key default gen_random_uuid(),
+  source text not null default 'macrodroid' check (source in ('macrodroid')),
+  hash text not null unique check (hash ~ '^[0-9a-f]{64}$'),
+  device text check (device is null or length(device) <= 60),
+  app text check (app is null or length(app) <= 120),
+  excerpt text check (excerpt is null or length(excerpt) <= 300),
+  format_name text check (format_name is null or length(format_name) <= 60),
+  amount numeric(18,2) check (amount is null or amount > 0),
+  posted_at timestamptz,
+  received_at timestamptz not null default now(),
+  status text not null default 'unmatched'
+    check (status in ('unmatched','matched','ambiguous','confirmed','ignored')),
+  reason text check (reason is null or length(reason) <= 300),
+  invoice_id uuid references public.invoices(id) on delete set null,
+  candidate_ids uuid[] not null default '{}',
+  payment_id uuid references public.invoice_payments(id) on delete set null,
+  claimed_at timestamptz,
+  reviewed_at timestamptz,
+  last_error text check (last_error is null or length(last_error) <= 300)
+);
+create index if not exists payment_signals_status_idx on public.payment_signals (status, received_at desc);
+create index if not exists payment_signals_invoice_idx on public.payment_signals (invoice_id, status);
+-- Klaim yang sudah selesai atau ditinggalkan (>10 menit) tidak menahan invoice (aman diulang; perlu sebelum
+-- indeks unik di bawah).
+update public.payment_signals set claimed_at = null
+  where claimed_at is not null and (payment_id is not null or claimed_at < now() - interval '10 minutes');
+create unique index if not exists payment_signals_invoice_claim_idx on public.payment_signals (invoice_id)
+  where claimed_at is not null;
+revoke all on public.payment_signals from anon, authenticated;
+grant all on public.payment_signals to service_role;
+alter table public.payment_signals enable row level security;
+notify pgrst, 'reload schema';

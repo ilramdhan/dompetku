@@ -142,6 +142,11 @@ async function compose(
     brandName(),
   ]);
   const methods = kind === "payment" ? [] : await ip.emailMethodsFor(inv.id);
+  // v26: unique code for bank-notification matching (null when MacroDroid is off / before v26).
+  const code =
+    kind === "payment"
+      ? null
+      : await (await import("./payment-signals.server")).ensureUniqueCode(inv.id);
   return buildInvoiceEmail({
     kind,
     brand,
@@ -156,6 +161,7 @@ async function compose(
     link: o.link ?? null,
     methods,
     payment_amount: o.paymentAmount ?? null,
+    unique_code: code,
   });
 }
 

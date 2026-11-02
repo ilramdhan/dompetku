@@ -61,6 +61,8 @@ export type InvoiceRow = {
   paid: number;
   created_at: string;
   updated_at: string;
+  /** v26 (#96): 1–999 rupiah added to the transfer amount (null/absent before v26 or when unset). */
+  unique_code?: number | null;
 };
 
 export type InvoiceInput = {
@@ -137,10 +139,8 @@ export async function listInvoices(o: ListOptions, scope: Scope) {
     throw new Error((list.error ?? open.error)!.message);
   }
   const rows = ((list.data ?? []) as any[]).map(num);
-  // v24: "Menunggu verifikasi" while proofs are pending (empty map without v24).
-  const pending = await (
-    await import("./invoice-payments.server")
-  ).pendingProofCounts(
+  // v24/v26: "Menunggu verifikasi" while proofs or matched bank notifications are pending.
+  const pending = await pendingReviews(
     rows.filter((r) => r.status === "unpaid" || r.status === "partial").map((r) => r.id),
   );
   const items = rows.map((r) => ({
@@ -167,9 +167,29 @@ export async function loadInvoice(id: string): Promise<InvoiceRow | null> {
   return res.data ? num(res.data) : null;
 }
 
+/**
+ * Pending reviews per invoice: v24 proofs + v26 matched bank notifications (empty maps before
+ * those schema sections). Drives the "Menunggu verifikasi" display status.
+ */
+async function pendingReviews(ids: readonly string[]): Promise<Map<string, number>> {
+  const [proofs, signals] = await Promise.all([
+    import("./invoice-payments.server").then((m) => m.pendingProofCounts(ids)),
+    import("./payment-signals.server").then((m) => m.matchedSignalCounts(ids)),
+  ]);
+  const out = new Map(proofs);
+  for (const [id, n] of signals) out.set(id, (out.get(id) ?? 0) + n);
+  return out;
+}
+
 /** One invoice with its items and payments (detail view / edit form). */
 export async function getInvoice(inv: InvoiceRow) {
   const ip = await import("./invoice-payments.server");
+  // v26: the admin sees (and may forward) the transfer amount, so make sure an open invoice has its
+  // unique code; null (shown without a code) when MacroDroid is off, pre-v26 or on refund hold.
+  if (inv.status === "unpaid" || inv.status === "partial") {
+    const code = await (await import("./payment-signals.server")).ensureUniqueCode(inv.id);
+    inv = { ...inv, unique_code: code };
+  }
   const [items, pays, today, pending, methodIds] = await Promise.all([
     db().from("invoice_items").select("*").eq("invoice_id", inv.id).order("position"),
     db()
@@ -179,7 +199,7 @@ export async function getInvoice(inv: InvoiceRow) {
       .order("paid_at")
       .order("created_at"),
     fin().then((f) => f.today()),
-    ip.pendingProofCounts([inv.id]),
+    pendingReviews([inv.id]),
     ip.invoiceMethodIds(inv.id),
   ]);
   if (items.error) throw new Error(items.error.message);
@@ -343,6 +363,7 @@ export async function invoiceAction(inv: InvoiceRow, action: InvoiceAction) {
   if (res.error) throw new Error(res.error.message);
   if (!res.data) throw new Error("Invoice berubah, muat ulang halaman");
   await retireGatewayOrders(num(res.data));
+  await (await import("./payment-signals.server")).releaseUniqueCode(num(res.data));
   await (
     await fin()
   ).logActivity("invoices.update", "invoices", {
@@ -361,7 +382,11 @@ export async function deleteInvoice(inv: InvoiceRow) {
     .eq("invoice_id", inv.id);
   if (pays.error) throw new Error(pays.error.message);
   const txIds = (pays.data ?? []).map((p) => p.transaction_id).filter((x): x is string => !!x);
-  const extIds = (pays.data ?? []).map((p) => paymentExternalId(p.id));
+  // v26: "Kode unik" incomes booked with these payments go too (read before the cascade).
+  const codeIds = await (
+    await import("./payment-signals.server")
+  ).uniqueCodeExternalIds((pays.data ?? []).map((p) => p.id));
+  const extIds = [...(pays.data ?? []).map((p) => paymentExternalId(p.id)), ...codeIds];
   // v25: refuse while a Midtrans order is pending/paid (history must not vanish); drop dead ones.
   await (await import("./gateway/payments.server")).releaseInvoiceGateway(inv.id);
   // v24: proof images live in Storage; the rows go with the invoice (cascade).
@@ -416,6 +441,8 @@ export async function syncInvoice(id: string): Promise<InvoiceRow> {
   if (res.error) throw new Error(res.error.message);
   const out = num(res.data);
   await retireGatewayOrders(out);
+  // v26: a paid/cancelled invoice gives its unique code back.
+  await (await import("./payment-signals.server")).releaseUniqueCode(out);
   return out;
 }
 
@@ -516,15 +543,23 @@ export async function loadPayment(id: string) {
   return res.data ?? null;
 }
 
-/** Deletes a payment and its income transaction, then recomputes paid/status. */
+/**
+ * Deletes a payment and its income transaction (plus the v26 "Kode unik" income booked with it),
+ * then recomputes paid/status.
+ */
 export async function deletePayment(
   inv: InvoiceRow,
   payment: { id: string; amount: number | string; transaction_id: string | null },
 ) {
+  // Read before the delete: payment_signals.payment_id is set to null by the FK.
+  const codeIds = await (
+    await import("./payment-signals.server")
+  ).uniqueCodeExternalIds([payment.id]);
   const del = await db().from("invoice_payments").delete().eq("id", payment.id);
   if (del.error) throw new Error(del.error.message);
   await removePaymentTransactions(payment.transaction_id ? [payment.transaction_id] : [], [
     paymentExternalId(payment.id),
+    ...codeIds,
   ]);
   const updated = await syncInvoice(inv.id);
   await (

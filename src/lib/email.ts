@@ -78,6 +78,8 @@ export type InvoiceEmailInput = {
   methods?: readonly InvoiceEmailMethod[];
   /** `payment` only: amount of the payment just received. */
   payment_amount?: number | null;
+  /** v26: unique code (1–999) to add to the transfer; shown with the transfer amount while open. */
+  unique_code?: number | null;
 };
 
 const TEXTS = {
@@ -110,6 +112,9 @@ const TEXTS = {
     },
     paidFull: "Invoice ini sudah lunas.",
     received: "Pembayaran diterima",
+    transfer: "Jumlah transfer",
+    codeNote: (c: number) =>
+      `Mohon transfer tepat sejumlah di atas (termasuk kode unik ${c}) agar pembayaran dikenali otomatis.`,
     subject: {
       invoice: (n: string, b: string) => `🧾 Invoice ${n} dari ${b}`,
       payment: (n: string) => `✅ Pembayaran invoice ${n} diterima`,
@@ -147,6 +152,9 @@ const TEXTS = {
     },
     paidFull: "This invoice is fully paid.",
     received: "Payment received",
+    transfer: "Amount to transfer",
+    codeNote: (c: number) =>
+      `Please transfer exactly the amount above (including the unique code ${c}) so the payment is recognised automatically.`,
     subject: {
       invoice: (n: string, b: string) => `🧾 Invoice ${n} from ${b}`,
       payment: (n: string) => `✅ Payment for invoice ${n} received`,
@@ -203,6 +211,15 @@ export function buildInvoiceEmail(i: InvoiceEmailInput) {
     rows.push([L.received, fmt(i.payment_amount, cur)]);
   if (i.paid > 0.005) rows.push([L.paid, fmt(i.paid, cur)]);
   rows.push([L.remaining, fmt(Math.max(0, i.remaining), cur)]);
+  const code =
+    open &&
+    i.kind !== "payment" &&
+    Number.isInteger(i.unique_code) &&
+    i.unique_code! >= 1 &&
+    i.unique_code! <= 999
+      ? i.unique_code!
+      : null;
+  if (code) rows.push([L.transfer, fmt(Math.round((i.remaining + code) * 100) / 100, cur)]);
   if (i.due_date)
     rows.push([L.due, `${i.due_date.slice(0, 10)}${whenText && open ? ` (${whenText})` : ""}`]);
 
@@ -226,6 +243,7 @@ export function buildInvoiceEmail(i: InvoiceEmailInput) {
     intro,
     "",
     ...rows.map(([k, v]) => `${k}: ${v}`),
+    ...(code ? ["", L.codeNote(code)] : []),
     ...(methods.length ? ["", `${L.pay}:`, ...methods.map((m) => `• ${methodLine(m)}`)] : []),
     ...(link ? ["", `${L.linkText}: ${link}`] : []),
     ...(tail ? ["", tail] : []),
@@ -237,7 +255,7 @@ export function buildInvoiceEmail(i: InvoiceEmailInput) {
   const rowsHtml = rows
     .map(
       ([k, v], idx) =>
-        `<tr><td style="${td};color:#4d5f57">${esc(k)}</td><td style="${td};font-family:monospace;text-align:right${idx === rows.length - 1 || k === L.remaining ? ";font-weight:bold" : ""}">${esc(v)}</td></tr>`,
+        `<tr><td style="${td};color:#4d5f57">${esc(k)}</td><td style="${td};font-family:monospace;text-align:right${idx === rows.length - 1 || k === L.remaining || k === L.transfer ? ";font-weight:bold" : ""}">${esc(v)}</td></tr>`,
     )
     .join("");
   const accent = i.kind === "overdue" ? "#b5452b" : "#1f3029";
@@ -247,6 +265,6 @@ export function buildInvoiceEmail(i: InvoiceEmailInput) {
   const linkHtml = link
     ? `<p style="margin:20px 0 0"><a href="${esc(link)}" style="display:inline-block;background:#1f3029;color:#fdfbf6;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:bold">${esc(L.link)}</a></p><p style="margin:8px 0 0;font-size:12px;color:#4d5f57;word-break:break-all">${esc(link)}</p>`
     : "";
-  const html = `<div style="font-family:Arial,sans-serif;background:#f7f3ea;padding:24px;color:#1f3029"><div style="max-width:600px;margin:auto;background:#fdfbf6;border-radius:14px;padding:24px"><h2 style="margin:0 0 4px">${esc(brand)}<span style="color:#e3b23c">.</span></h2><p style="margin:0 0 4px">${esc(L.hello)} ${esc(name)},</p><p style="margin:0 0 16px;color:${accent}">${esc(intro)}</p><table style="width:100%;border-collapse:collapse;font-size:14px">${rowsHtml}</table>${methodsHtml}${linkHtml}${tail ? `<p style="margin:20px 0 0;font-size:14px">${esc(tail)}</p>` : ""}<p style="margin:16px 0 0;font-size:14px">${esc(L.thanks)}</p></div></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;background:#f7f3ea;padding:24px;color:#1f3029"><div style="max-width:600px;margin:auto;background:#fdfbf6;border-radius:14px;padding:24px"><h2 style="margin:0 0 4px">${esc(brand)}<span style="color:#e3b23c">.</span></h2><p style="margin:0 0 4px">${esc(L.hello)} ${esc(name)},</p><p style="margin:0 0 16px;color:${accent}">${esc(intro)}</p><table style="width:100%;border-collapse:collapse;font-size:14px">${rowsHtml}</table>${code ? `<p style="margin:16px 0 0;font-size:14px;font-weight:bold">${esc(L.codeNote(code))}</p>` : ""}${methodsHtml}${linkHtml}${tail ? `<p style="margin:20px 0 0;font-size:14px">${esc(tail)}</p>` : ""}<p style="margin:16px 0 0;font-size:14px">${esc(L.thanks)}</p></div></div>`;
   return { subject, text, html };
 }
