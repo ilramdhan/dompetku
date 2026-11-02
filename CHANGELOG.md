@@ -9,6 +9,32 @@ Starting with v1.0.0, versioned entries (`## [x.y.z]`) are generated automatical
 > [!NOTE]
 > When an entry mentions a **schema section** (`v2`…`v13`), self-hosters must run that section of [`supabase/schema.sql`](supabase/schema.sql) on their Supabase project. Every section is safe to run more than once, and the app keeps working (with the feature disabled) until you do.
 
+## [1.11.0](https://github.com/ilramdhan/dompetku/compare/v1.10.2...v1.11.0) (2026-11-02)
+
+
+### Features
+
+* **gateway:** book midtrans mdr fees and allow opt-in partial gateway payments ([#126](https://github.com/ilramdhan/dompetku/issues/126)) ([6d9a23e](https://github.com/ilramdhan/dompetku/commit/6d9a23e6044e07cf6e495b880dc4d4fe1ec29a0c))
+* **invoices:** add a "Menunggu verifikasi" status filter to the invoice list ([#129](https://github.com/ilramdhan/dompetku/issues/129)) ([757ab12](https://github.com/ilramdhan/dompetku/commit/757ab12ff385d1f14d59c605afc1e8c1d829c9e0)), closes [#120](https://github.com/ilramdhan/dompetku/issues/120)
+* **invoices:** bank/QRIS payment methods with proof upload and verification queue ([#109](https://github.com/ilramdhan/dompetku/issues/109)) ([cfecf03](https://github.com/ilramdhan/dompetku/commit/cfecf0392698fc464ee136d23e54f1238490b192))
+* **invoices:** email invoices, payment confirmations and due reminders via Resend ([#111](https://github.com/ilramdhan/dompetku/issues/111)) ([e3cb1af](https://github.com/ilramdhan/dompetku/commit/e3cb1af602f0fbed33955b46e1ac8c612c59270e))
+* **invoices:** invoice core with items, numbering and manual payments ([#104](https://github.com/ilramdhan/dompetku/issues/104)) ([ab16e0b](https://github.com/ilramdhan/dompetku/commit/ab16e0b9f413e767e85071a2f8d9146e684cde66))
+* **invoices:** invoice report with aging and payment history ([#105](https://github.com/ilramdhan/dompetku/issues/105)) ([acdea49](https://github.com/ilramdhan/dompetku/commit/acdea49211e58369138a548acd8f1d851dd0e94a))
+* **invoices:** match MacroDroid bank notifications to invoices with unique transfer codes ([#134](https://github.com/ilramdhan/dompetku/issues/134)) ([7fff081](https://github.com/ilramdhan/dompetku/commit/7fff0819d4f431ce63810e0cc0c21e14871fa097))
+* **invoices:** online invoice payments via Midtrans Snap with verified webhooks and refunds ([#112](https://github.com/ilramdhan/dompetku/issues/112)) ([570e3cd](https://github.com/ilramdhan/dompetku/commit/570e3cdb1a17f40b7cddec825d934d1ee1169228))
+* **invoices:** public tokenized invoice page with print to PDF ([#108](https://github.com/ilramdhan/dompetku/issues/108)) ([bf1de96](https://github.com/ilramdhan/dompetku/commit/bf1de96742fb78f54e563105be95897db412f541))
+* **invoices:** send invoice emails in the customer's language ([#136](https://github.com/ilramdhan/dompetku/issues/136)) ([d44d743](https://github.com/ilramdhan/dompetku/commit/d44d74365841b92be52dccf8ffdb6ce36e43ed9f))
+* **notify:** let members manage their own telegram chat id ([#132](https://github.com/ilramdhan/dompetku/issues/132)) ([46aebdf](https://github.com/ilramdhan/dompetku/commit/46aebdfdb4a1d3a089b782ddbaa12bc09dad2d17))
+* **notify:** per-member telegram reports and reminders scoped to wallets ([#106](https://github.com/ilramdhan/dompetku/issues/106)) ([54f4ee0](https://github.com/ilramdhan/dompetku/commit/54f4ee0baf3dac3746e2ebfaf57ffe6a3f5df95f))
+* **security:** trusted-proxy setting for client ip resolution ([#131](https://github.com/ilramdhan/dompetku/issues/131)) ([acfcc77](https://github.com/ilramdhan/dompetku/commit/acfcc77cfd924c8da29a1dc538a7da4603c08bdf))
+* **settings:** configure PUBLIC_SITE_URL from settings ([#130](https://github.com/ilramdhan/dompetku/issues/130)) ([6b91dee](https://github.com/ilramdhan/dompetku/commit/6b91dee3ed70ed6182b967425005407f7f11014e))
+
+
+### Bug Fixes
+
+* **i18n:** add missing English translations and a test for missing keys ([#114](https://github.com/ilramdhan/dompetku/issues/114)) ([61510a0](https://github.com/ilramdhan/dompetku/commit/61510a0fd668892e88c7228ac7849caa341ed080))
+* **invoices:** send no-store headers on the /i/&lt;token&gt; 404 ([#128](https://github.com/ilramdhan/dompetku/issues/128)) ([91bad26](https://github.com/ilramdhan/dompetku/commit/91bad26dbc91c5379e077caf894ecf333889c5bb)), closes [#119](https://github.com/ilramdhan/dompetku/issues/119)
+
 ## [1.10.2](https://github.com/ilramdhan/dompetku/compare/v1.10.1...v1.10.2) (2026-10-23)
 
 
