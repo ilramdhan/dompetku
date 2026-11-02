@@ -35,7 +35,13 @@ import {
   saveIntegration,
 } from "@/lib/integrations.server";
 
-const ENV = ["SESSION_SECRET", "AI_API_KEY", "BOT_TEXT_AI", "N8N_API_KEY"] as const;
+const ENV = [
+  "SESSION_SECRET",
+  "AI_API_KEY",
+  "BOT_TEXT_AI",
+  "N8N_API_KEY",
+  "MIDTRANS_FEES",
+] as const;
 const saved = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
 beforeEach(() => {
   rows = [];
@@ -91,6 +97,15 @@ describe("integrations.server", () => {
     expect(await getIntegration("AI_API_KEY")).toBe("env-key-000000000");
     const item = (await readIntegrations()).items.find((i) => i.key === "AI_API_KEY")!;
     expect(item).toMatchObject({ source: "env", problem: "decrypt", stored: true });
+  });
+
+  it("flags an env value that fails validation (review L3)", async () => {
+    process.env["MIDTRANS_FEES"] = "qris=0,7%";
+    let item = (await readIntegrations()).items.find((i) => i.key === "MIDTRANS_FEES")!;
+    expect(item).toMatchObject({ source: "env", problem: "env", stored: false });
+    process.env["MIDTRANS_FEES"] = "qris=0.7%";
+    item = (await readIntegrations()).items.find((i) => i.key === "MIDTRANS_FEES")!;
+    expect(item).toMatchObject({ source: "env", problem: null });
   });
 
   it("stores secrets encrypted and validates before writing", async () => {

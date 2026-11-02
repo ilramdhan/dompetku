@@ -18,6 +18,8 @@ import {
   paidSum,
   parseInvoiceNumber,
   paymentExternalId,
+  overshootDecision,
+  stillOvershoots,
   paymentProblem,
   remainingOf,
   validateInvoice,
@@ -299,5 +301,36 @@ describe("invoice prefix setting (v21 app_settings.invoice_prefix)", () => {
     ).toBe("SHOP1");
     expect(appSettingsInputSchema.parse({ ...base, invoice_prefix: "" }).invoice_prefix).toBeNull();
     expect(() => appSettingsInputSchema.parse({ ...base, invoice_prefix: "IN-V" })).toThrow();
+  });
+});
+
+describe("concurrent payment overshoot (reviews L2/L4, #124)", () => {
+  const p = (id: string, amount: number, at: string, refunded = 0) => ({
+    id,
+    amount,
+    refunded,
+    created_at: `2026-11-01T10:00:${at}Z`,
+  });
+
+  it("rolls back the later of two racing payments at once and makes the earlier recheck", () => {
+    const rows = [p("b", 60000, "02"), p("a", 60000, "01")];
+    expect(overshootDecision(rows, 100000, "b")).toBe("rollback");
+    expect(overshootDecision(rows, 100000, "a")).toBe("recheck");
+    // After the wait: the later one is gone → keep; still there (inversion) → roll back too.
+    expect(stillOvershoots([p("a", 60000, "01")], 100000)).toBe(false);
+    expect(stillOvershoots(rows, 100000)).toBe(true);
+  });
+
+  it("breaks created_at ties by id and keeps payments that fit", () => {
+    const rows = [p("y", 60000, "01"), p("x", 60000, "01")];
+    expect(overshootDecision(rows, 100000, "x")).toBe("recheck");
+    expect(overshootDecision(rows, 100000, "y")).toBe("rollback");
+    expect(overshootDecision([p("a", 40000, "01"), p("b", 60000, "02")], 100000, "b")).toBe("keep");
+  });
+
+  it("nets refunds out and rolls back when its own row is missing from an overshooting read", () => {
+    const rows = [p("a", 100000, "01", 50000), p("b", 50000, "02")];
+    expect(overshootDecision(rows, 100000, "b")).toBe("keep");
+    expect(overshootDecision([p("a", 120000, "01")], 100000, "zz")).toBe("rollback");
   });
 });

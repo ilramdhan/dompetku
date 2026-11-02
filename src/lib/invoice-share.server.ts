@@ -195,6 +195,7 @@ export async function publicInvoiceByToken(raw: unknown): Promise<PublicInvoiceV
         gateway: gw.available,
         unique_code: code,
         transfer_amount: code ? transferAmount(pub.remaining, code) : null,
+        ...(gw.partial ? { gateway_partial: true, gateway_min: gw.min } : {}),
       },
     };
   } catch (e) {

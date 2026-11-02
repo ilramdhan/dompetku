@@ -8,6 +8,7 @@
  * APP_TOTP_SECRET, DEMO_MODE, SENTRY_DSN, SETTINGS_ENCRYPTION_KEY) are deliberately NOT here:
  * they must exist before the database can be read, or they guard access to the settings themselves.
  */
+import { formatMdrRules, mdrRulesProblem } from "./gateway/mdr";
 
 export type IntegrationGroup = "telegram" | "ai" | "email" | "n8n" | "payment" | "macrodroid";
 export type IntegrationSource = "db" | "env" | "default" | "none";
@@ -236,6 +237,25 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
     default: "false",
     validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
   },
+  // #124: MDR schedule (Midtrans sends no fee field) and partial "Bayar sekarang" amounts.
+  {
+    key: "MIDTRANS_FEES",
+    group: "payment",
+    secret: false,
+    label: "Biaya MDR Midtrans",
+    help: 'Per metode, mis. "qris=0.7%; gopay=2%; credit_card=2.9%+2000; bank_transfer=4000; *=0" (termasuk PPN bila ada). Dicatat sebagai pengeluaran "Biaya Admin" sekali per pembayaran. Kosong = tidak dicatat.',
+    placeholder: "qris=0.7%; gopay=2%; bank_transfer=4000",
+    validate: (v) => mdrRulesProblem(v),
+  },
+  {
+    key: "MIDTRANS_PARTIAL",
+    group: "payment",
+    secret: false,
+    label: "Izinkan bayar sebagian lewat Midtrans",
+    help: "true = pelanggan boleh memasukkan jumlah (min. Rp10.000 dan sisa setelahnya juga min. Rp10.000) di tombol Bayar sekarang. false = selalu seluruh sisa (default).",
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
   // v26 (#96): bank notifications forwarded by MacroDroid + unique codes. Off without a token.
   {
     key: "MACRODROID_TOKEN",
@@ -284,6 +304,8 @@ export type IntegrationKey =
   | "MIDTRANS_SERVER_KEY"
   | "MIDTRANS_CLIENT_KEY"
   | "MIDTRANS_PRODUCTION"
+  | "MIDTRANS_FEES"
+  | "MIDTRANS_PARTIAL"
   | "MACRODROID_TOKEN"
   | "MACRODROID_AUTO_CONFIRM"
   | "MACRODROID_GENERIC";
@@ -337,10 +359,13 @@ export function validateIntegration(
     key === "BOT_TEXT_AI" ||
     key === "MIDTRANS_ENABLED" ||
     key === "MIDTRANS_PRODUCTION" ||
+    key === "MIDTRANS_PARTIAL" ||
     key === "MACRODROID_AUTO_CONFIRM" ||
     key === "MACRODROID_GENERIC"
   )
     return { ok: true, value: value.toLowerCase() };
+  // MDR schedule is stored normalised: "QRIS = 0.7 %" → "qris=0.7%".
+  if (key === "MIDTRANS_FEES") return { ok: true, value: formatMdrRules(value) };
   return { ok: true, value };
 }
 
@@ -384,8 +409,11 @@ export type IntegrationStatus = {
   /** True when a DB row exists (so "remove" falls back to env). */
   stored: boolean;
   updated_at: string | null;
-  /** "decrypt" = stored secret cannot be decrypted (key rotated) → env used; "invalid" = bad DB value. */
-  problem: "decrypt" | "invalid" | null;
+  /**
+   * "decrypt" = stored secret cannot be decrypted (key rotated) → env used; "invalid" = bad DB
+   * value; "env" = the env value in use does not pass validation (it may be ignored by the feature).
+   */
+  problem: "decrypt" | "invalid" | "env" | null;
 };
 
 /* ---------------- Ciphertext format ---------------- */

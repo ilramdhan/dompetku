@@ -987,6 +987,8 @@ const DICT: Record<string, string> = {
     "The stored value cannot be decrypted (key changed) — re-enter it. Using env meanwhile.",
   "Nilai tersimpan tidak valid — sementara memakai env.":
     "The stored value is invalid — using env meanwhile.",
+  "Nilai env tidak valid — periksa formatnya atau simpan nilai di sini.":
+    "The env value is invalid — check its format or save a value here.",
   "Tersimpan — ketik untuk mengganti": "Saved — type to replace",
   "Aktif:": "Active:",
   "Nilai aktif:": "Active value:",
@@ -1574,6 +1576,23 @@ const DICT: Record<string, string> = {
   "Mode production Midtrans": "Midtrans production mode",
   "false = sandbox (uji coba, default). true = transaksi uang sungguhan; pakai key production.":
     "false = sandbox (testing, default). true = real money; use production keys.",
+  /* Midtrans MDR fees + partial payments (#124) */
+  "Biaya MDR Midtrans": "Midtrans MDR fees",
+  'Per metode, mis. "qris=0.7%; gopay=2%; credit_card=2.9%+2000; bank_transfer=4000; *=0" (termasuk PPN bila ada). Dicatat sebagai pengeluaran "Biaya Admin" sekali per pembayaran. Kosong = tidak dicatat.':
+    'Per method, e.g. "qris=0.7%; gopay=2%; credit_card=2.9%+2000; bank_transfer=4000; *=0" (include VAT where it applies). Booked once per payment as a "Biaya Admin" expense. Empty = not booked.',
+  "Izinkan bayar sebagian lewat Midtrans": "Allow partial payments through Midtrans",
+  "true = pelanggan boleh memasukkan jumlah (min. Rp10.000, maks. sisa tagihan) di tombol Bayar sekarang. false = selalu seluruh sisa (default).":
+    "true = customers may enter an amount (min. Rp10,000, max. the remaining balance) on Pay now. false = always the full remaining balance (default).",
+  "Terlalu banyak aturan biaya": "Too many fee rules",
+  "Format biaya: metode=persen%+tetap": "Fee format: method=percent%+flat",
+  "Persentase biaya harus di bawah 50%": "Fee percentage must be below 50%",
+  "Jumlah yang dibayar (opsional)": "Amount to pay (optional)",
+  "Boleh bayar sebagian: minimal": "Partial payment allowed: at least",
+  maksimal: "at most",
+  " (sisa minimal sama). Kosongkan untuk melunasi.":
+    " (leaving at least the same). Leave empty to pay in full.",
+  "Biaya MDR": "MDR fee",
+  "diterima bersih": "net received",
   "Payment gateway (Midtrans)": "Payment gateway (Midtrans)",
   "Butuh skema v25. Pasang Payment Notification URL di dashboard Midtrans ke":
     "Needs schema v25. Set the Payment Notification URL in the Midtrans dashboard to",
@@ -1637,6 +1656,10 @@ const DICT: Record<string, string> = {
   "Refund dengan kunci ini sudah ada dengan jumlah berbeda; cek status lalu coba lagi":
     "A refund with this key already exists with a different amount; check the status and try again",
   "Chargeback dari Midtrans, cek manual": "Chargeback from Midtrans, check manually",
+  "Digantikan order lain yang dibuat bersamaan":
+    "Replaced by another order created at the same time",
+  "Transaksi tertunda ini menahan pembayaran online baru untuk invoice ini sampai dicek (Cek status) atau ditangani manual.":
+    "This pending transaction blocks new online payments for this invoice until it is checked (Check status) or handled manually.",
   "Tagih ulang invoice ini?": "Bill this invoice again?",
   "Tombol Bayar sekarang dan pengingat jatuh tempo aktif lagi untuk sisa tagihan. Pilih Batalkan invoice bila pelanggan tidak perlu membayar lagi.":
     "The Pay now button and due reminders come back for the amount due. Cancel the invoice instead if the customer does not need to pay again.",

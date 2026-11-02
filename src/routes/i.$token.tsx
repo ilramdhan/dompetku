@@ -208,7 +208,13 @@ function PublicInvoicePage() {
         </div>
 
         {open && inv.payment?.gateway ? (
-          <PayNowButton token={token} amount={inv.remaining} currency={cur} returned={returned} />
+          <PayNowButton
+            token={token}
+            amount={inv.remaining}
+            currency={cur}
+            returned={returned}
+            partialMin={inv.payment.gateway_partial ? (inv.payment.gateway_min ?? null) : null}
+          />
         ) : null}
         {open ? <InvoicePaymentInstructions invoice={inv} token={token} /> : null}
 

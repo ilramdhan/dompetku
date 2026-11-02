@@ -21,14 +21,14 @@ After running the **v16** section of `supabase/schema.sql`, **Settings → Integ
 
 **Precedence:** value saved in Settings (if valid) → env var → built-in default. Nothing saved (or no v16 table) = exactly the env behaviour you have today. **Remove** in Settings deletes the database value and falls back to env.
 
-| Can be set in Settings → Integrasi                                                                     | Env only (never manageable from the UI)                                                                                                  |
-| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `N8N_API_KEY`\*, `BOT_ALLOWED_CHAT_IDS`, `TELEGRAM_ADMIN_CHAT_ID`, `BOT_TEXT_AI`, `BOT_AI_DAILY_LIMIT` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (needed to read the database at all)                                                         |
-| `AI_API_URL`, `AI_API_KEY`\*, `AI_MODEL`, `AI_MODEL_TEXT`                                              | `SESSION_SECRET`, `SETTINGS_ENCRYPTION_KEY`, `APP_USERNAME`, `APP_PASSWORD`, `APP_TOTP_SECRET` (guard access to the settings themselves) |
-| `RESEND_API_KEY`\*, `EMAIL_FROM`, `EMAIL_TO`                                                           | `DEMO_MODE`, `SENTRY_DSN`, `APP_TIMEZONE`/`BOT_DEFAULT_ACCOUNT` (those two are in Settings → Aplikasi, v14), `FALLBACK_USD_IDR`, …       |
-| `TELEGRAM_BOT_TOKEN`\* (optional, [Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n))     |                                                                                                                                          |
-| `MIDTRANS_ENABLED`, `MIDTRANS_SERVER_KEY`\*, `MIDTRANS_CLIENT_KEY`, `MIDTRANS_PRODUCTION` (v25)        | `MIDTRANS_API_BASE`, `MIDTRANS_SNAP_BASE` (test-only overrides)                                                                          |
-| `MACRODROID_TOKEN`\*, `MACRODROID_AUTO_CONFIRM`, `MACRODROID_GENERIC` (v26)                            |                                                                                                                                          |
+| Can be set in Settings → Integrasi                                                                                                   | Env only (never manageable from the UI)                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `N8N_API_KEY`\*, `BOT_ALLOWED_CHAT_IDS`, `TELEGRAM_ADMIN_CHAT_ID`, `BOT_TEXT_AI`, `BOT_AI_DAILY_LIMIT`                               | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (needed to read the database at all)                                                         |
+| `AI_API_URL`, `AI_API_KEY`\*, `AI_MODEL`, `AI_MODEL_TEXT`                                                                            | `SESSION_SECRET`, `SETTINGS_ENCRYPTION_KEY`, `APP_USERNAME`, `APP_PASSWORD`, `APP_TOTP_SECRET` (guard access to the settings themselves) |
+| `RESEND_API_KEY`\*, `EMAIL_FROM`, `EMAIL_TO`                                                                                         | `DEMO_MODE`, `SENTRY_DSN`, `APP_TIMEZONE`/`BOT_DEFAULT_ACCOUNT` (those two are in Settings → Aplikasi, v14), `FALLBACK_USD_IDR`, …       |
+| `TELEGRAM_BOT_TOKEN`\* (optional, [Telegram direct mode](N8N.md#telegram-direct-mode-without-n8n))                                   |                                                                                                                                          |
+| `MIDTRANS_ENABLED`, `MIDTRANS_SERVER_KEY`\*, `MIDTRANS_CLIENT_KEY`, `MIDTRANS_PRODUCTION`, `MIDTRANS_FEES`, `MIDTRANS_PARTIAL` (v25) | `MIDTRANS_API_BASE`, `MIDTRANS_SNAP_BASE` (test-only overrides)                                                                          |
+| `MACRODROID_TOKEN`\*, `MACRODROID_AUTO_CONFIRM`, `MACRODROID_GENERIC` (v26)                                                          |                                                                                                                                          |
 
 \* **Secrets** are write-only, like Vercel: they are encrypted at rest (AES-256-GCM, random IV per value) and the server never sends them back to the browser — Settings only shows the source (Database / Env / Belum diatur) and the last 4 characters. The `integration_settings` table is **not** included in JSON backups, so re-enter secrets after restoring onto a new instance.
 
@@ -116,17 +116,19 @@ All three are needed for `POST /api/public/n8n/reminders-send-email`. Not needed
 ## Payment gateway: Midtrans (optional)
 
 Online invoice payments ("Bayar sekarang" on the public invoice page), schema **v25**. Step-by-step
-guide (ID + EN): **[PAYMENT-GATEWAY.md](PAYMENT-GATEWAY.md)**. All four can also be set in
+guide (ID + EN): **[PAYMENT-GATEWAY.md](PAYMENT-GATEWAY.md)**. All six (except the test-only bases) can also be set in
 Settings → Integrasi (wins over env). Off unless `MIDTRANS_ENABLED=true` and a server key is set.
 
-| Name                  | Example                 | What it does                                                                                                      | How to obtain                                |
-| --------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `MIDTRANS_ENABLED`    | `true`                  | Turns the gateway on (default `false`).                                                                           | —                                            |
-| `MIDTRANS_SERVER_KEY` | `SB-Mid-server-…`       | Server key for Snap, status and refund calls and the webhook signature. **Secret**, never sent to the browser.    | Midtrans dashboard → Settings → Access Keys. |
-| `MIDTRANS_CLIENT_KEY` | `SB-Mid-client-…`       | Public client key for Snap JS. Without it the customer is redirected to the Midtrans page instead of a popup.     | Same page.                                   |
-| `MIDTRANS_PRODUCTION` | `false`                 | `false` = sandbox hosts (default), `true` = production hosts (real money). Must match the keys.                   | —                                            |
-| `MIDTRANS_API_BASE`   | `http://127.0.0.1:4010` | **Test only**, env only: Core API base (status/refund) for a local mock. Ignored when `MIDTRANS_PRODUCTION=true`. | Leave empty.                                 |
-| `MIDTRANS_SNAP_BASE`  | `http://127.0.0.1:4010` | **Test only**, env only: Snap base (create). Ignored in production; the browser then uses `redirect_url`.         | Leave empty.                                 |
+| Name                  | Example                                                | What it does                                                                                                                                                      | How to obtain                                |
+| --------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `MIDTRANS_ENABLED`    | `true`                                                 | Turns the gateway on (default `false`).                                                                                                                           | —                                            |
+| `MIDTRANS_SERVER_KEY` | `SB-Mid-server-…`                                      | Server key for Snap, status and refund calls and the webhook signature. **Secret**, never sent to the browser.                                                    | Midtrans dashboard → Settings → Access Keys. |
+| `MIDTRANS_CLIENT_KEY` | `SB-Mid-client-…`                                      | Public client key for Snap JS. Without it the customer is redirected to the Midtrans page instead of a popup.                                                     | Same page.                                   |
+| `MIDTRANS_PRODUCTION` | `false`                                                | `false` = sandbox hosts (default), `true` = production hosts (real money). Must match the keys.                                                                   | —                                            |
+| `MIDTRANS_FEES`       | `qris=0.7%; credit_card=2.9%+2000; bank_transfer=4000` | Optional (#124): MDR rates per Midtrans `payment_type` (`*` = others). Each paid order books the fee once as a "Biaya Admin" expense. Empty/invalid = not booked. | Your Midtrans pricing / agreement.           |
+| `MIDTRANS_PARTIAL`    | `false`                                                | Optional (#124): `true` lets customers pay part of the remaining balance (min. Rp10,000, leaving ≥ Rp10,000) via "Bayar sekarang".                                | —                                            |
+| `MIDTRANS_API_BASE`   | `http://127.0.0.1:4010`                                | **Test only**, env only: Core API base (status/refund) for a local mock. Ignored when `MIDTRANS_PRODUCTION=true`.                                                 | Leave empty.                                 |
+| `MIDTRANS_SNAP_BASE`  | `http://127.0.0.1:4010`                                | **Test only**, env only: Snap base (create). Ignored in production; the browser then uses `redirect_url`.                                                         | Leave empty.                                 |
 
 Set **Payment Notification URL** in the Midtrans dashboard to
 `https://<your-domain>/api/public/payments/midtrans`. Set `PUBLIC_SITE_URL` so the return link
