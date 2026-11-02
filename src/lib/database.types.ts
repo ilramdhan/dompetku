@@ -1193,6 +1193,8 @@ export type Database = {
           currency: string;
           total: number;
           paid: number;
+          /** v27 customer email language (optional column; null/missing = "id"). */
+          lang?: "id" | "en" | null;
           created_at: string;
           updated_at: string;
           unique_code?: number | null;
@@ -1212,6 +1214,7 @@ export type Database = {
           currency?: string;
           total?: number;
           paid?: number;
+          lang?: "id" | "en" | null;
           created_at?: string;
           updated_at?: string;
           unique_code?: number | null;
@@ -1231,6 +1234,7 @@ export type Database = {
           currency?: string;
           total?: number;
           paid?: number;
+          lang?: "id" | "en" | null;
           created_at?: string;
           updated_at?: string;
           unique_code?: number | null;

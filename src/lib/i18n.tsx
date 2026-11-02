@@ -1378,6 +1378,7 @@ const DICT: Record<string, string> = {
   "Buat tautan": "Create link",
   "Kirim invoice ke email pelanggan? Tautan lama akan diganti dan tidak bisa dibuka lagi.":
     "Email the invoice to the customer? The old link will be replaced and stop working.",
+  "Bahasa email": "Email language",
   "Kirim invoice ke email pelanggan?": "Email the invoice to the customer?",
   "Demi keamanan hanya hash tautan yang disimpan, jadi tautan baru dibuat saat mengirim.":
     "For security only a hash of the link is stored, so a new link is created when sending.",

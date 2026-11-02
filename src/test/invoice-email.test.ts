@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { missingColumn } from "@/lib/backup";
 import { buildInvoiceEmail, type InvoiceEmailInput } from "@/lib/email";
 import {
   dedupeWindowDays,
   isEmailAddress,
+  invoiceLang,
   leadDays,
   maskEmail,
+  parseEmailLang,
   reminderStage,
 } from "@/lib/invoice-email";
 
@@ -129,5 +132,46 @@ describe("invoice-email helpers", () => {
   it("dedupes overdue weekly and due-soon once", () => {
     expect(dedupeWindowDays("overdue")).toBe(7);
     expect(dedupeWindowDays("reminder_due")).toBeGreaterThan(30);
+  });
+});
+
+describe("customer language (#123)", () => {
+  it("parseEmailLang defaults to Indonesian", () => {
+    expect(parseEmailLang("en")).toBe("en");
+    expect(parseEmailLang("id")).toBe("id");
+    expect(parseEmailLang(undefined)).toBe("id");
+    expect(parseEmailLang("fr")).toBe("id");
+  });
+  it("subject, body and payment methods share the chosen language for every kind", () => {
+    for (const kind of ["invoice", "payment", "reminder_due", "overdue"] as const) {
+      const en = buildInvoiceEmail({ ...base, kind, lang: "en", payment_amount: 1000 });
+      const id = buildInvoiceEmail({ ...base, kind, lang: parseEmailLang(undefined) });
+      expect(en.text).toContain("Thank");
+      expect(en.text).not.toContain("Terima kasih");
+      expect(id.text).toContain("Terima kasih");
+      expect(id.text).not.toContain("Thank");
+      if (kind !== "payment") {
+        expect(en.text).toContain("a/n Toko");
+        expect(id.text).toContain("a.n. Toko");
+      }
+    }
+  });
+  it("invoiceLang reads v27 invoices.lang and defaults to Indonesian", () => {
+    expect(invoiceLang({ lang: "en" })).toBe("en");
+    expect(invoiceLang({ lang: "id" })).toBe("id");
+    expect(invoiceLang({ lang: null })).toBe("id");
+    expect(invoiceLang({})).toBe("id"); // column missing (v27 not run)
+    expect(invoiceLang({ lang: "fr" })).toBe("id");
+    expect(invoiceLang(null)).toBe("id");
+  });
+  it("the save retry recognises a missing v27 lang column", () => {
+    expect(
+      missingColumn({
+        message: "Could not find the 'lang' column of 'invoices' in the schema cache",
+      }),
+    ).toBe("lang");
+    expect(missingColumn({ message: 'column "lang" of relation "invoices" does not exist' })).toBe(
+      "lang",
+    );
   });
 });

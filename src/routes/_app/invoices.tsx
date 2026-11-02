@@ -145,6 +145,8 @@ type FormState = {
   issue_date: string;
   due_date: string;
   notes: string;
+  /** v27 customer email language (default id). */
+  lang: "id" | "en";
   items: ItemRow[];
   /** v24: picked payment methods ([] = all active). */
   method_ids: string[];
@@ -161,6 +163,7 @@ const newForm = (accountId: string): FormState => {
     issue_date: issue,
     due_date: addDays(issue, 14),
     notes: "",
+    lang: "id",
     items: [emptyItemRow()],
     method_ids: [],
   };
@@ -524,6 +527,7 @@ function InvoicesPage() {
         issue_date: d.issue_date,
         due_date: d.due_date ?? "",
         notes: d.notes ?? "",
+        lang: d.lang === "en" ? "en" : "id",
         items: d.items.length
           ? d.items.map((i: any) => ({
               description: i.description,
@@ -697,6 +701,7 @@ function InvoiceForm({
             ...draft,
             account_id: f.account_id,
             notes: f.notes || null,
+            lang: f.lang,
             ...(f.id ? {} : { issue }),
             ...(methodsReady ? { method_ids: f.method_ids } : {}),
           } as never,
@@ -757,7 +762,7 @@ function InvoiceForm({
                 onChange={(e) => set("customer_phone", e.target.value)}
               />
             </div>
-            <div className="col-span-2 space-y-1.5">
+            <div className="col-span-2 space-y-1.5 sm:col-span-1">
               <Label htmlFor="inv-acc">{t("Dompet penerima")}</Label>
               <Select value={f.account_id} onValueChange={(v) => set("account_id", v)}>
                 <SelectTrigger id="inv-acc">
@@ -771,6 +776,18 @@ function InvoiceForm({
                         {a.name}
                       </SelectItem>
                     ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2 space-y-1.5 sm:col-span-1">
+              <Label htmlFor="inv-lang">{t("Bahasa email")}</Label>
+              <Select value={f.lang} onValueChange={(v) => set("lang", v === "en" ? "en" : "id")}>
+                <SelectTrigger id="inv-lang">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="id">Indonesia</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Copy, ExternalLink, Link2, Link2Off, Mail, MessageCircle, RefreshCw } from "lucide-react";
@@ -53,6 +53,8 @@ export function InvoiceSharePanel({
     customer_name: string;
     customer_phone?: string | null;
     customer_email?: string | null;
+    /** v27 customer email language ("id" before v27). */
+    lang?: "id" | "en" | null;
     remaining: number;
   };
   locale: string;
@@ -69,6 +71,10 @@ export function InvoiceSharePanel({
   const revoke = useServerFn(revokeInvoiceShareFn);
   const sendMail = useServerFn(sendInvoiceEmailFn);
   const [days, setDays] = useState("0");
+  // Preselects the invoice's language; a different choice is saved back on send.
+  const savedLang = invoice.lang === "en" ? "en" : "id";
+  const [mailLang, setMailLang] = useState<"id" | "en">(savedLang);
+  useEffect(() => setMailLang(savedLang), [savedLang]);
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -137,9 +143,11 @@ export function InvoiceSharePanel({
       return;
     setBusy(true);
     try {
-      const r = await sendMail({ data: { id: invoice.id, expires_days: Number(days) || null } });
+      const r = await sendMail({
+        data: { id: invoice.id, expires_days: Number(days) || null, lang: mailLang },
+      });
       if (r.link) setLink(r.link);
-      await invalidateFor(qc, "invoice_shares");
+      await invalidateFor(qc, "invoice_shares"); // also refreshes the invoice (saved language)
       if (r.sent) toast.success(`${t("Email terkirim ke")} ${r.to}`);
       else
         toast.error(
@@ -247,6 +255,20 @@ export function InvoiceSharePanel({
                   {d === 0 ? t("Tanpa kedaluwarsa") : `${d} ${t("hari")}`}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`mail-lang-${invoice.id}`} className="text-xs">
+            {t("Bahasa email")}
+          </Label>
+          <Select value={mailLang} onValueChange={(v) => setMailLang(v === "en" ? "en" : "id")}>
+            <SelectTrigger id={`mail-lang-${invoice.id}`} className="h-9 w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="id">Indonesia</SelectItem>
+              <SelectItem value="en">English</SelectItem>
             </SelectContent>
           </Select>
         </div>
