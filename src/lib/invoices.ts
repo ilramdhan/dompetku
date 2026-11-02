@@ -19,8 +19,8 @@ export { DEFAULT_INVOICE_PREFIX };
 
 export const INVOICE_STATUSES = ["draft", "unpaid", "partial", "paid", "cancelled"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
-/** List filter values: every stored status plus the computed "overdue". */
-export const INVOICE_FILTERS = [...INVOICE_STATUSES, "overdue"] as const;
+/** List filter values: every stored status plus the computed "overdue" and "verifying" (#120). */
+export const INVOICE_FILTERS = [...INVOICE_STATUSES, "overdue", "verifying"] as const;
 export type InvoiceFilter = (typeof INVOICE_FILTERS)[number];
 export type DisplayStatus = InvoiceStatus | "overdue" | "verifying";
 
@@ -82,6 +82,41 @@ export function invoiceTotal(
 /** Net paid: every payment minus what was refunded of it (v25; missing column = 0). */
 export function paidSum(payments: readonly InvoicePaymentLike[]): number {
   return r2(payments.reduce((s, p) => s + (Number(p.amount) || 0) - (Number(p.refunded) || 0), 0));
+}
+
+/**
+ * Overshoot re-check after inserting payment `ownId` (concurrent bookings, reviews L2/L4 of #124):
+ * - "keep": the net sum of every payment fits the total;
+ * - "rollback": this payment's running net sum in `(created_at, id)` order overshoots, so it is
+ *   the later one of a racing pair;
+ * - "recheck": the sum overshoots only because of payments that sort AFTER this one. They are
+ *   expected to roll back, but `created_at` is the transaction start, not the commit, so a later
+ *   row may already have kept itself (it re-read before this one committed). The caller waits
+ *   briefly, re-reads, and rolls back unless the overshoot is gone. It fails safe like the old
+ *   "roll back on any overshoot" rule; at worst both roll back and the next sync re-books one.
+ */
+export function overshootDecision(
+  payments: readonly (InvoicePaymentLike & { id: string; created_at?: string | null })[],
+  total: number | string,
+  ownId: string,
+): "keep" | "rollback" | "recheck" {
+  if (!(paidSum(payments) > Number(total) + EPS)) return "keep";
+  const sorted = [...payments].sort((a, b) => {
+    const ta = Date.parse(a.created_at ?? "") || 0;
+    const tb = Date.parse(b.created_at ?? "") || 0;
+    return ta !== tb ? ta - tb : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  const i = sorted.findIndex((p) => p.id === ownId);
+  if (i < 0) return "rollback";
+  return paidSum(sorted.slice(0, i + 1)) > Number(total) + EPS ? "rollback" : "recheck";
+}
+
+/** Final word after the "recheck" wait: true = this payment must roll back (still overshoots). */
+export function stillOvershoots(
+  payments: readonly InvoicePaymentLike[],
+  total: number | string,
+): boolean {
+  return paidSum(payments) > Number(total) + EPS;
 }
 
 /** Amount still to pay (never negative). */

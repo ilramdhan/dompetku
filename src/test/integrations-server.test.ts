@@ -42,6 +42,7 @@ const ENV = [
   "N8N_API_KEY",
   "PUBLIC_SITE_URL",
   "DEMO_MODE",
+  "MIDTRANS_FEES",
 ] as const;
 const saved = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
 beforeEach(() => {
@@ -125,6 +126,15 @@ describe("integrations.server", () => {
     await saveIntegration("PUBLIC_SITE_URL", "https://x.test/");
     const w = upserts.find((u) => u.table === "integration_settings")!.v;
     expect(w).toMatchObject({ key: "PUBLIC_SITE_URL", value: "https://x.test", is_secret: false });
+  });
+
+  it("flags an env value that fails validation (review L3)", async () => {
+    process.env["MIDTRANS_FEES"] = "qris=0,7%";
+    let item = (await readIntegrations()).items.find((i) => i.key === "MIDTRANS_FEES")!;
+    expect(item).toMatchObject({ source: "env", problem: "env", stored: false });
+    process.env["MIDTRANS_FEES"] = "qris=0.7%";
+    item = (await readIntegrations()).items.find((i) => i.key === "MIDTRANS_FEES")!;
+    expect(item).toMatchObject({ source: "env", problem: null });
   });
 
   it("stores secrets encrypted and validates before writing", async () => {

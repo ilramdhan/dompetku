@@ -13,11 +13,18 @@ import { db } from "./db.server";
 import { isMissingTable, logActivity } from "./finance.server";
 import { grantsFromRows, type Level } from "./permissions";
 import {
+  maskChatId,
+  notifySetByMap,
   planRecipients,
+  planSelfNotify,
+  sameSelfNotify,
+  viewableWallets,
   withWalletLine,
+  type MyNotifyInput,
   type NotifyKind,
   type NotifyMember,
   type NotifyRecipientInput,
+  type NotifySetBy,
   type NotifyTarget,
 } from "./notify";
 import { clampMessage } from "./bot";
@@ -41,10 +48,43 @@ export type NotifySettings = {
   send_report: boolean;
   send_reminders: boolean;
   wallets: string[];
+  /**
+   * Who saved the row last (activity log, #122 L1): "member" = chat id set by the member and NOT
+   * verified (the admin dialog flags it); null = unknown (no activity log / older rows).
+   */
+  set_by?: NotifySetBy | null;
 };
 
+/** Last saver per member from `activity_log` (best effort: {} when missing or failing). */
+async function notifySetBy(userIds: readonly string[]): Promise<Record<string, NotifySetBy>> {
+  if (!userIds.length) return {};
+  try {
+    const [log, users] = await Promise.all([
+      db()
+        .from("activity_log")
+        .select("action, detail")
+        .in("action", ["notify.update", "notify.self_update"])
+        .order("created_at", { ascending: false })
+        .limit(500),
+      db()
+        .from("app_users")
+        .select("id, username")
+        .in("id", [...userIds]),
+    ]);
+    if (log.error || users.error) return {};
+    return notifySetByMap(
+      log.data ?? [],
+      (users.data ?? []).map((u) => ({ user_id: u.id, username: u.username })),
+    );
+  } catch {
+    return {};
+  }
+}
+
 /** Stored recipient rows + wallet subsets; `ready: false` when v22 is not run yet. */
-export async function listNotifySettings(): Promise<{ ready: boolean; items: NotifySettings[] }> {
+export async function listNotifySettings(
+  opts: { setBy?: boolean } = {},
+): Promise<{ ready: boolean; items: NotifySettings[] }> {
   const rec = await db()
     .from("notify_recipients")
     .select("user_id, chat_id, enabled, send_report, send_reminders");
@@ -63,15 +103,18 @@ export async function listNotifySettings(): Promise<{ ready: boolean; items: Not
     list.push(w.account_id);
     byUser.set(w.user_id, list);
   }
+  const rows = (rec.data ?? []) as RecipientRow[];
+  const setBy = opts.setBy ? await notifySetBy(rows.map((r) => r.user_id)) : {};
   return {
     ready: true,
-    items: ((rec.data ?? []) as RecipientRow[]).map((r) => ({
+    items: rows.map((r) => ({
       user_id: r.user_id,
       chat_id: r.chat_id,
       enabled: r.enabled,
       send_report: r.send_report,
       send_reminders: r.send_reminders,
       wallets: (byUser.get(r.user_id) ?? []).sort(),
+      set_by: setBy[r.user_id] ?? null,
     })),
   };
 }
@@ -127,19 +170,72 @@ export async function saveNotifySettings(input: NotifyRecipientInput) {
     if (isMissingTable(up.error)) throw new Error(MISSING_V22);
     throw new Error(up.error.message);
   }
-  const del = await db().from("notify_recipient_wallets").delete().eq("user_id", row.id);
-  if (del.error) {
-    if (isMissingTable(del.error)) throw new Error(MISSING_V22);
-    throw new Error(del.error.message);
-  }
-  if (wallets.length) {
-    const ins = await db()
-      .from("notify_recipient_wallets")
-      .insert(wallets.map((account_id) => ({ user_id: row.id, account_id })));
-    if (ins.error) throw new Error(ins.error.message);
-  }
-  await logActivity("notify.update", "notify_recipients", { name: row.username });
+  await setNotifyWallets(row.id, wallets);
+  await logActivity("notify.update", "notify_recipients", {
+    name: row.username,
+    user_id: row.id,
+    chat: maskChatId(input.chat_id),
+  });
   return { ok: true };
+}
+
+/* Fail-closed checklist rewrite (#122 L2) ------------------------------------------------- */
+
+const WALLETS_FAILED =
+  "Gagal menyimpan daftar dompet — notifikasi dinonaktifkan sampai admin mengaktifkannya lagi.";
+
+/**
+ * Replaces a recipient's wallet checklist so it can never silently become EMPTY (= every viewable
+ * wallet) when the member asked for a subset: new rows are inserted first (existing ones kept),
+ * only then the rows outside the set are removed, and the result is re-read. Any failure, or an
+ * empty result for a non-empty request (e.g. two interleaved saves), disables the row
+ * (`enabled = false`; deleted when even that fails) and throws — no notifications rather than
+ * all wallets. An empty request means "all viewable wallets" on purpose.
+ */
+async function setNotifyWallets(userId: string, wallets: readonly string[]) {
+  const table = () => db().from("notify_recipient_wallets");
+  const step = (r: { error: { message: string; code?: string } | null }) => {
+    if (!r.error) return;
+    if (isMissingTable(r.error)) throw new MissingV22();
+    throw new Error(r.error.message);
+  };
+  try {
+    if (wallets.length) {
+      step(
+        await table().upsert(
+          wallets.map((account_id) => ({ user_id: userId, account_id })),
+          { onConflict: "user_id,account_id", ignoreDuplicates: true },
+        ),
+      );
+      step(
+        await table()
+          .delete()
+          .eq("user_id", userId)
+          .not("account_id", "in", `(${wallets.join(",")})`),
+      );
+      const now = await table().select("account_id").eq("user_id", userId);
+      step(now);
+      if (!now.data?.length) throw new Error("empty checklist after save");
+    } else {
+      step(await table().delete().eq("user_id", userId));
+    }
+  } catch (e) {
+    if (e instanceof MissingV22) throw new Error(MISSING_V22);
+    await failClosed(userId, e);
+    throw new Error(WALLETS_FAILED);
+  }
+}
+
+class MissingV22 extends Error {}
+
+async function failClosed(userId: string, cause: unknown) {
+  const { logError } = await import("./monitoring.server");
+  logError("notify:wallets", cause);
+  const off = await db()
+    .from("notify_recipients")
+    .update({ enabled: false, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (off.error) await db().from("notify_recipients").delete().eq("user_id", userId);
 }
 
 /** Removes a member's notification settings (wallet subset cascades). */
@@ -151,6 +247,161 @@ export async function deleteNotifySettings(userId: string) {
     throw new Error(del.error.message);
   }
   await logActivity("notify.delete", "notify_recipients", { name: row.username });
+  return { ok: true };
+}
+
+/* ---------------- Profile → Notifikasi Telegram (#122): a member's OWN row ---------------- */
+
+export type MyNotify = {
+  ready: boolean;
+  chat_id: string;
+  /** false = muted by the admin (members cannot unmute themselves). */
+  enabled: boolean;
+  send_report: boolean;
+  send_reminders: boolean;
+  wallets: string[];
+  /** Wallets the member may view right now (checklist options). */
+  options: { id: string; name: string }[];
+};
+
+/** Fresh wallet grants of a member (never the cached session, never client input). */
+async function freshGrants(userId: string): Promise<Record<string, Level> | null> {
+  const perms = await db()
+    .from("account_permissions")
+    .select("account_id, level")
+    .eq("user_id", userId);
+  if (perms.error) {
+    if (isMissingTable(perms.error)) return null;
+    throw new Error(perms.error.message);
+  }
+  return grantsFromRows(perms.data);
+}
+
+/** The signed-in member's own notification settings; `ready: false` before v22. */
+export async function getMyNotify(userId: string): Promise<MyNotify> {
+  const empty: MyNotify = {
+    ready: false,
+    chat_id: "",
+    enabled: true,
+    send_report: true,
+    send_reminders: true,
+    wallets: [],
+    options: [],
+  };
+  const grants = await freshGrants(userId);
+  if (!grants) return empty;
+  const rec = await db()
+    .from("notify_recipients")
+    .select("user_id, chat_id, enabled, send_report, send_reminders")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (rec.error) {
+    if (isMissingTable(rec.error)) return empty;
+    throw new Error(rec.error.message);
+  }
+  const wal = await db()
+    .from("notify_recipient_wallets")
+    .select("user_id, account_id")
+    .eq("user_id", userId);
+  if (wal.error) {
+    if (isMissingTable(wal.error)) return empty;
+    throw new Error(wal.error.message);
+  }
+  const view = viewableWallets(grants);
+  const names = view.length
+    ? await db().from("accounts").select("id, name").in("id", view)
+    : { data: [], error: null };
+  if (names.error) throw new Error(names.error.message);
+  const row = rec.data as RecipientRow | null;
+  return {
+    ready: true,
+    chat_id: row?.chat_id ?? "",
+    enabled: row?.enabled ?? true,
+    send_report: row?.send_report ?? true,
+    send_reminders: row?.send_reminders ?? true,
+    // Only show checked wallets the member can still view (revoked access wins).
+    wallets: (wal.data ?? [])
+      .map((w) => w.account_id)
+      .filter((id) => view.includes(id))
+      .sort(),
+    options: (names.data ?? [])
+      .map((a) => ({ id: a.id, name: a.name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
+/**
+ * Saves the signed-in member's own chat id, toggles and wallet checklist. The user id comes from
+ * the session, the checklist must stay inside their fresh grants, `enabled` (admin mute) is never
+ * changed here, and an empty chat id removes the row (stop receiving). These chat ids are never
+ * added to BOT_ALLOWED_CHAT_IDS: receiving notifications does not grant bot access.
+ */
+export async function saveMyNotify(userId: string, input: MyNotifyInput) {
+  const row = await memberOf(userId);
+  const grants = await freshGrants(row.id);
+  if (!grants) throw new Error(MISSING_V22);
+  const cur = await db()
+    .from("notify_recipients")
+    .select("user_id, chat_id, enabled, send_report, send_reminders")
+    .eq("user_id", row.id)
+    .maybeSingle();
+  if (cur.error) {
+    if (isMissingTable(cur.error)) throw new Error(MISSING_V22);
+    throw new Error(cur.error.message);
+  }
+  const curRow = cur.data as RecipientRow | null;
+  const plan = planSelfNotify(input, grants, { muted: curRow?.enabled === false });
+  if (plan.action === "error") throw new Error(plan.error);
+  if (plan.action === "keep") return { ok: true };
+  if (plan.action === "delete") {
+    // `.select()` returns the removed rows: log only when a row actually existed (#122 L3).
+    const del = await db()
+      .from("notify_recipients")
+      .delete()
+      .eq("user_id", row.id)
+      .select("user_id");
+    if (del.error) {
+      if (isMissingTable(del.error)) throw new Error(MISSING_V22);
+      throw new Error(del.error.message);
+    }
+    if (del.data?.length)
+      await logActivity("notify.self_delete", "notify_recipients", {
+        name: row.username,
+        user_id: row.id,
+      });
+    return { ok: true };
+  }
+  if (curRow) {
+    // Unchanged save → no writes, no activity row (#122 L3: repeated saves cannot spam the log).
+    const wal = await db()
+      .from("notify_recipient_wallets")
+      .select("account_id")
+      .eq("user_id", row.id);
+    if (wal.error) throw new Error(wal.error.message);
+    const stored = { ...curRow, wallets: (wal.data ?? []).map((w) => w.account_id) };
+    if (sameSelfNotify(stored, { ...input, wallets: plan.wallets })) return { ok: true };
+  }
+  const up = await db().from("notify_recipients").upsert(
+    {
+      user_id: row.id,
+      chat_id: input.chat_id,
+      send_report: input.send_report,
+      send_reminders: input.send_reminders,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (up.error) {
+    if (isMissingTable(up.error)) throw new Error(MISSING_V22);
+    throw new Error(up.error.message);
+  }
+  await setNotifyWallets(row.id, plan.wallets);
+  // Masked chat id so the admin can see what the member pointed notifications at (#122 L1).
+  await logActivity("notify.self_update", "notify_recipients", {
+    name: row.username,
+    user_id: row.id,
+    chat: maskChatId(input.chat_id),
+  });
   return { ok: true };
 }
 

@@ -5,7 +5,7 @@
  * invoice-email.server.ts). Unit-tested in src/test/invoice-email.test.ts.
  */
 import { diffDays } from "./dates";
-import type { InvoiceEmailKind } from "./email";
+import type { EmailLang, InvoiceEmailKind } from "./email";
 
 export const EMAIL_KIND_LABEL: Record<InvoiceEmailKind, string> = {
   invoice: "Invoice",
@@ -63,4 +63,19 @@ export function reminderStage(
  */
 export function dedupeWindowDays(kind: "reminder_due" | "overdue"): number {
   return kind === "overdue" ? 7 : MAX_LEAD_DAYS + 1;
+}
+
+/* ---------------- customer language (#123, v27 `invoices.lang`) ---------------- */
+
+export const EMAIL_LANGS = ["id", "en"] as const;
+export const DEFAULT_EMAIL_LANG: EmailLang = "id";
+
+/** Anything but "en" is Indonesian (the default; also null/missing before v27). */
+export function parseEmailLang(v: unknown): EmailLang {
+  return v === "en" ? "en" : DEFAULT_EMAIL_LANG;
+}
+
+/** Language of an invoice row (v27 `lang`; absent column or null → Indonesian). */
+export function invoiceLang(inv: { lang?: unknown } | null | undefined): EmailLang {
+  return parseEmailLang(inv?.lang);
 }

@@ -11,8 +11,13 @@
  *   payment change (`syncInvoice`).
  * - Reads degrade to `{ ready: false }` before schema v21; writes throw a "run v21" message.
  * - Wallet scoping: callers pass `accountScope(ctx)` (null = owner, all wallets).
+ * - v27 `lang` (customer email language) is optional: writes drop it and retry when the column is
+ *   missing, reads default to "id".
  */
 import { db } from "./db.server";
+import { missingColumn } from "./backup";
+import type { EmailLang } from "./email";
+import { parseEmailLang } from "./invoice-email";
 import { fetchAll } from "./paginate";
 import { scopeIds } from "./permissions";
 import {
@@ -24,6 +29,8 @@ import {
   invoiceTotal,
   nextInvoiceNumber,
   paidSum,
+  overshootDecision,
+  stillOvershoots,
   paymentExternalId,
   paymentProblem,
   remainingOf,
@@ -59,8 +66,12 @@ export type InvoiceRow = {
   currency: string;
   total: number;
   paid: number;
+  /** v27 customer email language (always set; "id" when the column is missing or null). */
+  lang: EmailLang;
   created_at: string;
   updated_at: string;
+  /** v26 (#96): 1–999 rupiah added to the transfer amount (null/absent before v26 or when unset). */
+  unique_code?: number | null;
 };
 
 export type InvoiceInput = {
@@ -71,6 +82,8 @@ export type InvoiceInput = {
   issue_date: string;
   due_date: string | null;
   notes: string | null;
+  /** v27 customer email language (omitted = "id" on create, unchanged on edit). */
+  lang?: EmailLang | undefined;
   items: InvoiceItem[];
   /** Create only: save as draft (default) or issue right away (status unpaid). */
   issue?: boolean | undefined;
@@ -84,7 +97,26 @@ export type PaymentInput = {
   note: string | null;
 };
 
-const num = (r: any): InvoiceRow => ({ ...r, total: Number(r.total), paid: Number(r.paid) });
+const num = (r: any): InvoiceRow => ({
+  ...r,
+  total: Number(r.total),
+  paid: Number(r.paid),
+  lang: parseEmailLang(r.lang),
+});
+
+/** Runs an invoices write; when v27 is not run, drops `lang` from the values and retries once. */
+async function withoutMissingLang<T extends { error: any }>(
+  values: Record<string, unknown>,
+  run: (v: Record<string, unknown>) => PromiseLike<T>,
+): Promise<T> {
+  const res = await run(values);
+  if (res.error && "lang" in values && missingColumn(res.error) === "lang") {
+    const { lang: _drop, ...rest } = values;
+    void _drop;
+    return run(rest);
+  }
+  return res;
+}
 
 /* ---------------- reads ---------------- */
 
@@ -105,6 +137,22 @@ function scoped(q: any, scope: Scope, account?: string) {
   return q;
 }
 
+const NIL_ID = "00000000-0000-0000-0000-000000000000";
+
+/** Ids of invoices that have at least one pending payment proof (empty without v24). */
+async function invoicesWithPendingProofs(): Promise<string[]> {
+  const rows = await fetchAll((from, to) =>
+    db()
+      .from("invoice_proofs")
+      .select("invoice_id")
+      .eq("status", "pending")
+      .order("id")
+      .range(from, to),
+  );
+  if (rows.error) return [];
+  return [...new Set((rows.data ?? []).map((r: any) => r.invoice_id as string))];
+}
+
 /** Paginated, sorted list with outstanding/overdue summary of the same wallet selection. */
 export async function listInvoices(o: ListOptions, scope: Scope) {
   const today = (await fin()).today();
@@ -112,7 +160,11 @@ export async function listInvoices(o: ListOptions, scope: Scope) {
   q = scoped(q, scope, o.account);
   if (o.status === "overdue")
     q = q.in("status", ["unpaid", "partial"]).not("due_date", "is", null).lt("due_date", today);
-  else if (o.status) q = q.eq("status", o.status);
+  else if (o.status === "verifying") {
+    // Derived status (#120): open invoices with a pending proof (v24); none/no table → empty list.
+    const ids = await invoicesWithPendingProofs();
+    q = q.in("status", ["unpaid", "partial"]).in("id", ids.length ? ids : [NIL_ID]);
+  } else if (o.status) q = q.eq("status", o.status);
   const s = o.search?.replace(/[%,()*]/g, "").trim();
   if (s) q = q.or(`number.ilike.%${s}%,customer_name.ilike.%${s}%`);
   q = q
@@ -137,10 +189,8 @@ export async function listInvoices(o: ListOptions, scope: Scope) {
     throw new Error((list.error ?? open.error)!.message);
   }
   const rows = ((list.data ?? []) as any[]).map(num);
-  // v24: "Menunggu verifikasi" while proofs are pending (empty map without v24).
-  const pending = await (
-    await import("./invoice-payments.server")
-  ).pendingProofCounts(
+  // v24/v26: "Menunggu verifikasi" while proofs or matched bank notifications are pending.
+  const pending = await pendingReviews(
     rows.filter((r) => r.status === "unpaid" || r.status === "partial").map((r) => r.id),
   );
   const items = rows.map((r) => ({
@@ -167,9 +217,29 @@ export async function loadInvoice(id: string): Promise<InvoiceRow | null> {
   return res.data ? num(res.data) : null;
 }
 
+/**
+ * Pending reviews per invoice: v24 proofs + v26 matched bank notifications (empty maps before
+ * those schema sections). Drives the "Menunggu verifikasi" display status.
+ */
+async function pendingReviews(ids: readonly string[]): Promise<Map<string, number>> {
+  const [proofs, signals] = await Promise.all([
+    import("./invoice-payments.server").then((m) => m.pendingProofCounts(ids)),
+    import("./payment-signals.server").then((m) => m.matchedSignalCounts(ids)),
+  ]);
+  const out = new Map(proofs);
+  for (const [id, n] of signals) out.set(id, (out.get(id) ?? 0) + n);
+  return out;
+}
+
 /** One invoice with its items and payments (detail view / edit form). */
 export async function getInvoice(inv: InvoiceRow) {
   const ip = await import("./invoice-payments.server");
+  // v26: the admin sees (and may forward) the transfer amount, so make sure an open invoice has its
+  // unique code; null (shown without a code) when MacroDroid is off, pre-v26 or on refund hold.
+  if (inv.status === "unpaid" || inv.status === "partial") {
+    const code = await (await import("./payment-signals.server")).ensureUniqueCode(inv.id);
+    inv = { ...inv, unique_code: code };
+  }
   const [items, pays, today, pending, methodIds] = await Promise.all([
     db().from("invoice_items").select("*").eq("invoice_id", inv.id).order("position"),
     db()
@@ -179,7 +249,7 @@ export async function getInvoice(inv: InvoiceRow) {
       .order("paid_at")
       .order("created_at"),
     fin().then((f) => f.today()),
-    ip.pendingProofCounts([inv.id]),
+    pendingReviews([inv.id]),
     ip.invoiceMethodIds(inv.id),
   ]);
   if (items.error) throw new Error(items.error.message);
@@ -259,6 +329,7 @@ export async function createInvoice(v: InvoiceInput) {
     issue_date: v.issue_date,
     due_date: v.due_date,
     notes: v.notes,
+    lang: v.lang ?? "id",
     status: (v.issue ? "unpaid" : "draft") as InvoiceStatus,
     currency: "IDR",
     total,
@@ -267,11 +338,13 @@ export async function createInvoice(v: InvoiceInput) {
   let row: InvoiceRow | null = null;
   for (let attempt = 0; attempt < 5 && !row; attempt++) {
     const number = await nextNumber(prefix, v.issue_date);
-    const res = await db()
-      .from("invoices")
-      .insert({ ...base, number })
-      .select()
-      .single();
+    const res = await withoutMissingLang({ ...base, number }, (row) =>
+      db()
+        .from("invoices")
+        .insert(row as any)
+        .select()
+        .single(),
+    );
     if (!res.error) row = num(res.data);
     else if (isDup(res.error)) continue;
     else if ((await fin()).isMissingTable(res.error)) throw new Error(V21_MISSING);
@@ -300,23 +373,27 @@ export async function updateInvoice(prev: InvoiceRow, v: InvoiceInput) {
   const total = invoiceTotal(v.items);
   const problem = editProblem(prev, { total, account_id: v.account_id });
   if (problem) throw new Error(problem);
-  const res = await db()
-    .from("invoices")
-    .update({
-      customer_name: v.customer_name.trim(),
-      customer_email: v.customer_email,
-      customer_phone: v.customer_phone,
-      account_id: v.account_id,
-      issue_date: v.issue_date,
-      due_date: v.due_date,
-      notes: v.notes,
-      total,
-      status: derivedStatus(prev.status, total, prev.paid),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", prev.id)
-    .select()
-    .single();
+  const values: Record<string, unknown> = {
+    customer_name: v.customer_name.trim(),
+    customer_email: v.customer_email,
+    customer_phone: v.customer_phone,
+    account_id: v.account_id,
+    issue_date: v.issue_date,
+    due_date: v.due_date,
+    notes: v.notes,
+    ...(v.lang ? { lang: v.lang } : {}),
+    total,
+    status: derivedStatus(prev.status, total, prev.paid),
+    updated_at: new Date().toISOString(),
+  };
+  const res = await withoutMissingLang(values, (row) =>
+    db()
+      .from("invoices")
+      .update(row as any)
+      .eq("id", prev.id)
+      .select()
+      .single(),
+  );
   if (res.error) throw new Error(res.error.message);
   await replaceItems(prev.id, v.items);
   await (
@@ -327,6 +404,20 @@ export async function updateInvoice(prev: InvoiceRow, v: InvoiceInput) {
     currency: "IDR",
   });
   return num(res.data);
+}
+
+/**
+ * Saves the customer email language chosen in "Kirim invoice" (v27). Best effort: before v27
+ * (missing column) it does nothing and the send still goes out in the chosen language.
+ */
+export async function setInvoiceLang(inv: InvoiceRow, lang: EmailLang): Promise<InvoiceRow> {
+  if (inv.lang === lang) return inv;
+  const res = await db().from("invoices").update({ lang }).eq("id", inv.id);
+  if (res.error) {
+    if (missingColumn(res.error) === "lang") return inv;
+    throw new Error(res.error.message);
+  }
+  return { ...inv, lang };
 }
 
 /** issue / cancel / reopen / unissue (see `actionTarget`). */
@@ -343,6 +434,7 @@ export async function invoiceAction(inv: InvoiceRow, action: InvoiceAction) {
   if (res.error) throw new Error(res.error.message);
   if (!res.data) throw new Error("Invoice berubah, muat ulang halaman");
   await retireGatewayOrders(num(res.data));
+  await (await import("./payment-signals.server")).releaseUniqueCode(num(res.data));
   await (
     await fin()
   ).logActivity("invoices.update", "invoices", {
@@ -361,7 +453,11 @@ export async function deleteInvoice(inv: InvoiceRow) {
     .eq("invoice_id", inv.id);
   if (pays.error) throw new Error(pays.error.message);
   const txIds = (pays.data ?? []).map((p) => p.transaction_id).filter((x): x is string => !!x);
-  const extIds = (pays.data ?? []).map((p) => paymentExternalId(p.id));
+  // v26: "Kode unik" incomes booked with these payments go too (read before the cascade).
+  const codeIds = await (
+    await import("./payment-signals.server")
+  ).uniqueCodeExternalIds((pays.data ?? []).map((p) => p.id));
+  const extIds = [...(pays.data ?? []).map((p) => paymentExternalId(p.id)), ...codeIds];
   // v25: refuse while a Midtrans order is pending/paid (history must not vanish); drop dead ones.
   await (await import("./gateway/payments.server")).releaseInvoiceGateway(inv.id);
   // v24: proof images live in Storage; the rows go with the invoice (cascade).
@@ -416,6 +512,8 @@ export async function syncInvoice(id: string): Promise<InvoiceRow> {
   if (res.error) throw new Error(res.error.message);
   const out = num(res.data);
   await retireGatewayOrders(out);
+  // v26: a paid/cancelled invoice gives its unique code back.
+  await (await import("./payment-signals.server")).releaseUniqueCode(out);
   return out;
 }
 
@@ -438,6 +536,24 @@ async function retireGatewayOrders(inv: InvoiceRow) {
  */
 export async function recordPayment(inv: InvoiceRow, p: PaymentInput) {
   return (await bookPayment(inv, p)).invoice;
+}
+
+/** Wait before the "recheck" re-read, so a racing later payment can finish its rollback. */
+export const OVERSHOOT_RECHECK_MS = 1500;
+
+export async function overshoots(
+  inv: Pick<InvoiceRow, "id" | "total">,
+  paymentId: string,
+): Promise<boolean> {
+  const read = () => db().from("invoice_payments").select("*").eq("invoice_id", inv.id);
+  const after = await read();
+  // Fail closed like the recheck (review I9): an unreadable re-check rolls this payment back.
+  if (after.error) return true;
+  const d = overshootDecision(after.data ?? [], inv.total, paymentId);
+  if (d !== "recheck") return d === "rollback";
+  await new Promise((r) => setTimeout(r, OVERSHOOT_RECHECK_MS));
+  const again = await read();
+  return again.error ? true : stillOvershoots(again.data ?? [], inv.total);
 }
 
 /** `recordPayment` that also returns the new payment id (v24 proof approval links it). */
@@ -464,9 +580,10 @@ export async function bookPayment(
     .single();
   if (ins.error) throw new Error(ins.error.message);
   const pay = ins.data;
-  // Re-check against concurrent payments; roll back this one when it overshoots.
-  const after = await db().from("invoice_payments").select("*").eq("invoice_id", inv.id);
-  if (!after.error && paidSum(after.data ?? []) > inv.total + 0.005) {
+  // Re-check against concurrent payments: the later one of a racing pair (created_at, id) rolls
+  // back at once; the earlier one waits for it and still rolls back if the overshoot remains
+  // (created_at/commit inversion fails safe), see overshootDecision.
+  if (await overshoots(inv, pay.id)) {
     await db().from("invoice_payments").delete().eq("id", pay.id);
     throw new Error("Pembayaran melebihi sisa tagihan");
   }
@@ -516,15 +633,23 @@ export async function loadPayment(id: string) {
   return res.data ?? null;
 }
 
-/** Deletes a payment and its income transaction, then recomputes paid/status. */
+/**
+ * Deletes a payment and its income transaction (plus the v26 "Kode unik" income booked with it),
+ * then recomputes paid/status.
+ */
 export async function deletePayment(
   inv: InvoiceRow,
   payment: { id: string; amount: number | string; transaction_id: string | null },
 ) {
+  // Read before the delete: payment_signals.payment_id is set to null by the FK.
+  const codeIds = await (
+    await import("./payment-signals.server")
+  ).uniqueCodeExternalIds([payment.id]);
   const del = await db().from("invoice_payments").delete().eq("id", payment.id);
   if (del.error) throw new Error(del.error.message);
   await removePaymentTransactions(payment.transaction_id ? [payment.transaction_id] : [], [
     paymentExternalId(payment.id),
+    ...codeIds,
   ]);
   const updated = await syncInvoice(inv.id);
   await (

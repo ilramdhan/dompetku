@@ -85,6 +85,10 @@ export type GatewayConfig = {
   snapBase: string;
   /** True when a test-only base URL override is active (the browser then uses redirect_url). */
   overridden: boolean;
+  /** #124: MDR schedule from MIDTRANS_FEES (null/absent = no MDR booked). */
+  fees?: import("./mdr").MdrRules | null;
+  /** #124: MIDTRANS_PARTIAL — customers may pay part of the remaining amount. */
+  partial?: boolean;
 };
 
 export type CreatePaymentInput = {
@@ -167,6 +171,94 @@ export function gatewayAmount(remaining: number | string): number | null {
   const r = Math.round((Number(remaining) || 0) * 100) / 100;
   if (!(r >= 1) || !Number.isInteger(r) || r > 1e12) return null;
   return r;
+}
+
+/** Smallest partial gateway payment (rupiah); the last payment may be smaller (= remaining). */
+export const GATEWAY_MIN_PARTIAL = 10_000;
+
+/**
+ * Amount to charge for a "Bayar sekarang" request (issue #124). `requested` empty → the whole
+ * remaining amount. With partial payments on, a whole-rupiah amount of at least
+ * GATEWAY_MIN_PARTIAL that also leaves at least GATEWAY_MIN_PARTIAL unpaid is accepted (a smaller
+ * rest could not be paid online, Midtrans channels have minimums); otherwise only the exact
+ * remaining amount. null = refused (caller answers a fixed public error).
+ */
+export function chargeAmount(
+  remaining: number | string,
+  requested: number | null | undefined,
+  partial: boolean,
+): number | null {
+  const full = gatewayAmount(remaining);
+  if (full === null) return null;
+  if (requested === null || requested === undefined) return full;
+  if (typeof requested !== "number" || !Number.isInteger(requested)) return null;
+  if (requested === full) return full;
+  if (!partial) return null;
+  if (requested < GATEWAY_MIN_PARTIAL || full - requested < GATEWAY_MIN_PARTIAL) return null;
+  return requested;
+}
+
+/** Partial amounts are possible at all: the remaining amount fits two minimum payments. */
+export const partialAllowed = (remaining: number | string): boolean =>
+  (gatewayAmount(remaining) ?? 0) >= 2 * GATEWAY_MIN_PARTIAL;
+
+/**
+ * Public input `amount` (#124): absent/null → null (= whole remaining amount); a positive safe
+ * integer passes through (chargeAmount still re-checks it); anything else (string, fraction,
+ * ≤ 0, NaN) → "invalid" so the request is refused instead of silently charging the full amount.
+ */
+export function parseRequestedAmount(v: unknown): number | null | "invalid" {
+  if (v === undefined || v === null) return null;
+  return typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? v : "invalid";
+}
+
+/** Snap order lifetime (minutes); a pending order is reused while > 10 min remain. */
+export const ORDER_EXPIRY_MIN = 24 * 60;
+/** Extra time after a Snap order's expiry before a never-started order is treated as dead. */
+export const EXPIRY_GRACE_MS = 10 * 60_000;
+/** A row without a Snap token older than this was never handed out (create crashed / aborted). */
+export const TOKENLESS_GRACE_MS = 2 * 60_000;
+
+/**
+ * A pending row whose expire Midtrans refused and whose Get Status is unknown (404: the customer
+ * never picked a method, so there is no Core transaction) can no longer be paid when (review M1 of
+ * #124): it has no Snap token (never handed to anyone) and is older than TOKENLESS_GRACE_MS (an
+ * in-flight create may still save its token), or its Snap token is past `expires_at` (or
+ * `created_at` + ORDER_EXPIRY_MIN) plus EXPIRY_GRACE_MS. Unparsable dates = not aged out.
+ */
+export function pendingAgedOut(
+  row: { snap_token?: string | null; expires_at?: string | null; created_at?: string | null },
+  now: Date,
+): boolean {
+  const t = now.getTime();
+  const created = Date.parse(row.created_at ?? "");
+  if (!row.snap_token) return Number.isFinite(created) && t - created > TOKENLESS_GRACE_MS;
+  const exp = row.expires_at
+    ? Date.parse(row.expires_at)
+    : Number.isFinite(created)
+      ? created + ORDER_EXPIRY_MIN * 60_000
+      : NaN;
+  return Number.isFinite(exp) && t - exp > EXPIRY_GRACE_MS;
+}
+
+/**
+ * Concurrent "Bayar sekarang" starts (#124 E2E): among pending rows that are still being created
+ * (no Snap token, younger than TOKENLESS_GRACE_MS) the earliest by `(created_at, id)` wins; every
+ * request computes the same winner from the rows it sees, so at least one start succeeds instead
+ * of all of them retiring each other. null = no in-flight row visible.
+ */
+export function startWinner(
+  rows: readonly { id: string; snap_token?: string | null; created_at?: string | null }[],
+  now: Date,
+): string | null {
+  const t = now.getTime();
+  const live = rows
+    .map((r) => ({ id: r.id, at: Date.parse(r.created_at ?? "") }))
+    .filter(
+      (r, i) => !rows[i]!.snap_token && Number.isFinite(r.at) && t - r.at <= TOKENLESS_GRACE_MS,
+    )
+    .sort((a, b) => (a.at !== b.at ? a.at - b.at : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return live[0]?.id ?? null;
 }
 
 export const amountsMatch = (a: number | string, b: number | string) =>

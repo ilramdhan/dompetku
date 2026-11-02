@@ -37,6 +37,8 @@ const invoiceSchema = z.object({
   issue_date: dateStr,
   due_date: optDate,
   notes: optText(2000),
+  /** v27 customer email language (dropped server-side when the column is missing). */
+  lang: z.enum(["id", "en"]).optional(),
   items: z.array(itemSchema).min(1).max(MAX_INVOICE_ITEMS),
   issue: z.boolean().optional(),
   /** v24: payment methods shown on the public page ([] = all active; omitted = unchanged). */
@@ -234,7 +236,11 @@ export const sendInvoiceEmailFn = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator((d: unknown) =>
     z
-      .object({ id, expires_days: z.number().int().min(0).max(3650).nullable().optional() })
+      .object({
+        id,
+        expires_days: z.number().int().min(0).max(3650).nullable().optional(),
+        lang: z.enum(["id", "en"]).optional(),
+      })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -244,7 +250,11 @@ export const sendInvoiceEmailFn = createServerFn({ method: "POST" })
     const { seoConfig } = await import("./seo.server");
     const origin = (await seoConfig()).siteUrl ?? new URL(getRequest().url).origin;
     const mail = await import("./invoice-email.server");
-    return mail.sendInvoiceLinkEmail(inv, { origin, expiresDays: data.expires_days ?? null });
+    return mail.sendInvoiceLinkEmail(inv, {
+      origin,
+      expiresDays: data.expires_days ?? null,
+      lang: data.lang,
+    });
   });
 
 /* ---------------- v24 payment methods & proof verification (issue #94) ---------------- */

@@ -212,6 +212,10 @@ or dark). Regenerate them with `bun run screenshots` (see [Regenerating screensh
 - **Invoice emails** via Resend: send the invoice, payment confirmations and due/overdue reminders.
 - **Online payment (optional)** through **Midtrans Snap** (QRIS, e-wallets, cards, VA) with
   verified webhooks and refunds (v25) — step-by-step guide: [PAYMENT-GATEWAY.md](docs/PAYMENT-GATEWAY.md).
+- **Bank notification matching (optional)**: an Android phone forwards incoming-money notifications
+  from any bank / e-wallet app via **MacroDroid**; formats are configurable in Settings and a
+  1–999 rupiah **unique code** per invoice makes the match exact (v26) — guide:
+  [MACRODROID.md](docs/MACRODROID.md).
 
 ### Reports
 
@@ -309,6 +313,7 @@ public/          PWA manifest, icons and self-hosted fonts
 | [Self-hosting guide](docs/SELF-HOSTING.md)   | Step-by-step install: Supabase, Vercel, first login, optional features, updates    |
 | [Environment variables](docs/ENVIRONMENT.md) | Reference for every setting                                                        |
 | [Payment gateway](docs/PAYMENT-GATEWAY.md)   | Online invoice payments with Midtrans (ID + EN): setup, sandbox, refunds           |
+| [Bank notifications](docs/MACRODROID.md)     | Match bank/e-wallet notifications to invoices via MacroDroid (ID + EN)             |
 | [n8n, Telegram & email](docs/N8N.md)         | Telegram bot, reminders, reports, weekly backup, Google Drive, Gmail SMTP, Resend  |
 | [Architecture](docs/ARCHITECTURE.md)         | Tech stack, directory layout, data flows, contributor rules                        |
 | [FAQ](docs/FAQ.md)                           | Common questions and troubleshooting                                               |

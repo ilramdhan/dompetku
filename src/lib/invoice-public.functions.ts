@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { parseRequestedAmount } from "./gateway/types";
 
 /**
  * PUBLIC (no login, issue #93): the customer view of one invoice by its share token. This is the
@@ -93,8 +94,13 @@ export const submitInvoiceProof = createServerFn({ method: "POST" })
  */
 export const createGatewayPayment = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => {
-    const token = (d as { token?: unknown } | null)?.token;
-    return { token: typeof token === "string" ? token.slice(0, 128) : "" };
+    const o = (d && typeof d === "object" ? d : {}) as { token?: unknown; amount?: unknown };
+    // #124: optional partial amount. Absent = whole remaining amount; anything but a positive safe
+    // integer is refused (never silently charged in full); chargeAmount re-checks the range.
+    return {
+      token: typeof o.token === "string" ? o.token.slice(0, 128) : "",
+      amount: parseRequestedAmount(o.amount),
+    };
   })
   .handler(async ({ data }) => {
     const gw = await import("./gateway/payments.server");
@@ -103,13 +109,14 @@ export const createGatewayPayment = createServerFn({ method: "POST" })
     const { getRequest } = await import("@tanstack/react-start/server");
     const allowed = new Set([gw.PAY_UNAVAILABLE, gw.PAY_RATE_LIMITED, gw.PAY_FAILED]);
     if (isDemo()) throw new Error(DEMO_DISABLED);
+    if (data.amount === "invalid") throw new Error(gw.PAY_UNAVAILABLE);
     try {
       const req = getRequest();
       const { seoConfig } = await import("./seo.server");
       // Finish URL only from the configured PUBLIC_SITE_URL (never the request Host header);
       // without it Midtrans uses the Finish Redirect URL from its dashboard.
       const { siteUrl } = await seoConfig();
-      return await gw.startGatewayPayment(data.token, clientIp(req.headers), siteUrl);
+      return await gw.startGatewayPayment(data.token, clientIp(req.headers), siteUrl, data.amount);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (allowed.has(msg)) throw new Error(msg);

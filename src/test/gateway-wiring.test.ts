@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { readFileSync } from "fs";
 import { describe, expect, it } from "vitest";
 import { signatureMatches } from "@/lib/gateway/midtrans.server";
 import { validateIntegration, resolveIntegration } from "@/lib/integrations";
@@ -53,6 +54,15 @@ describe("v25 wiring", () => {
       { id: "1", order_id: "o", snap_token: "t", redirect_url: "u" },
     ]);
     expect(r).toEqual({ id: "1", order_id: "o" });
+  });
+  it("keeps the public invoice read token-only (review I2)", () => {
+    const src = readFileSync("src/lib/invoice-public.functions.ts", "utf8");
+    const read = src.slice(
+      src.indexOf("export const getPublicInvoice"),
+      src.indexOf("const PUBLIC_ERRORS"),
+    );
+    expect(read).toContain("publicInvoiceByToken(data.token)");
+    expect(read).not.toMatch(/amount/);
   });
   it("labels the gateway activity", () => {
     expect(activityLabel("invoices.gateway")).toBe("Pembayaran Midtrans diterima");

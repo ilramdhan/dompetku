@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/app-shell";
 import { RouteError } from "@/components/route-error";
 import { DemoDisabled } from "@/components/demo";
 import { UserAvatar } from "@/components/user-avatar";
+import { MyNotifyCard } from "@/components/my-notify-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -63,6 +64,7 @@ async function resizeAvatar(file: File): Promise<string> {
 
 function ProfilePage() {
   const { t } = useI18n();
+  const { isAdmin } = useAccess();
   const q = useQuery(profileQuery());
   const forced = !!q.data?.must_change_password;
   if (forced && q.data)
@@ -111,6 +113,12 @@ function ProfilePage() {
               resetMode={q.data.reset_mode}
             />
           </DemoDisabled>
+          {/* #122: members set their own Telegram chat id; the owner uses Settings → Integrasi. */}
+          {!isAdmin && q.data.ready ? (
+            <DemoDisabled>
+              <MyNotifyCard />
+            </DemoDisabled>
+          ) : null}
         </div>
       )}
     </>

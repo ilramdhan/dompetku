@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
 import { toast } from "@/lib/toast";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { deleteNotifySettingsFn, saveNotifySettingsFn } from "@/lib/notify.functions";
-import { chatIdProblem, normalizeChatId } from "@/lib/notify";
+import { chatIdProblem, maskChatId, normalizeChatId } from "@/lib/notify";
 import { errMsg, invalidateFor, notifyQueryKey } from "@/lib/queries";
 import { displayNameOf } from "@/lib/users";
 import { useI18n } from "@/lib/i18n";
@@ -29,6 +30,8 @@ export type NotifyEntry = {
   send_report: boolean;
   send_reminders: boolean;
   wallets: string[];
+  /** "member" = chat id set by the member in Profil, not verified (#122). */
+  set_by?: "member" | "admin" | null;
 };
 
 type Member = {
@@ -67,6 +70,9 @@ export function NotifyDialog({
     () => new Set((current?.wallets ?? []).filter((id) => viewable.some((a) => a.id === id))),
   );
   const [busy, setBusy] = useState(false);
+  // A member-set chat id is unverified: show it masked until the admin chooses to edit it.
+  const memberSet = current?.set_by === "member";
+  const [editChat, setEditChat] = useState(!memberSet);
   const problem = chatId ? chatIdProblem(chatId) : null;
   const canSubmit = !busy && !!user.id && !!normalizeChatId(chatId);
 
@@ -139,15 +145,34 @@ export function NotifyDialog({
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="n-chat">{t("Chat ID Telegram")}</Label>
-            <Input
-              id="n-chat"
-              inputMode="numeric"
-              autoComplete="off"
-              value={chatId}
-              maxLength={21}
-              placeholder="123456789"
-              onChange={(e) => setChatId(e.target.value)}
-            />
+            {editChat ? (
+              <Input
+                id="n-chat"
+                inputMode="numeric"
+                autoComplete="off"
+                value={chatId}
+                maxLength={21}
+                placeholder="123456789"
+                onChange={(e) => setChatId(e.target.value)}
+              />
+            ) : (
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="num rounded-md border px-2 py-1 text-sm">
+                  {maskChatId(chatId)}
+                </span>
+                <Badge variant="outline">{t("Diatur anggota")}</Badge>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditChat(true)}>
+                  {t("Ubah")}
+                </Button>
+              </div>
+            )}
+            {memberSet ? (
+              <p className="rounded-lg border border-dashed p-2 text-xs text-muted-foreground">
+                {t(
+                  "Chat ID ini diisi sendiri oleh anggota dan belum diverifikasi. Pastikan itu chat pribadinya atau grup yang setuju menerima laporan; matikan Aktif untuk menghentikannya.",
+                )}
+              </p>
+            ) : null}
             <p className="text-xs text-muted-foreground">
               {t("Chat pribadi atau grup (ID grup diawali tanda minus, mis. -100…).")}
             </p>

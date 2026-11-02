@@ -1,6 +1,7 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
+import { publicInvoiceHeadersFor } from "./lib/invoice-headers";
 
 const errorMiddleware = createMiddleware().server(async ({ next, request }) => {
   try {
@@ -32,11 +33,25 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy": "camera=(self), microphone=(), geolocation=()",
 };
 
-const securityHeadersMiddleware = createMiddleware().server(async ({ next }) => {
+const securityHeadersMiddleware = createMiddleware().server(async ({ next, request }) => {
   const result = await next();
   const res: unknown =
     result instanceof Response ? result : (result as { response?: unknown } | undefined)?.response;
   if (res instanceof Response) {
+    // Public invoice page: its 404 (bad/revoked token) must be as uncached as the 200 (#119).
+    let pathname = "";
+    try {
+      pathname = new URL(request.url).pathname;
+    } catch {
+      // ignore: no path-specific headers
+    }
+    for (const [k, v] of Object.entries(publicInvoiceHeadersFor(pathname))) {
+      try {
+        res.headers.set(k, v);
+      } catch {
+        // Immutable headers: skip.
+      }
+    }
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
       try {
         if (!res.headers.has(k)) res.headers.set(k, v);
