@@ -52,7 +52,8 @@ export const submitInvoiceProof = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const pm = await import("./invoice-payments.server");
     const { assertNotDemo } = await import("./demo.server");
-    const { DEMO_DISABLED, clientIp } = await import("./demo");
+    const { DEMO_DISABLED } = await import("./demo");
+    const { requestIp } = await import("./client-ip.server");
     const { getRequest } = await import("@tanstack/react-start/server");
     if (!PUBLIC_ERRORS.size) {
       const ip = await import("./invoice-payments");
@@ -73,7 +74,7 @@ export const submitInvoiceProof = createServerFn({ method: "POST" })
     }
     try {
       assertNotDemo();
-      return await pm.submitProof(data, clientIp(getRequest().headers));
+      return await pm.submitProof(data, requestIp(getRequest()));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (PUBLIC_ERRORS.has(msg)) throw new Error(msg);
@@ -105,7 +106,8 @@ export const createGatewayPayment = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const gw = await import("./gateway/payments.server");
     const { isDemo } = await import("./demo.server");
-    const { DEMO_DISABLED, clientIp } = await import("./demo");
+    const { DEMO_DISABLED } = await import("./demo");
+    const { requestIp } = await import("./client-ip.server");
     const { getRequest } = await import("@tanstack/react-start/server");
     const allowed = new Set([gw.PAY_UNAVAILABLE, gw.PAY_RATE_LIMITED, gw.PAY_FAILED]);
     if (isDemo()) throw new Error(DEMO_DISABLED);
@@ -116,7 +118,7 @@ export const createGatewayPayment = createServerFn({ method: "POST" })
       // Finish URL only from the configured PUBLIC_SITE_URL (never the request Host header);
       // without it Midtrans uses the Finish Redirect URL from its dashboard.
       const { siteUrl } = await seoConfig();
-      return await gw.startGatewayPayment(data.token, clientIp(req.headers), siteUrl, data.amount);
+      return await gw.startGatewayPayment(data.token, requestIp(req), siteUrl, data.amount);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (allowed.has(msg)) throw new Error(msg);

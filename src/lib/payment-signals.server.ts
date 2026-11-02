@@ -573,7 +573,11 @@ export async function handleNotify(
   if (!c) return { status: 503, body: { ok: false } };
   const { rateHit, subjectHash } = await import("./rate-limit.server");
   if (!tokenMatches(tokenFrom(headers), c.token)) {
-    const allowed = await rateHit(NOTIFY_RATE_RULES.bad, subjectHash(`ip:${ip}`));
+    // No known address: skip the per-IP rule rather than share one bucket (#118).
+    const { ipRateSubject } = await import("./client-ip.server");
+    const ipKey = ipRateSubject(ip);
+    const allowed =
+      ipKey === null || (await rateHit(NOTIFY_RATE_RULES.bad, subjectHash(`ip:${ipKey}`)));
     return { status: allowed ? 401 : 429, body: { ok: false } };
   }
   if (!(await signalsReady())) return { status: 503, body: { ok: false } };

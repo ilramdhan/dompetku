@@ -6,7 +6,7 @@ import { withErrorLogging } from "@/lib/monitoring";
 // demo → 403; gateway off → 503 (no details); body ≤ 64 KB; signature
 // SHA512(order_id + status_code + gross_amount + server key) compared in constant time → 401
 // (bad payloads/signatures, and only those, are rate limited per IP → 429; signed notifications
-// are never limited, so a spoofed X-Forwarded-For cannot block them);
+// are never limited, so a spoofed X-Forwarded-For cannot block them; the IP honours TRUSTED_PROXY);
 // then the status and amount are ALWAYS re-read from the Midtrans Get Status API (the body is
 // never trusted), the transition machine is applied and a success books the payment once.
 // Midtrans retries on non-2xx, so processed/ignored events answer 200 and transient errors 503.
@@ -24,9 +24,9 @@ export const Route = createFileRoute("/api/public/payments/midtrans")({
         const { readJsonBody } = await import("@/lib/bot-request");
         const body = await readJsonBody(request, MAX_BODY);
         if (!body.ok) return json({ ok: false }, body.status);
-        const { clientIp } = await import("@/lib/demo");
+        const { requestIp } = await import("@/lib/client-ip.server");
         const gw = await import("@/lib/gateway/payments.server");
-        const r = await gw.handleMidtransWebhook(body.value, clientIp(request.headers));
+        const r = await gw.handleMidtransWebhook(body.value, requestIp(request));
         return json(r.body, r.status);
       }),
     },

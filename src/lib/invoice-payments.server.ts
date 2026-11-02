@@ -269,7 +269,10 @@ export async function submitProof(s: ProofSubmission, ip: string): Promise<{ ok:
   const b64 = proofBase64(s.image);
   if (!b64) throw new Error("Format gambar tidak didukung (JPEG/PNG/WebP).");
 
-  if (!(await rateHit(PROOF_RATE_RULES.ip, subjectHash(`ip:${ip}`))))
+  const { ipRateSubject } = await import("./client-ip.server");
+  const ipKey = ipRateSubject(ip);
+  // No known address: skip the per-IP rule (never one shared bucket); per-token still applies.
+  if (ipKey !== null && !(await rateHit(PROOF_RATE_RULES.ip, subjectHash(`ip:${ipKey}`))))
     throw new Error(PROOF_RATE_LIMITED);
   if (!token) throw new Error(PROOF_NOT_FOUND);
   if (!(await rateHit(PROOF_RATE_RULES.token, subjectHash(`token:${hashShareToken(token)}`))))
@@ -336,7 +339,7 @@ export async function submitProof(s: ProofSubmission, ip: string): Promise<{ ok:
       claimed_amount: Math.round(Number(s.claimed_amount) * 100) / 100,
       payer_name,
       note,
-      ip_hash: subjectHash(`ip:${ip}`),
+      ip_hash: ipKey === null ? null : subjectHash(`ip:${ipKey}`),
     });
   if (ins.error) {
     await removeFile(path);

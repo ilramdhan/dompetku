@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/public/payments/notify")({
         const { json } = await import("@/lib/api-key.server");
         if ((await import("@/lib/demo.server")).isDemo())
           return json({ ok: false, error: "demo" }, 403);
-        const { clientIp } = await import("@/lib/demo");
+        const { requestIp } = await import("@/lib/client-ip.server");
         const { readTextBody } = await import("@/lib/bot-request");
         const { hasDuplicateJsonKeys } = await import("@/lib/bank-notify");
         const s = await import("@/lib/payment-signals.server");
@@ -37,7 +37,7 @@ export const Route = createFileRoute("/api/public/payments/notify")({
               return { ok: false, status: 400 };
             }
           },
-          clientIp(request.headers),
+          requestIp(request),
         );
         return json(r.body, r.status);
       }),

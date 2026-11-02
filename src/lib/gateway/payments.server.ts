@@ -249,7 +249,11 @@ export async function startGatewayPayment(
   const { GATEWAY_RATE_RULES } = await import("../rate-limit");
   const { remainingOf } = await import("../invoices");
 
-  if (!(await rateHit(GATEWAY_RATE_RULES.ip, subjectHash(`ip:${ip}`))))
+  const { ipRateSubject } = await import("../client-ip.server");
+  const ipKey = ipRateSubject(ip);
+  // No known address: skip the per-IP rule (one shared bucket would let one client block all);
+  // the per-token rule below still applies.
+  if (ipKey !== null && !(await rateHit(GATEWAY_RATE_RULES.ip, subjectHash(`ip:${ipKey}`))))
     throw new Error(PAY_RATE_LIMITED);
   const token = normalizeShareToken(rawToken);
   if (!token) throw new Error(PAY_UNAVAILABLE);
@@ -865,7 +869,10 @@ export async function handleMidtransWebhook(body: unknown, ip: string): Promise<
   const check = midtrans.verifyWebhook(c, body);
   if (!check.ok) {
     const { rateHit, subjectHash } = await import("../rate-limit.server");
-    const allowed = await rateHit(BAD_WEBHOOK_RULES, subjectHash(`ip:${ip}`));
+    const { ipRateSubject } = await import("../client-ip.server");
+    const ipKey = ipRateSubject(ip);
+    const allowed =
+      ipKey === null || (await rateHit(BAD_WEBHOOK_RULES, subjectHash(`ip:${ipKey}`)));
     return { status: allowed ? check.status : 429, body: { ok: false } };
   }
   if (!(await gatewayReady())) return { status: 503, body: { ok: false } };

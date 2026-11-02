@@ -9,6 +9,9 @@ services:
       context: .
     env_file: .env
     ports:
+      # Behind a reverse proxy on the same host (and with TRUSTED_PROXY set) publish on loopback
+      # only, so nobody can reach the app directly and forge X-Forwarded-For:
+      #   - "127.0.0.1:3000:3000"
       - "3000:3000"
     restart: unless-stopped
     # Hardening: the server never writes to disk, so run it read-only with no extra privileges.

@@ -138,6 +138,40 @@ never trusted) and Midtrans uses the Finish Redirect URL from its dashboard. A s
 with `MIDTRANS_PRODUCTION=true`, or a production key in sandbox mode, keeps the gateway off. The
 test-only base overrides apply only in sandbox mode with an `SB-` server key.
 
+## Network (optional)
+
+Per-IP rate limits (invoice proof upload, the pay button, bad gateway webhooks, demo writes) need
+the real client address. `X-Forwarded-For` can be forged by any client, so it is **ignored unless
+you set `TRUSTED_PROXY`**; the address the platform reports for the connection is used instead.
+Env only (a security setting, never manageable from Settings).
+
+| Name            | Example                                       | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | When to set                                                                                                                                                                                                                                                      |
+| --------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TRUSTED_PROXY` | `127.0.0.1`, `172.18.0.0/16`, `loopback`, `1` | Empty (default) = `X-Forwarded-For`/`X-Real-IP` ignored. A comma list of IPs/CIDRs (plus `loopback`, `private`) = trusted proxy addresses; the header is walked right to left past them (recommended). A number `1`–`10` = that many proxies in front of the app each **append** to `X-Forwarded-For`; the client is that many entries from the right (fewer entries = the connection address), and the header is only read when the connection comes from a loopback/private address. Invalid entries are ignored and never become the client address. | **Vercel** and **Lovable/Cloudflare**: leave empty (the platform already reports the real client). **Docker/Node behind Caddy, Nginx, Traefik or a tunnel**: the proxy address(es), or the number of appending proxies. Directly exposed container: leave empty. |
+
+> [!WARNING]
+> `TRUSTED_PROXY` is only safe when the app port is reachable **only through the proxy** (e.g.
+> `127.0.0.1:3000:3000` in `docker-compose.yml`, or no published port on a shared Docker network).
+>
+> - **Prefer the address list.** A hop count must equal the number of proxies that _append_ to
+>   `X-Forwarded-For`. Too high a count lets a client pick its own address (e.g. `2` behind a
+>   single Nginx using `$proxy_add_x_forwarded_for`); too low or a proxy that _replaces_ the header
+>   puts everyone in the proxy's bucket.
+> - **Caddy and Traefik replace `X-Forwarded-For`** with their own peer unless they trust the hop
+>   before them. Behind Cloudflare → Caddy, first set `trusted_proxies` to the Cloudflare ranges
+>   in Caddy's global `servers` options (so Caddy keeps Cloudflare's entry and appends its own),
+>   then set `TRUSTED_PROXY` to Caddy's address plus the Cloudflare ranges (or `2`). With default
+>   Caddy settings `2` only ever sees Caddy's own peer.
+> - **`private` and the Docker gateway:** with a published port, Docker's userland proxy (Docker
+>   Desktop, loopback and IPv6 traffic) makes every connection appear to come from the bridge
+>   gateway (e.g. `172.17.0.1`), which is inside `private`. Use `private` only when nothing but the
+>   proxy can reach the port; otherwise list the exact proxy address or container subnet.
+> - IPv4-mapped ranges (`::ffff:10.0.0.0/104`) are ignored; mapped peers match the plain IPv4 range.
+
+Per-IP limits bucket IPv6 clients by their `/64`. When the runtime reports no client address at all,
+the per-IP rule is skipped (the per-invoice-link limits still apply) and `client-ip:unknown` is
+logged once per server instance.
+
 ## Bank notifications: MacroDroid (optional)
 
 Matches incoming-money notifications from bank / e-wallet apps (forwarded by MacroDroid on an

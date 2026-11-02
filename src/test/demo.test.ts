@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  clientIp,
   createRateLimiter,
   DEMO_CAP_REACHED,
   DEMO_DISABLED,
@@ -70,11 +69,6 @@ describe("caps and write detection", () => {
     expect(isDemoWrite("get", "serverFn")).toBe(false);
     expect(isDemoWrite("POST", "router")).toBe(false);
   });
-  it("reads the client IP from proxy headers", () => {
-    expect(clientIp(new Headers({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" }))).toBe("1.2.3.4");
-    expect(clientIp(new Headers({ "x-real-ip": "5.6.7.8" }))).toBe("5.6.7.8");
-    expect(clientIp(new Headers())).toBe("unknown");
-  });
 });
 
 describe("rate limiter", () => {
@@ -125,6 +119,8 @@ describe("server guards", () => {
       method: "POST",
       headers: { "x-forwarded-for": "9.9.9.9" },
     });
+    // Keyed by the connection address (`request.ip`); without one the per-IP rule is skipped.
+    Object.defineProperty(post, "ip", { value: "203.0.113.9" });
     const get = new Request("https://x/_serverFn/abc", {
       headers: { "x-forwarded-for": "9.9.9.9" },
     });
