@@ -1366,6 +1366,29 @@ const DICT: Record<string, string> = {
     "The owner uses TELEGRAM_ADMIN_CHAT_ID in Settings → Integrations",
   "Notifikasi per anggota belum aktif — jalankan bagian v22 di supabase/schema.sql.":
     "Per-member notifications are not enabled yet — run section v22 of supabase/schema.sql.",
+  /* Members manage their own Telegram chat id (#122) */
+  "Laporan & pengingat terjadwal hanya berisi dompet yang boleh Anda lihat. Chat ID ini tidak memberi akses ke bot.":
+    "Scheduled reports & reminders only include wallets you may view. This chat ID does not grant bot access.",
+  "Notifikasi per anggota belum aktif. Minta admin menjalankan bagian v22.":
+    "Per-member notifications are not enabled yet. Ask the admin to run section v22.",
+  "Admin menonaktifkan notifikasi Anda. Hubungi admin untuk mengaktifkannya lagi.":
+    "The admin has turned off your notifications. Contact the admin to turn them back on.",
+  "Mulai chat dengan bot dulu (atau tambahkan bot ke grup). Kosongkan untuk berhenti menerima notifikasi.":
+    "Start a chat with the bot first (or add the bot to a group). Leave empty to stop receiving notifications.",
+  "Anda belum punya akses dompet, jadi belum ada notifikasi yang dikirim.":
+    "You have no wallet access yet, so no notifications are sent.",
+  "Tidak ada yang dicentang = semua dompet yang boleh Anda lihat.":
+    "Nothing checked = every wallet you may view.",
+  "Notifikasi Telegram dimatikan": "Telegram notifications turned off",
+  "Diatur anggota": "Set by member",
+  "Chat ID ini diisi sendiri oleh anggota dan belum diverifikasi. Pastikan itu chat pribadinya atau grup yang setuju menerima laporan; matikan Aktif untuk menghentikannya.":
+    "This chat ID was entered by the member and is not verified. Make sure it is their own chat or a group that agreed to receive reports; turn off Active to stop it.",
+  "Isi hanya chat ID Anda sendiri atau grup yang setuju menerima laporan. Chat ID belum diverifikasi; admin melihatnya sebagai “diatur anggota”.":
+    "Enter only your own chat ID or a group that agreed to receive reports. Chat IDs are not verified; the admin sees it as “set by member”.",
+  "Gagal menyimpan daftar dompet — notifikasi dinonaktifkan sampai admin mengaktifkannya lagi.":
+    "Could not save the wallet list — notifications are disabled until the admin turns them back on.",
+  "Anggota mengatur notifikasi Telegram sendiri": "Member updated their own Telegram notifications",
+  "Anggota berhenti menerima notifikasi Telegram": "Member stopped Telegram notifications",
   "Notifikasi anggota diubah": "Member notifications changed",
   "Notifikasi anggota dihapus": "Member notifications removed",
   "Chat ID admin (notifikasi)": "Admin chat ID (notifications)",

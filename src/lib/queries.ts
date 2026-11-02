@@ -26,6 +26,7 @@ import {
 import { getRecurring } from "./recurring.functions";
 import { getAccountReport, getReconcileTransactions } from "./account-report.functions";
 import { getProfile } from "./profile.functions";
+import { getMyNotifyFn } from "./notify.functions";
 import { getAccountPockets, getPocketOptions, getPocketWarnings } from "./pockets.functions";
 import {
   getInvoiceFn,
@@ -54,6 +55,9 @@ export const rowsQuery = (table: CrudTable) =>
 export const usersQueryKey = ["users"] as const;
 /** Settings → Pengguna → Notifikasi (v22, admin only). */
 export const notifyQueryKey = ["notify"] as const;
+/** Profile → Notifikasi Telegram (#122, members only): the member's own v22 row. */
+export const myNotifyQuery = () =>
+  queryOptions({ queryKey: ["notify", "me"], queryFn: () => getMyNotifyFn() });
 /** Logged-in user's profile (v17); also feeds the header avatar. */
 export const profileQuery = () =>
   queryOptions({ queryKey: ["profile"], queryFn: () => getProfile(), staleTime: 5 * 60_000 });

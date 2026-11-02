@@ -60,6 +60,8 @@ const SPECIAL: Record<string, string> = {
   "permission.update": "Akses dompet diubah",
   "notify.update": "Notifikasi anggota diubah",
   "notify.delete": "Notifikasi anggota dihapus",
+  "notify.self_update": "Anggota mengatur notifikasi Telegram sendiri",
+  "notify.self_delete": "Anggota berhenti menerima notifikasi Telegram",
   "invoices.email": "Email invoice dikirim",
   "invoice_shares.create": "Tautan publik invoice dibuat",
   "invoice_shares.delete": "Tautan publik invoice dicabut",

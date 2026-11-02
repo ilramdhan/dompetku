@@ -122,6 +122,9 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     getNotifySettingsFn: "admin",
     saveNotifySettingsFn: "admin",
     deleteNotifySettingsFn: "admin",
+    // #122: a member's OWN row only (user id from the session, wallets ⊆ fresh grants).
+    getMyNotifyFn: "member",
+    saveMyNotifyFn: "member",
   },
   // v23 (#93): customer view by share token; returns only the toPublicInvoice() whitelist.
   // v24 (#94): proof upload by share token; demo-off, rate limited, answers only { ok }.
