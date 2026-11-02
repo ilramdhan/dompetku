@@ -51,6 +51,7 @@ import { Route as ApiPublicN8nReportRouteImport } from './routes/api/public/n8n/
 import { Route as ApiPublicN8nSummaryRouteImport } from './routes/api/public/n8n/summary'
 import { Route as ApiPublicN8nTransactionsRouteImport } from './routes/api/public/n8n/transactions'
 import { Route as ApiPublicPaymentsMidtransRouteImport } from './routes/api/public/payments/midtrans'
+import { Route as ApiPublicPaymentsNotifyRouteImport } from './routes/api/public/payments/notify'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -268,6 +269,11 @@ const ApiPublicPaymentsMidtransRoute =
     path: '/api/public/payments/midtrans',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPaymentsNotifyRoute = ApiPublicPaymentsNotifyRouteImport.update({
+  id: '/api/public/payments/notify',
+  path: '/api/public/payments/notify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTelegramWebhookRoute =
   ApiPublicTelegramWebhookRouteImport.update({
     id: '/api/public/telegram/webhook',
@@ -317,6 +323,7 @@ export interface FileRoutesByFullPath {
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
   '/api/public/payments/midtrans': typeof ApiPublicPaymentsMidtransRoute
+  '/api/public/payments/notify': typeof ApiPublicPaymentsNotifyRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -361,6 +368,7 @@ export interface FileRoutesByTo {
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
   '/api/public/payments/midtrans': typeof ApiPublicPaymentsMidtransRoute
+  '/api/public/payments/notify': typeof ApiPublicPaymentsNotifyRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesById {
@@ -407,6 +415,7 @@ export interface FileRoutesById {
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
   '/api/public/payments/midtrans': typeof ApiPublicPaymentsMidtransRoute
+  '/api/public/payments/notify': typeof ApiPublicPaymentsNotifyRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRouteTypes {
@@ -453,6 +462,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
     | '/api/public/payments/midtrans'
+    | '/api/public/payments/notify'
     | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -497,6 +507,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
     | '/api/public/payments/midtrans'
+    | '/api/public/payments/notify'
     | '/api/public/telegram/webhook'
   id:
     | '__root__'
@@ -542,6 +553,7 @@ export interface FileRouteTypes {
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
     | '/api/public/payments/midtrans'
+    | '/api/public/payments/notify'
     | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -570,6 +582,7 @@ export interface RootRouteChildren {
   ApiPublicN8nSummaryRoute: typeof ApiPublicN8nSummaryRoute
   ApiPublicN8nTransactionsRoute: typeof ApiPublicN8nTransactionsRoute
   ApiPublicPaymentsMidtransRoute: typeof ApiPublicPaymentsMidtransRoute
+  ApiPublicPaymentsNotifyRoute: typeof ApiPublicPaymentsNotifyRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
 
@@ -869,6 +882,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPaymentsMidtransRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/notify': {
+      id: '/api/public/payments/notify'
+      path: '/api/public/payments/notify'
+      fullPath: '/api/public/payments/notify'
+      preLoaderRoute: typeof ApiPublicPaymentsNotifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/telegram/webhook': {
       id: '/api/public/telegram/webhook'
       path: '/api/public/telegram/webhook'
@@ -948,6 +968,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicN8nSummaryRoute: ApiPublicN8nSummaryRoute,
   ApiPublicN8nTransactionsRoute: ApiPublicN8nTransactionsRoute,
   ApiPublicPaymentsMidtransRoute: ApiPublicPaymentsMidtransRoute,
+  ApiPublicPaymentsNotifyRoute: ApiPublicPaymentsNotifyRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport

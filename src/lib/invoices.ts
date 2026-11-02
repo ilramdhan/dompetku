@@ -19,8 +19,8 @@ export { DEFAULT_INVOICE_PREFIX };
 
 export const INVOICE_STATUSES = ["draft", "unpaid", "partial", "paid", "cancelled"] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
-/** List filter values: every stored status plus the computed "overdue". */
-export const INVOICE_FILTERS = [...INVOICE_STATUSES, "overdue"] as const;
+/** List filter values: every stored status plus the computed "overdue" and "verifying" (#120). */
+export const INVOICE_FILTERS = [...INVOICE_STATUSES, "overdue", "verifying"] as const;
 export type InvoiceFilter = (typeof INVOICE_FILTERS)[number];
 export type DisplayStatus = InvoiceStatus | "overdue" | "verifying";
 

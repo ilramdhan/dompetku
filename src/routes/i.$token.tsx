@@ -10,6 +10,7 @@ import { STATUS_LABEL, type DisplayStatus } from "@/lib/invoices";
 import { dateLabel } from "@/lib/dates";
 import { money } from "@/lib/format";
 import { FONT_MONO, fontPreloads } from "@/lib/fonts";
+import { PUBLIC_INVOICE_HEADERS } from "@/lib/invoice-headers";
 import { pageHead } from "@/lib/head";
 import { translate, useI18n } from "@/lib/i18n";
 import {
@@ -44,11 +45,8 @@ export const Route = createFileRoute("/i/$token")({
     if (!invoice) throw notFound();
     return invoice;
   },
-  headers: () => ({
-    "Cache-Control": "private, no-store",
-    "Referrer-Policy": "no-referrer",
-    "X-Robots-Tag": "noindex, nofollow",
-  }),
+  // start.ts applies the same headers to the 404 too (#119).
+  headers: () => PUBLIC_INVOICE_HEADERS,
   head: ({ loaderData, match }) => {
     const lang = parseLang(match.search.lang) ?? DEFAULT_LANG;
     const head = pageHead(

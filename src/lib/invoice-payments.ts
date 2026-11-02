@@ -190,6 +190,10 @@ export type PublicPayment = {
   /** #124: the customer may enter a partial amount (MIDTRANS_PARTIAL), from `gateway_min` up. */
   gateway_partial?: boolean;
   gateway_min?: number | null;
+  /** v26: unique code (1–999) added to the transfer, or null when MacroDroid matching is off. */
+  unique_code?: number | null;
+  /** v26: remaining + unique code (what to transfer), or null without a code. */
+  transfer_amount?: number | null;
 };
 export const PUBLIC_PAYMENT_KEYS = ["methods", "pending", "upload", "upload_off"] as const;
 

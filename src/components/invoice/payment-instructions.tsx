@@ -31,19 +31,32 @@ export function InvoicePaymentInstructions({
   if (!p) return null;
   const hasMethods = p.methods.length > 0;
   if (!hasMethods && !p.upload && !p.pending) return null;
-  const amount = money(invoice.remaining, invoice.currency, { reveal: true });
+  // v26: with a unique code the customer transfers remaining + code (exact amount matching).
+  const code = p.unique_code ?? null;
+  const toPay = code && p.transfer_amount ? p.transfer_amount : invoice.remaining;
+  const amount = money(toPay, invoice.currency, { reveal: true });
 
   return (
     <section className="mt-8 space-y-4" aria-labelledby="invoice-howto">
       <h2 id="invoice-howto" className="text-sm font-semibold">
         {t("Cara membayar")}
       </h2>
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm">
-        <span className="text-muted-foreground">{t("Jumlah yang dibayar")}</span>
-        <span className="flex items-center gap-1">
-          <span className="num text-base font-bold">{amount}</span>
-          <CopyButton value={String(Math.round(invoice.remaining))} label={t("Salin jumlah")} />
-        </span>
+      <div className="rounded-lg border bg-muted/50 px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-muted-foreground">
+            {code ? t("Jumlah transfer") : t("Jumlah yang dibayar")}
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="num text-base font-bold">{amount}</span>
+            <CopyButton value={String(Math.round(toPay))} label={t("Salin jumlah")} />
+          </span>
+        </div>
+        {code ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("Termasuk kode unik")} <span className="num font-semibold">{code}</span>.{" "}
+            {t("Transfer tepat sejumlah ini agar pembayaran dikenali otomatis.")}
+          </p>
+        ) : null}
       </div>
       {p.pending > 0 ? (
         <p
