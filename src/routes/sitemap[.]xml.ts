@@ -9,7 +9,7 @@ export const Route = createFileRoute("/sitemap.xml")({
       GET: withErrorLogging("public:sitemap", async () => {
         const { seoConfig } = await import("@/lib/seo.server");
         const { sitemapXml } = await import("@/lib/seo");
-        const cfg = seoConfig();
+        const cfg = await seoConfig();
         if (!cfg.siteUrl || !cfg.indexable)
           return new Response("Not found", {
             status: 404,

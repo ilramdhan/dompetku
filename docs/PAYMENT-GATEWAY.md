@@ -158,7 +158,8 @@ Di dashboard Midtrans (lingkungan yang sama dengan key Anda) → **Settings → 
 Klik **Update**.
 
 - Notification URL **wajib** dan harus `https://`, port standar, tanpa login.
-- Finish URL: bila `PUBLIC_SITE_URL=https://dompet.example.com` diatur, Dompetku mengirim alamat
+- Finish URL: bila `PUBLIC_SITE_URL=https://dompet.example.com` diatur (env, atau Pengaturan →
+  Integrasi → Situs), Dompetku mengirim alamat
   kembali per pembayaran (`/i/<token>?gw=1`), yang menang atas dashboard. **Tanpa
   `PUBLIC_SITE_URL`** Dompetku tidak mengirim alamat kembali (header Host tidak dipercaya) dan
   Midtrans memakai **Finish Redirect URL** dari dashboard, isi dengan domain Anda.
@@ -413,7 +414,8 @@ accounts **Settings → Payment → Notification URL**):
 Click **Update**.
 
 - The Notification URL is **required**: `https://`, standard port, no login.
-- Finish URL: when `PUBLIC_SITE_URL=https://dompet.example.com` is set, Dompetku sends a return
+- Finish URL: when `PUBLIC_SITE_URL=https://dompet.example.com` is set (env, or Settings →
+  Integrasi → Situs), Dompetku sends a return
   address per payment (`/i/<token>?gw=1`), which takes precedence. **Without `PUBLIC_SITE_URL`**
   Dompetku sends none (the request Host header is not trusted) and Midtrans uses the **Finish
   Redirect URL** from its dashboard; set it to your domain.
