@@ -1397,6 +1397,37 @@ export async function computeYearly(year: string, account?: string | null) {
   };
 }
 
+export async function computeMultiYear(years: number[], account?: string | null) {
+  if (!years.length) return { years: [], income: 0, expense: 0, net: 0, avgIncome: 0, avgExpense: 0, byYear: [], byCategory: [] };
+  const start = `${years[0]}-01-01`;
+  const end = `${years[years.length - 1]! + 1}-01-01`;
+  const { fb, js } = reportSource(start, end, account, {});
+  const [totals, cats] = await Promise.all([
+    monthTotals(start, end, fb, js),
+    categoryTotals(start, end, "expense", fb, js),
+  ]);
+  const income = kindTotal(totals, "income");
+  const expense = kindTotal(totals, "expense");
+  const byYear = years.map((y) => {
+    const yearStart = `${y}-01-01`;
+    const yearEnd = `${y + 1}-01-01`;
+    const yearTotals = totals.filter((t) => t.month >= yearStart.slice(0, 7) && t.month < yearEnd.slice(0, 7));
+    const yearIncome = kindTotal(yearTotals, "income");
+    const yearExpense = kindTotal(yearTotals, "expense");
+    return { year: y, income: yearIncome, expense: yearExpense, net: yearIncome - yearExpense };
+  });
+  return {
+    years,
+    income,
+    expense,
+    net: income - expense,
+    avgIncome: income / years.length,
+    avgExpense: expense / years.length,
+    byYear,
+    byCategory: categoriesByName(cats),
+  };
+}
+
 /* ---------------- Email reminders (via n8n) ---------------- */
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

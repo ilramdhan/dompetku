@@ -10,8 +10,9 @@ import { PENDING_MS, RekapSkeleton } from "@/components/skeletons";
 import { Empty } from "./dashboard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { rowsQuery, yearlyQuery } from "@/lib/queries";
+import { rowsQuery, yearlyQuery, multiYearQuery } from "@/lib/queries";
 import { WalletFilter } from "@/components/wallet-filter";
+import { YearRangeFilter } from "@/components/year-range-filter";
 import {
   isTransferCategory,
   resolveReportAccount,
@@ -22,6 +23,7 @@ import { money } from "@/lib/format";
 import { usePrivacy } from "@/lib/privacy";
 import { useI18n } from "@/lib/i18n";
 import { pageHead } from "@/lib/head";
+import { currentYear, yearRangeYears, type YearRange } from "@/lib/year-range";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const Route = createFileRoute("/_app/rekap")({
@@ -51,15 +53,40 @@ function RekapPage() {
   const { t, lang } = useI18n();
   const locale = lang === "en" ? "en-US" : "id-ID";
   const [year, setYear] = useState(currentMonth().slice(0, 4));
+  const [range, setRange] = useState<YearRange>("1");
+  const [customStart, setCustomStart] = useState<number>();
+  const [customEnd, setCustomEnd] = useState<number>();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const accounts = (useQuery(rowsQuery("accounts")).data ?? []) as { id: string; name: string }[];
   const account = resolveReportAccount(search.account, accounts);
   const setAccount = (a: string | undefined) =>
     void navigate({ search: a ? { account: a } : {}, replace: true });
-  const { data: d } = useQuery({ ...yearlyQuery(year, account), placeholderData: (p) => p });
+  
+  const years = yearRangeYears(range, customStart, customEnd);
+  const isMultiYear = years.length > 1;
+  
+  const { data: singleYearData } = useQuery({
+    ...yearlyQuery(year, account),
+    placeholderData: (p) => p,
+    enabled: !isMultiYear,
+  });
+  
+  const { data: multiYearData } = useQuery({
+    ...multiYearQuery(years, account),
+    placeholderData: (p) => p,
+    enabled: isMultiYear,
+  });
+  
+  const d = isMultiYear ? multiYearData : singleYearData;
   const catName = (name: string) => (isTransferCategory(name) ? t(name) : name);
   if (!d) return <RekapSkeleton />;
+
+  const handleRangeChange = (newRange: YearRange, start?: number, end?: number) => {
+    setRange(newRange);
+    setCustomStart(start);
+    setCustomEnd(end);
+  };
 
   return (
     <>
@@ -73,26 +100,34 @@ function RekapPage() {
         }
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-2">
-        <div className="flex items-center gap-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setYear(String(Number(year) - 1))}
-            aria-label={t("Sebelumnya")}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <p className="min-w-24 text-center font-display text-lg font-semibold">{year}</p>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setYear(String(Number(year) + 1))}
-            aria-label={t("Berikutnya")}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
+      <div className="mb-5 space-y-3">
+        <YearRangeFilter
+          value={range}
+          customStart={customStart}
+          customEnd={customEnd}
+          onChange={handleRangeChange}
+        />
+        {!isMultiYear && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setYear(String(Number(year) - 1))}
+              aria-label={t("Sebelumnya")}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <p className="min-w-24 text-center font-display text-lg font-semibold">{year}</p>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setYear(String(Number(year) + 1))}
+              aria-label={t("Berikutnya")}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        )}
         <WalletFilter
           value={account}
           accounts={accounts}
@@ -116,7 +151,7 @@ function RekapPage() {
           </p>
           <p className="mt-1 break-words text-xs text-muted-foreground">
             {t("Rata-rata ")}
-            {money(d.avgIncome)}/{t("bln")}
+            {money(d.avgIncome)}/{isMultiYear ? t("Per tahun") : t("bln")}
           </p>
         </Card>
         <Card className="min-w-0 p-5">
@@ -128,12 +163,12 @@ function RekapPage() {
           </p>
           <p className="mt-1 break-words text-xs text-muted-foreground">
             {t("Rata-rata ")}
-            {money(d.avgExpense)}/{t("bln")}
+            {money(d.avgExpense)}/{isMultiYear ? t("Per tahun") : t("bln")}
           </p>
         </Card>
         <Card className="min-w-0 p-5">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            {t("Selisih setahun")}
+            {isMultiYear ? t("Selisih") : t("Selisih setahun")}
           </p>
           <p
             className={`num mt-2 break-words text-xl font-semibold sm:text-2xl ${d.net >= 0 ? "text-income" : "text-expense"}`}
@@ -141,7 +176,7 @@ function RekapPage() {
             {money(d.net)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {d.net >= 0 ? t("Surplus") : t("Defisit")} {money(Math.abs(d.net / 12))}/{t("bln")}
+            {d.net >= 0 ? t("Surplus") : t("Defisit")} {isMultiYear ? money(Math.abs(d.avgIncome - d.avgExpense)) : money(Math.abs(d.net / 12))}/{isMultiYear ? t("Per tahun") : t("bln")}
           </p>
         </Card>
         <Card className="min-w-0 bg-ink p-5 text-ink-foreground">
@@ -154,19 +189,31 @@ function RekapPage() {
       </div>
 
       <Card className="mt-4 min-w-0 p-5">
-        <h2 className="mb-4 text-lg font-semibold">{t("Arus kas per bulan")}</h2>
+        <h2 className="mb-4 text-lg font-semibold">
+          {isMultiYear ? t("Arus kas per tahun") : t("Arus kas per bulan")}
+        </h2>
         <div className="h-72 short:h-52">
-          <CashflowBarChart
-            data={d.months.map((m: any) => ({ ...m, label: shortMonth(m.month, locale) }))}
-            incomeLabel={t("Pemasukan")}
-            expenseLabel={t("Pengeluaran")}
-          />
+          {isMultiYear && d.byYear ? (
+            <CashflowBarChart
+              data={d.byYear.map((y: any) => ({ ...y, month: String(y.year), label: String(y.year) }))}
+              incomeLabel={t("Pemasukan")}
+              expenseLabel={t("Pengeluaran")}
+            />
+          ) : d.months ? (
+            <CashflowBarChart
+              data={d.months.map((m: any) => ({ ...m, label: shortMonth(m.month, locale) }))}
+              incomeLabel={t("Pemasukan")}
+              expenseLabel={t("Pengeluaran")}
+            />
+          ) : null}
         </div>
       </Card>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="min-w-0 p-5">
-          <h2 className="mb-2 text-lg font-semibold">{t("Pengeluaran per kategori (setahun)")}</h2>
+          <h2 className="mb-2 text-lg font-semibold">
+            {isMultiYear ? t("Pengeluaran per kategori") : t("Pengeluaran per kategori (setahun)")}
+          </h2>
           {d.byCategory.length ? (
             <div className="h-64 short:h-52">
               <DonutChart

@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## 💾 Dompetku — Weekly backup\nEvery Sunday 02:00 (Asia/Jakarta): `GET /api/public/n8n/backup` → save the JSON file to **Google Drive**. File name = the server's Content-Disposition filename (`dompetku-cadangan-yyyy-MM-dd.json`), fallback `dompetku-backup-yyyy-MM-dd.json`.\n\nEnv: `FINTRACK_URL`. Credentials: Header Auth `x-api-key` (= `N8N_API_KEY`) + Google Drive OAuth2.\nReplace `REPLACE_ME_FOLDER_ID` in *Upload ke Google Drive* with your folder ID (the part after `/folders/` in the Drive URL).\n\n**Email instead of / in addition to Drive:** select the *Kirim via email* node and press **D** (or right-click → Activate). Create an **SMTP** credential:\n• Gmail: host `smtp.gmail.com`, port 465 + SSL on (or 587 + SSL off), user = your Gmail, password = a 16-char App Password.\n• Resend: host `smtp.resend.com`, user `resend`, password = API key, port 465/2465 + SSL on (or 587/2587 + SSL off).\nSet env `BACKUP_EMAIL_FROM` (must be your Gmail / an address on your verified Resend domain) and `BACKUP_EMAIL_TO`, then restart n8n. Disable the Drive node if you don't use it.\nRestore in the web app: Settings → **Restore from backup**. Guide: docs/N8N.md",
+        "content": "## 💾 Dompetku — Weekly backup\nEvery Sunday 02:00 (Asia/Jakarta): `GET /api/public/n8n/backup` → save the JSON file to **Google Drive**. File name = the server's Content-Disposition filename (`dompetku-cadangan-yyyy-MM-dd.json`), fallback `dompetku-backup-yyyy-MM-dd.json`.\n\nEnv: `FINTRACK_URL`. Credentials: Header Auth `x-api-key` (= `N8N_API_KEY`) + Google Drive OAuth2.\nReplace `REPLACE_ME_FOLDER_ID` in *Upload ke Google Drive* with your folder ID (the part after `/folders/` in the Drive URL).\n\n**Auto-cleanup:** Google Drive searches and permanently deletes only `dompetku-backup-*` and `dompetku-cadangan-*` files created over 90 days ago after each upload, freeing Drive storage.\n\n**Email instead of / in addition to Drive:** select the *Kirim via email* node and press **D** (or right-click → Activate). Create an **SMTP** credential:\n• Gmail: host `smtp.gmail.com`, port 465 + SSL on (or 587 + SSL off), user = your Gmail, password = a 16-char App Password.\n• Resend: host `smtp.resend.com`, user `resend`, password = API key, port 465/2465 + SSL on (or 587/2587 + SSL off).\nSet env `BACKUP_EMAIL_FROM` (must be your Gmail / an address on your verified Resend domain) and `BACKUP_EMAIL_TO`, then restart n8n. Disable the Drive node if you don't use it.\nRestore in the web app: Settings → **Restore from backup**. Guide: docs/N8N.md",
         "height": 460,
         "width": 720,
         "color": "6"
@@ -132,6 +132,72 @@
           "name": "SMTP account"
         }
       }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "query",
+        "queryString": "={{ \"(name contains 'dompetku-backup-' or name contains 'dompetku-cadangan-') and createdTime < '\" + $now.minus({ days: 90 }).toUTC().toISO() + \"'\" }}",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "REPLACE_ME_FOLDER_ID"
+          },
+          "whatToSearch": "files"
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "createdTime"
+          ]
+        }
+      },
+      "id": "2ffbc145-a30f-4be5-b8cd-7066875966de",
+      "name": "Cari Backup Lama",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        720,
+        -100
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {
+          "deletePermanently": true
+        }
+      },
+      "id": "803f7fdb-0238-40b6-a0c3-d356560c3e4e",
+      "name": "Hapus Backup Lama",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1200,
+        -100
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Drive account"
+        }
+      }
     }
   ],
   "connections": {
@@ -156,6 +222,28 @@
           },
           {
             "node": "Kirim via email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload ke Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Cari Backup Lama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cari Backup Lama": {
+      "main": [
+        [
+          {
+            "node": "Hapus Backup Lama",
             "type": "main",
             "index": 0
           }

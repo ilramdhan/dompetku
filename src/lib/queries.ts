@@ -13,6 +13,7 @@ import {
   getReminders,
   getTxCount,
   getYearly,
+  getMultiYear,
   getActivity,
   getCategoryTrend,
   getYearlySummary,
@@ -308,6 +309,13 @@ export const yearlyQuery = (year: string, account?: string) =>
     staleTime: FRESH,
   });
 
+export const multiYearQuery = (years: number[], account?: string) =>
+  queryOptions({
+    queryKey: account ? ["multi-year", years, account] : ["multi-year", years],
+    queryFn: () => getMultiYear({ data: { years, ...withAccount(account) } }),
+    staleTime: FRESH,
+  });
+
 /** Money-moving changes touch every aggregate; reference data only touches its own lists. */
 const MONEY = [
   "tx",
@@ -317,6 +325,7 @@ const MONEY = [
   "budgets",
   "trend",
   "yearly",
+  "multi-year",
   "yearly-summary",
   "net-worth",
   "reminders",
