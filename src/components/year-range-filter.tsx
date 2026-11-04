@@ -50,13 +50,12 @@ export function YearRangeFilter({ value, customStart, customEnd, onChange }: Pro
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {options.map((opt) => (
+      {options.slice(0, 3).map((opt) => (
         <Button
           key={opt.value}
           variant={value === opt.value ? "default" : "outline"}
           size="sm"
           onClick={() => handleSelect(opt.value)}
-          className={cn(opt.value === "custom" && "hidden sm:inline-flex")}
         >
           {opt.label}
         </Button>
@@ -66,9 +65,9 @@ export function YearRangeFilter({ value, customStart, customEnd, onChange }: Pro
           <Button
             variant={value === "custom" ? "default" : "outline"}
             size="sm"
-            className="sm:hidden"
+            onClick={() => handleSelect("custom")}
           >
-            {label}
+            {value === "custom" && customStart && customEnd ? `${customStart}–${customEnd}` : t("Rentang khusus")}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-64" align="start">
