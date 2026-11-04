@@ -134,7 +134,6 @@ function RekapPage() {
           onChange={setAccount}
           className="sm:ml-auto"
         />
-      </div>
         {account ? (
           <p className="w-full text-xs text-muted-foreground sm:text-right">
             {t("Transfer dihitung sebagai uang masuk/keluar dompet ini.")}
