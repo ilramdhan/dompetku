@@ -58,6 +58,7 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     addGoalFunds: "admin",
     scanReceipt: "admin",
     getYearly: "admin",
+    getMultiYear: "admin",
     importTransactionsCsv: "admin",
     importCsvTransactions: "admin",
     exportBackupJson: "admin",

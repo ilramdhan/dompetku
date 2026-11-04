@@ -338,6 +338,19 @@ export const getYearly = createServerFn({ method: "GET" })
     return (await computeYearly(data.year, account)) as any;
   });
 
+export const getMultiYear = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) =>
+    z.object({ years: z.array(z.number().int().min(2000).max(2100)).min(1).max(20), account: reportAccount }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { computeMultiYear } = await import("./finance.server");
+    const { accountScope } = await import("./rbac.server");
+    const { reportScope } = await import("./report-filter");
+    const { account } = reportScope(accountScope(context), data.account);
+    return (await computeMultiYear(data.years, account)) as any;
+  });
+
 export const importTransactionsCsv = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ csv: z.string().min(1).max(5_000_000) }).parse(d))
