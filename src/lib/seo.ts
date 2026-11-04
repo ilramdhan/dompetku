@@ -33,6 +33,7 @@ export const PRIVATE_PATHS = [
   "/debts",
   "/goals",
   "/gold",
+  "/invoices",
   "/profile",
   "/receivables",
   "/recurring",

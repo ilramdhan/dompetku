@@ -78,6 +78,63 @@ export const SERVER_FN_ACCESS: Record<string, Record<string, FnAccess>> = {
     setTelegramWebhook: "admin",
     deleteTelegramWebhook: "admin",
   },
+  "invoices.functions.ts": {
+    getInvoices: "admin",
+    getInvoiceFn: "admin",
+    saveInvoiceFn: "admin",
+    invoiceActionFn: "admin",
+    deleteInvoiceFn: "admin",
+    recordInvoicePaymentFn: "admin",
+    deleteInvoicePaymentFn: "admin",
+    getInvoiceShareFn: "admin",
+    createInvoiceShareFn: "admin",
+    revokeInvoiceShareFn: "admin",
+    sendInvoiceEmailFn: "admin",
+    // v24 (#94): payment methods and the proof verification queue.
+    getPaymentMethodsFn: "admin",
+    savePaymentMethodFn: "admin",
+    deletePaymentMethodFn: "admin",
+    getInvoiceProofsFn: "admin",
+    getProofUrlFn: "admin",
+    approveProofFn: "admin",
+    rejectProofFn: "admin",
+    // v25 (#97): Midtrans orders, status re-check and refunds.
+    getGatewayTransactionsFn: "admin",
+    syncGatewayFn: "admin",
+    refundGatewayFn: "admin",
+    releaseRefundHoldFn: "admin",
+  },
+  // v26 (#96): MacroDroid notification formats (Settings) and the bank-notification review queue.
+  "payment-signals.functions.ts": {
+    getNotifyFormatsFn: "admin",
+    saveNotifyFormatFn: "admin",
+    deleteNotifyFormatFn: "admin",
+    getPaymentSignalsFn: "admin",
+    confirmSignalFn: "admin",
+    ignoreSignalFn: "admin",
+  },
+  "invoice-report.functions.ts": {
+    getInvoiceReport: "admin",
+    getInvoicePayments: "admin",
+    getOpenInvoices: "admin",
+  },
+  "notify.functions.ts": {
+    getNotifySettingsFn: "admin",
+    saveNotifySettingsFn: "admin",
+    deleteNotifySettingsFn: "admin",
+    // #122: a member's OWN row only (user id from the session, wallets ⊆ fresh grants).
+    getMyNotifyFn: "member",
+    saveMyNotifyFn: "member",
+  },
+  // v23 (#93): customer view by share token; returns only the toPublicInvoice() whitelist.
+  // v24 (#94): proof upload by share token; demo-off, rate limited, answers only { ok }.
+  // v25 (#97): "Bayar sekarang" by share token; demo-off, rate limited, server-computed amount,
+  // answers only the Snap token/redirect URL + public client key.
+  "invoice-public.functions.ts": {
+    getPublicInvoice: "public",
+    submitInvoiceProof: "public",
+    createGatewayPayment: "public",
+  },
   "pockets.functions.ts": {
     getAccountPockets: "member",
     getPocketOptions: "member",

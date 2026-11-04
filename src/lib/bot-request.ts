@@ -47,24 +47,26 @@ export const botUpdateSchema = z
 export type BodyResult =
   { ok: true; value: unknown } | { ok: false; status: 400 | 413; error: string };
 
-const tooLarge = (): BodyResult => ({
-  ok: false,
-  status: 413,
-  error: `Body terlalu besar (maks ${(MAX_BOT_BODY_BYTES / 1_000_000).toFixed(1)} MB)`,
-});
+export type TextBodyResult = { ok: true; text: string } | { ok: false; status: 413; error: string };
 
 /**
- * Reads a JSON body without ever buffering more than `max` bytes: a declared Content-Length above
- * the cap is refused up front, and a body without one is streamed with a running size check.
+ * Reads a request body as text without ever buffering more than `max` bytes: a declared
+ * Content-Length above the cap is refused up front, and a body without one is streamed with a
+ * running size check.
  */
-export async function readJsonBody(
+export async function readTextBody(
   request: Request,
   max = MAX_BOT_BODY_BYTES,
-): Promise<BodyResult> {
+): Promise<TextBodyResult> {
+  const big = (): TextBodyResult => ({
+    ok: false,
+    status: 413,
+    error: `Body terlalu besar (maks ${(max / 1_000_000).toFixed(1)} MB)`,
+  });
   const declared = request.headers.get("content-length");
   if (declared != null && declared.trim() !== "") {
     const n = Number(declared);
-    if (Number.isFinite(n) && n > max) return tooLarge();
+    if (Number.isFinite(n) && n > max) return big();
   }
   let text = "";
   if (request.body) {
@@ -77,14 +79,24 @@ export async function readJsonBody(
       size += value.byteLength;
       if (size > max) {
         await reader.cancel().catch(() => undefined);
-        return tooLarge();
+        return big();
       }
       text += decoder.decode(value, { stream: true });
     }
     text += decoder.decode();
   }
+  return { ok: true, text };
+}
+
+/** Reads a JSON body with the same size cap as `readTextBody`. */
+export async function readJsonBody(
+  request: Request,
+  max = MAX_BOT_BODY_BYTES,
+): Promise<BodyResult> {
+  const body = await readTextBody(request, max);
+  if (!body.ok) return body;
   try {
-    return { ok: true, value: JSON.parse(text) };
+    return { ok: true, value: JSON.parse(body.text) };
   } catch {
     return { ok: false, status: 400, error: "Body bukan JSON yang valid" };
   }

@@ -254,6 +254,7 @@ const DICT: Record<string, string> = {
   "Catat pembayaran cicilan ke-": "Record installment payment #",
   "?": "?",
   "Cicilan tercatat & masuk ke pengeluaran": "Installment recorded as an expense",
+  "otomatis tercatat sebagai pengeluaran.": "recorded automatically as an expense.",
   Penyedia: "Provider",
   "Total pinjaman": "Total loan",
   "Cicilan per bulan": "Installment per month",
@@ -427,6 +428,7 @@ const DICT: Record<string, string> = {
   "peringatan di": "alert at",
   langganan: "subscription",
   budget: "budget",
+  target: "goal",
   "hutang / cicilan": "debt / installment",
   Emas: "Gold",
   Piutang: "Receivables",
@@ -900,8 +902,16 @@ const DICT: Record<string, string> = {
     "AI provider (OpenAI-compatible API) — receives receipt photos or transaction text to read, along with your category names.",
   "Telegram dan n8n — meneruskan pesan bot, ringkasan, dan pengingat antara Anda dan aplikasi.":
     "Telegram and n8n — relay bot messages, summaries and reminders between you and the app.",
-  "Resend — mengirim email pengingat ke alamat yang diatur pemilik instance.":
-    "Resend — sends reminder emails to the address set by the instance owner.",
+  "Resend — mengirim email pengingat ke alamat yang diatur pemilik instance, serta email invoice, konfirmasi pembayaran, dan pengingat jatuh tempo ke email pelanggan invoice.":
+    "Resend — sends reminder emails to the address set by the instance owner, plus invoices, payment confirmations and due-date reminders to invoice customers' email.",
+  "Midtrans (payment gateway) — bila pembayaran online diaktifkan, menerima nomor invoice, jumlah tagihan, serta nama, email, dan telepon pelanggan untuk memproses pembayaran. Data kartu atau e-wallet diisi langsung di halaman Midtrans dan tidak pernah melewati aplikasi ini.":
+    "Midtrans (payment gateway) — when online payment is enabled, receives the invoice number, amount due and the customer's name, email and phone to process the payment. Card or e-wallet details are entered on Midtrans' own page and never pass through this app.",
+  "Bila fitur invoice dipakai, data pelanggan yang diisi pemilik instance (nama, email, telepon) dan bukti transfer yang diunggah pelanggan juga disimpan di sana. Untuk membatasi penyalahgunaan unggahan, alamat IP pengunggah hanya disimpan dalam bentuk hash.":
+    "When invoices are used, the customer details the owner enters (name, email, phone) and transfer proofs uploaded by customers are stored there too. To limit upload abuse, the uploader's IP address is stored only as a hash.",
+  "Bila notifikasi bank via MacroDroid diaktifkan, HP pemilik instance meneruskan notifikasi dari aplikasi bank/e-wallet yang dipilih ke server ini. Teks notifikasi diproses di server untuk mencocokkan pembayaran invoice; yang disimpan hanya cuplikan singkat (nomor rekening atau referensi panjang disamarkan), nominal, nama aplikasi, waktu, dan status — tidak pernah teks lengkapnya. Notifikasi yang diabaikan atau tidak cocok dihapus otomatis setelah sekitar 90 hari dan tidak ikut backup.":
+    "When bank notifications via MacroDroid are enabled, the instance owner's phone forwards notifications from the selected bank/e-wallet apps to this server. The notification text is processed on the server to match invoice payments; only a short excerpt (long account or reference numbers masked), the amount, app name, time and status are stored — never the full text. Ignored or unmatched notifications are deleted automatically after about 90 days and are not included in backups.",
+  "MacroDroid (aplikasi Android di HP pemilik instance) — membaca notifikasi aplikasi bank/e-wallet yang dipilih pemilik dan mengirimkannya hanya ke server instance ini. Teks notifikasi tidak dikirim ke pihak lain.":
+    "MacroDroid (Android app on the instance owner's phone) — reads notifications of the bank/e-wallet apps the owner selects and sends them only to this instance's server. Notification text is not sent to anyone else.",
   "Sentry — menerima laporan error teknis (pesan error dan konteks permintaan), bukan isi data keuangan Anda.":
     "Sentry — receives technical error reports (error message and request context), not your financial records.",
   "Google Drive — menyimpan file backup bila backup terjadwal diaktifkan.":
@@ -924,8 +934,8 @@ const DICT: Record<string, string> = {
   "Tanggung jawab Anda": "Your responsibilities",
   "Pemilik instance bertanggung jawab atas deployment, keamanan server, kunci API, kata sandi, dan backup-nya sendiri.":
     "The instance owner is responsible for their own deployment, server security, API keys, passwords and backups.",
-  "Pemilik instance wajib mematuhi ketentuan layanan pihak ketiga yang dipakai (Supabase, Vercel, penyedia AI, Telegram, dan lainnya).":
-    "The instance owner must follow the terms of the third-party services they use (Supabase, Vercel, AI providers, Telegram and others).",
+  "Pemilik instance wajib mematuhi ketentuan layanan pihak ketiga yang dipakai (Supabase, Vercel, penyedia AI, Telegram, Midtrans, dan lainnya).":
+    "The instance owner must follow the terms of the third-party services they use (Supabase, Vercel, AI providers, Telegram, Midtrans and others).",
   "Penggunaan yang wajar": "Acceptable use",
   "Jangan memakai aplikasi ini untuk aktivitas yang melanggar hukum, untuk mengakses data orang lain tanpa izin, atau untuk mengganggu layanan pihak ketiga yang terhubung.":
     "Do not use the app for unlawful activity, to access other people's data without permission, or to disrupt the connected third-party services.",
@@ -977,6 +987,8 @@ const DICT: Record<string, string> = {
     "The stored value cannot be decrypted (key changed) — re-enter it. Using env meanwhile.",
   "Nilai tersimpan tidak valid — sementara memakai env.":
     "The stored value is invalid — using env meanwhile.",
+  "Nilai env tidak valid — periksa formatnya atau simpan nilai di sini.":
+    "The env value is invalid — check its format or save a value here.",
   "Tersimpan — ketik untuk mengganti": "Saved — type to replace",
   "Aktif:": "Active:",
   "Nilai aktif:": "Active value:",
@@ -1218,6 +1230,328 @@ const DICT: Record<string, string> = {
   "Kantong sudah diarsipkan": "The pocket is archived",
   "Nama kantong sudah dipakai di dompet ini": "This wallet already has a pocket with that name",
   "Kantong tidak ditemukan": "Pocket not found",
+  /* v21 Invoice */
+  "Batalkan invoice": "Cancel invoice",
+  "Batalkan invoice ini?": "Cancel this invoice?",
+  "Belum ada invoice. Buat tagihan pertama untuk pelanggan Anda.":
+    "No invoices yet. Create the first bill for your customer.",
+  "Belum ada pembayaran.": "No payments yet.",
+  "Belum dibayar": "Unpaid",
+  "Belum dibayar:": "Outstanding:",
+  "Buat invoice": "Create invoice",
+  "Buka kembali sebagai draft?": "Reopen as a draft?",
+  "Cari nomor / pelanggan": "Search number / customer",
+  "Catat pembayaran": "Record payment",
+  "Deskripsi item": "Item description",
+  "Deskripsi item wajib diisi": "Item description is required",
+  Dibatalkan: "Cancelled",
+  "Dibayar sebagian": "Partially paid",
+  "Dompet penerima": "Receiving wallet",
+  "Dompet tidak bisa diganti setelah ada pembayaran":
+    "The wallet cannot change once payments exist",
+  Draft: "Draft",
+  "Email (opsional)": "Email (optional)",
+  "Email pelanggan tidak valid": "Customer email is invalid",
+  "Filter status": "Filter by status",
+  "Fitur invoice belum aktif: jalankan bagian v21 di supabase/schema.sql.":
+    "Invoices are not enabled yet: run section v21 of supabase/schema.sql.",
+  "Hapus pembayaran": "Delete payment",
+  "Hapus pembayaran ini?": "Delete this payment?",
+  "Harga satuan": "Unit price",
+  "Harga satuan tidak boleh negatif": "Unit price cannot be negative",
+  Invoice: "Invoices",
+  "Invoice berubah, muat ulang halaman": "The invoice changed, reload the page",
+  "Invoice ini tidak bisa menerima pembayaran": "This invoice cannot receive payments",
+  "Invoice lunas atau dibatalkan tidak bisa diubah": "Paid or cancelled invoices cannot be edited",
+  "Invoice tidak ditemukan": "Invoice not found",
+  Item: "Items",
+  "Jadikan draft": "Back to draft",
+  "Jatuh tempo (opsional)": "Due date (optional)",
+  "Jatuh tempo tidak boleh sebelum tanggal terbit": "The due date cannot be before the issue date",
+  "Kembalikan invoice ini ke draft?": "Move this invoice back to draft?",
+  Metode: "Method",
+  "Nama pelanggan": "Customer name",
+  "Nama pelanggan wajib diisi": "Customer name is required",
+  Nomor: "Number",
+  "Nomor dibuat otomatis. Total dihitung dari item. Hanya IDR.":
+    "The number is generated automatically. The total is computed from the items. IDR only.",
+  "Nomor invoice bentrok, coba lagi": "Invoice number collision, please try again",
+  "Pembayaran dan transaksi pemasukannya ikut dihapus.":
+    "Its payments and their income transactions are deleted too.",
+  "Pembayaran invoice": "Invoice payment",
+  "Pembayaran melebihi sisa tagihan": "The payment exceeds the amount due",
+  "Pembayaran tidak ditemukan": "Payment not found",
+  "Pilih dompet penerima": "Choose the receiving wallet",
+  "Prefix invoice hanya huruf/angka, maks. 10": "Invoice prefix: letters/digits only, max. 10",
+  "Prefix nomor invoice": "Invoice number prefix",
+  QRIS: "QRIS",
+  Qty: "Qty",
+  "Qty harus lebih dari 0": "Qty must be greater than 0",
+  "Referensi (opsional)": "Reference (optional)",
+  Rincian: "Details",
+  "Semua status": "All statuses",
+  "Simpan & terbitkan": "Save & issue",
+  "Simpan draft": "Save draft",
+  "Sisa tagihan terbuka": "Open amount due",
+  "Status invoice tidak bisa diubah dengan cara ini":
+    "The invoice status cannot be changed this way",
+  "Tambahkan minimal satu item": "Add at least one item",
+  "Tanggal jatuh tempo tidak valid": "Invalid due date",
+  "Tanggal terbit": "Issue date",
+  "Tanggal terbit tidak valid": "Invalid issue date",
+  "Telepon (opsional)": "Phone (optional)",
+  Terbit: "Issued",
+  Terbitkan: "Issue",
+  "Terbitkan invoice ini? Nomor tetap dan pembayaran bisa dicatat.":
+    "Issue this invoice? The number stays and payments can be recorded.",
+  "Tercatat sebagai pemasukan kategori Invoice.": "Recorded as income in category Invoice.",
+  "Terlalu banyak item (maks. 100)": "Too many items (max. 100)",
+  Terlambat: "Overdue",
+  "Tidak ada invoice yang cocok dengan filter.": "No invoices match the filters.",
+  "Total invoice harus lebih dari 0": "The invoice total must be greater than 0",
+  "Total invoice terlalu besar": "The invoice total is too large",
+  "Total tidak boleh lebih kecil dari yang sudah dibayar":
+    "The total cannot be less than what was already paid",
+  "Transaksi pemasukannya ikut dihapus.": "Its income transaction is deleted too.",
+  "Transfer bank": "Bank transfer",
+  "Ubah invoice": "Edit invoice",
+  invoice: "invoices",
+  "invoice belum lunas": "unpaid invoices",
+  "lewat jatuh tempo": "past due",
+  /* Invoice reports (issue #98) */
+  "Laporan invoice": "Invoice report",
+  "Ringkasan tagihan, umur piutang (aging), dan riwayat pembayaran.":
+    "Billing summary, receivables aging and payment history.",
+  Diterbitkan: "Issued",
+  Diterima: "Received",
+  pembayaran: "payments",
+  "Outstanding akhir periode": "Outstanding at period end",
+  Outstanding: "Outstanding",
+  "Umur piutang (aging)": "Receivables aging",
+  "Per hari ini": "As of today",
+  "Tidak ada invoice yang belum lunas.": "No unpaid invoices.",
+  "Belum jatuh tempo": "Not yet due",
+  "1–30 hari": "1–30 days",
+  "31–60 hari": "31–60 days",
+  "61–90 hari": "61–90 days",
+  "> 90 hari": "> 90 days",
+  "Per dompet": "Per wallet",
+  "Pembayaran diterima": "Payments received",
+  "Belum ada pembayaran pada periode ini.": "No payments in this period.",
+  "Invoice belum lunas": "Unpaid invoices",
+  "Laporan & aging": "Report & aging",
+  Dompet: "Wallet",
+  /* Per-member Telegram notifications (v22, issue #75) */
+  "Notifikasi Telegram": "Telegram notifications",
+  Telegram: "Telegram",
+  "Laporan & pengingat terjadwal (n8n) hanya berisi dompet yang boleh dilihat anggota ini. Chat ID ini tidak memberi akses ke bot.":
+    "Scheduled reports & reminders (n8n) only include wallets this member may view. This chat ID does not grant bot access.",
+  "Chat ID Telegram": "Telegram chat ID",
+  "Chat pribadi atau grup (ID grup diawali tanda minus, mis. -100…).":
+    "A private chat or a group (group IDs start with a minus, e.g. -100…).",
+  "Chat ID wajib diisi": "Chat ID is required",
+  "Chat ID harus berupa angka (grup diawali tanda minus)":
+    "Chat ID must be a number (groups start with a minus)",
+  "Chat ID tidak valid": "Invalid chat ID",
+  "Laporan terjadwal": "Scheduled reports",
+  "Pengingat tagihan": "Bill reminders",
+  "Dompet di notifikasi": "Wallets in notifications",
+  "Anggota ini belum punya akses dompet, jadi tidak akan menerima notifikasi.":
+    "This member has no wallet access yet, so they will not receive notifications.",
+  "Tidak ada yang dicentang = semua dompet yang boleh dilihat anggota.":
+    "Nothing checked = every wallet the member may view.",
+  "Hapus notifikasi": "Remove notifications",
+  "Jalankan bagian v22 di supabase/schema.sql untuk notifikasi Telegram per anggota.":
+    "Run section v22 of supabase/schema.sql for per-member Telegram notifications.",
+  "Dompet di luar akses anggota": "Wallet outside the member's access",
+  "Pemilik memakai TELEGRAM_ADMIN_CHAT_ID di Pengaturan → Integrasi":
+    "The owner uses TELEGRAM_ADMIN_CHAT_ID in Settings → Integrations",
+  "Notifikasi per anggota belum aktif — jalankan bagian v22 di supabase/schema.sql.":
+    "Per-member notifications are not enabled yet — run section v22 of supabase/schema.sql.",
+  /* Members manage their own Telegram chat id (#122) */
+  "Laporan & pengingat terjadwal hanya berisi dompet yang boleh Anda lihat. Chat ID ini tidak memberi akses ke bot.":
+    "Scheduled reports & reminders only include wallets you may view. This chat ID does not grant bot access.",
+  "Notifikasi per anggota belum aktif. Minta admin menjalankan bagian v22.":
+    "Per-member notifications are not enabled yet. Ask the admin to run section v22.",
+  "Admin menonaktifkan notifikasi Anda. Hubungi admin untuk mengaktifkannya lagi.":
+    "The admin has turned off your notifications. Contact the admin to turn them back on.",
+  "Mulai chat dengan bot dulu (atau tambahkan bot ke grup). Kosongkan untuk berhenti menerima notifikasi.":
+    "Start a chat with the bot first (or add the bot to a group). Leave empty to stop receiving notifications.",
+  "Anda belum punya akses dompet, jadi belum ada notifikasi yang dikirim.":
+    "You have no wallet access yet, so no notifications are sent.",
+  "Tidak ada yang dicentang = semua dompet yang boleh Anda lihat.":
+    "Nothing checked = every wallet you may view.",
+  "Notifikasi Telegram dimatikan": "Telegram notifications turned off",
+  "Diatur anggota": "Set by member",
+  "Chat ID ini diisi sendiri oleh anggota dan belum diverifikasi. Pastikan itu chat pribadinya atau grup yang setuju menerima laporan; matikan Aktif untuk menghentikannya.":
+    "This chat ID was entered by the member and is not verified. Make sure it is their own chat or a group that agreed to receive reports; turn off Active to stop it.",
+  "Isi hanya chat ID Anda sendiri atau grup yang setuju menerima laporan. Chat ID belum diverifikasi; admin melihatnya sebagai “diatur anggota”.":
+    "Enter only your own chat ID or a group that agreed to receive reports. Chat IDs are not verified; the admin sees it as “set by member”.",
+  "Gagal menyimpan daftar dompet — notifikasi dinonaktifkan sampai admin mengaktifkannya lagi.":
+    "Could not save the wallet list — notifications are disabled until the admin turns them back on.",
+  "Anggota mengatur notifikasi Telegram sendiri": "Member updated their own Telegram notifications",
+  "Anggota berhenti menerima notifikasi Telegram": "Member stopped Telegram notifications",
+  "Notifikasi anggota diubah": "Member notifications changed",
+  "Notifikasi anggota dihapus": "Member notifications removed",
+  "Chat ID admin (notifikasi)": "Admin chat ID (notifications)",
+  "Penerima laporan & pengingat terjadwal semua dompet lewat endpoint n8n notifications. Pribadi atau grup (diawali minus). Tidak memberi akses bot.":
+    "Receives scheduled all-wallet reports & reminders via the n8n notifications endpoint. Private or group (starts with a minus). Does not grant bot access.",
+  /* Public invoice link & page (v23, issue #93) */
+  Bagikan: "Share",
+  "Belum ada tautan publik.": "No public link yet.",
+  "berikut invoice": "here is invoice",
+  "Buat tautan": "Create link",
+  "Kirim invoice ke email pelanggan? Tautan lama akan diganti dan tidak bisa dibuka lagi.":
+    "Email the invoice to the customer? The old link will be replaced and stop working.",
+  "Bahasa email": "Email language",
+  "Kirim invoice ke email pelanggan?": "Email the invoice to the customer?",
+  "Demi keamanan hanya hash tautan yang disimpan, jadi tautan baru dibuat saat mengirim.":
+    "For security only a hash of the link is stored, so a new link is created when sending.",
+  "Tautan publik dibuat otomatis.": "A public link is created automatically.",
+  "Email terkirim ke": "Email sent to",
+  "Tautan baru tetap dibuat dan tampil di bawah.":
+    "The new link was still created and is shown below.",
+  "Kirim invoice": "Send invoice",
+  "Pelanggan belum punya alamat email.": "The customer has no email address.",
+  "Email belum dikonfigurasi (RESEND_API_KEY dan EMAIL_FROM).":
+    "Email is not configured (RESEND_API_KEY and EMAIL_FROM).",
+  "Gagal mengirim email.": "Failed to send the email.",
+  "Terbitkan invoice dulu; draft dan invoice batal tidak bisa dikirim":
+    "Issue the invoice first; drafts and cancelled invoices cannot be sent",
+  "Email invoice dikirim": "Invoice email sent",
+  "Buat tautan baru? Tautan lama tidak bisa dibuka lagi.":
+    "Create a new link? The old link will stop working.",
+  "Buat ulang tautan": "Create new link",
+  Cabut: "Revoke",
+  "Cabut tautan publik invoice ini?": "Revoke the public link of this invoice?",
+  "Cetak / simpan PDF": "Print / save PDF",
+  "Ditagihkan kepada": "Billed to",
+  Halo: "Hi",
+  "Invoice ini dibuat dengan": "This invoice was created with",
+  Kedaluwarsa: "Expiry",
+  "Kirim via WhatsApp": "Send via WhatsApp",
+  "Mode demo: tautan kedaluwarsa dalam": "Demo mode: links expire within",
+  "Pelanggan tidak bisa membuka tautan ini lagi.": "The customer can no longer open this link.",
+  Pratinjau: "Preview",
+  "Salin tautan": "Copy link",
+  "Simpan tautan ini sekarang: demi keamanan hanya hash-nya yang disimpan. Buat ulang untuk tautan baru.":
+    "Save this link now: for security only its hash is stored. Create a new link to get another one.",
+  "Sisa tagihan": "Amount due",
+  "Sudah dibayar": "Paid",
+  "Tagihan untuk pelanggan, bisa dicetak atau disimpan sebagai PDF.":
+    "Invoice for the customer, ready to print or save as PDF.",
+  "Tanpa kedaluwarsa": "No expiry",
+  "Tautan aktif, berlaku sampai": "Link active, valid until",
+  "Tautan aktif, tanpa kedaluwarsa.": "Link active, no expiry.",
+  "Tautan dibuat": "Link created",
+  "Tautan dicabut": "Link revoked",
+  "Tautan publik invoice belum aktif: jalankan bagian v23 di supabase/schema.sql.":
+    "Public invoice links are not active yet: run section v23 of supabase/schema.sql.",
+  "Tautan publik invoice dibuat": "Public invoice link created",
+  "Tautan publik invoice dicabut": "Public invoice link revoked",
+  "Tautan sudah dicabut.": "The link was revoked.",
+  "Tautan sudah kedaluwarsa.": "The link has expired.",
+  "Terbitkan invoice dulu untuk membuat tautan publik.":
+    "Issue the invoice first to create a public link.",
+  "Terbitkan invoice dulu; draft dan invoice batal tidak bisa dibagikan":
+    "Issue the invoice first; drafts and cancelled invoices cannot be shared",
+  /* Invoice payment methods & transfer proofs (v24, issue #94) */
+  Alasan: "Reason",
+  "Alasan penolakan": "Rejection reason",
+  "Alasan penolakan wajib diisi": "A rejection reason is required",
+  "Atas nama": "Account holder",
+  "Belum ada bukti.": "No proofs yet.",
+  "Belum ada gambar QRIS": "No QRIS image yet",
+  "Belum ada metode pembayaran.": "No payment methods yet.",
+  "Berkas bukti tidak valid": "Invalid proof file",
+  "Bukti disetujui, pembayaran dicatat": "Proof approved, payment recorded",
+  "Bukti diterima, menunggu verifikasi": "Proof received, awaiting verification",
+  "Bukti ditolak": "Proof rejected",
+  "Bukti gagal dikirim, coba lagi.": "The proof could not be sent, please try again.",
+  "Bukti ini sudah diproses": "This proof was already processed",
+  "Bukti tidak ditemukan": "Proof not found",
+  "Bukti transfer": "Transfer proof",
+  "Bukti transfer disetujui": "Transfer proof approved",
+  "Bukti transfer diterima": "Transfer proof received",
+  "Bukti transfer ditolak": "Transfer proof rejected",
+  "Bukti yang sudah dikirim tetap tersimpan.": "Proofs already sent are kept.",
+  "Cara membayar": "How to pay",
+  "Catatan (opsional)": "Note (optional)",
+  Disetujui: "Approved",
+  Ditolak: "Rejected",
+  "Dompet tujuan (opsional, hanya untuk Anda)": "Receiving wallet (optional, only visible to you)",
+  "Filter bukti": "Filter proofs",
+  "Format gambar tidak didukung (JPEG/PNG/WebP).": "Unsupported image format (JPEG/PNG/WebP).",
+  "Foto atau tangkapan layar bukti transfer (JPEG/PNG/WebP, maks. 5 MB).":
+    "Photo or screenshot of the transfer (JPEG/PNG/WebP, max. 5 MB).",
+  "Gambar QRIS": "QRIS image",
+  "Gambar QRIS harus PNG/JPEG/WebP maksimal 200 KB":
+    "The QRIS image must be PNG/JPEG/WebP, at most 200 KB",
+  "Gambar QRIS terlalu besar (maks. 200 KB)": "QRIS image too large (max. 200 KB)",
+  "Gambar QRIS terpasang": "QRIS image set",
+  "Hapus gambar": "Remove image",
+  "Invoice tidak ditemukan atau tidak bisa menerima bukti.":
+    "Invoice not found or it cannot accept a proof.",
+  "Jenis metode tidak valid": "Invalid method type",
+  "Jumlah diterima": "Amount received",
+  "Jumlah melebihi sisa tagihan": "The amount exceeds the amount due",
+  "Jumlah tidak valid": "Invalid amount",
+  "Jumlah yang dibayar": "Amount to pay",
+  "Jumlah yang ditransfer": "Amount transferred",
+  "Kirim bukti": "Send proof",
+  "Kode QRIS": "QRIS code",
+  "Lihat bukti": "View proof",
+  "Mengirim…": "Sending…",
+  Menunggu: "Pending",
+  "Menunggu verifikasi": "Awaiting verification",
+  "Metode pembayaran": "Payment methods",
+  "Metode pembayaran invoice belum aktif: jalankan bagian v24 di supabase/schema.sql.":
+    "Invoice payment methods are not active yet: run section v24 of supabase/schema.sql.",
+  "Metode tidak ditemukan": "Method not found",
+  "Nama bank": "Bank name",
+  "Nama bank wajib diisi": "Bank name is required",
+  "Nama metode": "Method name",
+  "Nama metode wajib diisi": "Method name is required",
+  "Nama pemilik rekening wajib diisi": "Account holder is required",
+  "Nama pengirim (opsional)": "Sender name (optional)",
+  "No. rekening": "Account number",
+  "Nomor rekening tidak valid": "Invalid account number",
+  "Nomor rekening wajib diisi": "Account number is required",
+  "PNG/JPEG/WebP, otomatis dikecilkan (maks. 200 KB).":
+    "PNG/JPEG/WebP, resized automatically (max. 200 KB).",
+  "Pelanggan melihat detail ini di halaman invoice. Dompet tidak pernah ditampilkan.":
+    "Customers see these details on the invoice page. The wallet is never shown.",
+  "Pilih foto bukti transfer": "Choose a photo of the transfer",
+  "Pilih metode (opsional)": "Choose a method (optional)",
+  "Pindai dengan aplikasi bank atau e-wallet.": "Scan with your banking or e-wallet app.",
+  "Rekening bank dan QRIS yang tampil di halaman invoice publik.":
+    "Bank accounts and QRIS shown on public invoice pages.",
+  "Salin jumlah": "Copy amount",
+  "Salin nomor rekening": "Copy account number",
+  Setujui: "Approve",
+  "Setujui bukti": "Approve proof",
+  "Sudah ada beberapa bukti yang menunggu verifikasi. Tunggu konfirmasi penjual.":
+    "Several proofs are already awaiting verification. Please wait for the seller to confirm.",
+  "Sudah transfer? Unggah bukti": "Already paid? Upload the proof",
+  "Tambah metode": "Add method",
+  "Tautan pratinjau berlaku 2 menit.": "The preview link is valid for 2 minutes.",
+  "Terima kasih! Bukti transfer terkirim dan akan diperiksa penjual.":
+    "Thank you! Your transfer proof was sent and will be checked by the seller.",
+  "Terlalu banyak metode (maks. 20)": "Too many methods (max. 20)",
+  "Terlalu banyak unggahan, coba lagi nanti.": "Too many uploads, please try again later.",
+  "Tidak ada bukti yang menunggu verifikasi.": "No proofs awaiting verification.",
+  "Tidak dipilih = semua metode aktif tampil di halaman publik.":
+    "None selected = every active method is shown on the public page.",
+  "Tidak ditautkan": "Not linked",
+  Tolak: "Reject",
+  "Tolak bukti": "Reject proof",
+  "Ubah metode": "Edit method",
+  "Unggah bukti belum tersedia untuk invoice ini.":
+    "Proof upload is not available for this invoice.",
+  "Unggah bukti dinonaktifkan di mode demo.": "Proof upload is disabled in demo mode.",
+  "Unggah gambar QRIS": "Upload QRIS image",
+  "Unggah gambar dinonaktifkan di mode demo.": "Image upload is disabled in demo mode.",
+  menunggu: "pending",
   /* SEO (document head of public pages, issue #44) */
   "Dompetku — Pencatat Keuangan Open Source & Self-Hosted Expense Tracker":
     "Dompetku — Open Source, Self-Hosted Personal Finance & Expense Tracker",
@@ -1227,6 +1561,269 @@ const DICT: Record<string, string> = {
     "What data this Dompetku instance stores, where it is stored, and which third-party services may be used.",
   "Ketentuan penggunaan Dompetku: lisensi MIT, tanpa jaminan, bukan nasihat keuangan.":
     "Terms of use for Dompetku: MIT license, no warranty, not financial advice.",
+  // Site URL from Settings (#117)
+  Situs: "Site",
+  "URL situs publik": "Public site URL",
+  "Alamat publik instance ini. Dipakai untuk canonical, sitemap, tautan invoice/email dan URL kembali Midtrans. Kosong = env PUBLIC_SITE_URL.":
+    "This instance's public address. Used for canonical URLs, the sitemap, invoice/email links and the Midtrans return URL. Empty = env PUBLIC_SITE_URL.",
+  "URL situs tidak valid": "Invalid site URL",
+  "URL situs harus https:// (http hanya untuk localhost)":
+    "The site URL must be https:// (http only for localhost)",
+  // v25 payment gateway (#97)
+  "Aktifkan Midtrans": "Enable Midtrans",
+  'true = tombol "Bayar sekarang" di halaman invoice publik (butuh skema v25 dan server key).':
+    'true = "Pay now" button on the public invoice page (needs schema v25 and a server key).',
+  "Isi true atau false": "Enter true or false",
+  "Server key Midtrans": "Midtrans server key",
+  "Dashboard Midtrans → Settings → Access Keys. Sandbox diawali SB-Mid-server-. Tidak pernah dikirim ke browser.":
+    "Midtrans dashboard → Settings → Access Keys. Sandbox keys start with SB-Mid-server-. Never sent to the browser.",
+  "Format key Midtrans tidak valid": "Invalid Midtrans key format",
+  "Client key Midtrans": "Midtrans client key",
+  "Publik, dipakai Snap JS di browser pelanggan.":
+    "Public, used by Snap JS in the customer's browser.",
+  "Mode production Midtrans": "Midtrans production mode",
+  "false = sandbox (uji coba, default). true = transaksi uang sungguhan; pakai key production.":
+    "false = sandbox (testing, default). true = real money; use production keys.",
+  /* Midtrans MDR fees + partial payments (#124) */
+  "Biaya MDR Midtrans": "Midtrans MDR fees",
+  'Per metode, mis. "qris=0.7%; gopay=2%; credit_card=2.9%+2000; bank_transfer=4000; *=0" (termasuk PPN bila ada). Dicatat sebagai pengeluaran "Biaya Admin" sekali per pembayaran. Kosong = tidak dicatat.':
+    'Per method, e.g. "qris=0.7%; gopay=2%; credit_card=2.9%+2000; bank_transfer=4000; *=0" (include VAT where it applies). Booked once per payment as a "Biaya Admin" expense. Empty = not booked.',
+  "Izinkan bayar sebagian lewat Midtrans": "Allow partial payments through Midtrans",
+  "true = pelanggan boleh memasukkan jumlah (min. Rp10.000, maks. sisa tagihan) di tombol Bayar sekarang. false = selalu seluruh sisa (default).":
+    "true = customers may enter an amount (min. Rp10,000, max. the remaining balance) on Pay now. false = always the full remaining balance (default).",
+  "Terlalu banyak aturan biaya": "Too many fee rules",
+  "Format biaya: metode=persen%+tetap": "Fee format: method=percent%+flat",
+  "Persentase biaya harus di bawah 50%": "Fee percentage must be below 50%",
+  "Jumlah yang dibayar (opsional)": "Amount to pay (optional)",
+  "Boleh bayar sebagian: minimal": "Partial payment allowed: at least",
+  maksimal: "at most",
+  " (sisa minimal sama). Kosongkan untuk melunasi.":
+    " (leaving at least the same). Leave empty to pay in full.",
+  "Biaya MDR": "MDR fee",
+  "diterima bersih": "net received",
+  "Payment gateway (Midtrans)": "Payment gateway (Midtrans)",
+  "Butuh skema v25. Pasang Payment Notification URL di dashboard Midtrans ke":
+    "Needs schema v25. Set the Payment Notification URL in the Midtrans dashboard to",
+  "Mulai dengan sandbox. Panduan: docs/PAYMENT-GATEWAY.md.":
+    "Start with sandbox. Guide: docs/PAYMENT-GATEWAY.md.",
+  "Bayar online": "Pay online",
+  "Kartu, e-wallet, QRIS, atau virtual account lewat Midtrans.":
+    "Card, e-wallet, QRIS or virtual account via Midtrans.",
+  "Bayar sekarang": "Pay now",
+  "Pembayaran sedang diproses. Status invoice diperbarui otomatis setelah Midtrans mengonfirmasi.":
+    "Payment is being processed. The invoice status updates automatically once Midtrans confirms it.",
+  "Muat ulang": "Reload",
+  "Pembayaran online tidak tersedia untuk invoice ini.":
+    "Online payment is not available for this invoice.",
+  "Terlalu banyak percobaan, coba lagi nanti.": "Too many attempts, try again later.",
+  "Pembayaran online gagal dibuat, coba lagi.": "Could not start the online payment, try again.",
+  "Transaksi Midtrans": "Midtrans transactions",
+  "Menunggu pembayaran": "Awaiting payment",
+  Berhasil: "Succeeded",
+  Gagal: "Failed",
+  "Lewat batas waktu": "Expired",
+  Dikembalikan: "Refunded",
+  "Dikembalikan sebagian": "Partially refunded",
+  "Cek status": "Check status",
+  "Status diperbarui": "Status updated",
+  Refund: "Refund",
+  refund: "refund",
+  "Refund Midtrans": "Midtrans refund",
+  "Sisa yang bisa dikembalikan": "Refundable remainder",
+  "Alasan (opsional)": "Reason (optional)",
+  "Jumlah refund tidak valid": "Invalid refund amount",
+  "Kirim refund ke Midtrans?": "Send the refund to Midtrans?",
+  "Dana dikembalikan ke pelanggan dan tidak bisa dibatalkan. Pengeluaran pembalik dicatat di kategori Invoice.":
+    "The money goes back to the customer and cannot be undone. A reversing expense is recorded in the Invoice category.",
+  "Refund dikirim": "Refund sent",
+  "Metode ini hanya mendukung refund penuh": "This method only supports full refunds",
+  "Hanya pembayaran berhasil yang bisa dikembalikan": "Only successful payments can be refunded",
+  "Pembayaran belum settlement; coba lagi nanti": "Payment is not settled yet; try again later",
+  "Metode ini tidak bisa direfund lewat Midtrans (mis. transfer bank/VA); kembalikan dana secara manual":
+    "This method cannot be refunded through Midtrans (e.g. bank transfer/VA); return the money manually",
+  "Jumlah refund harus bilangan bulat": "Refund amount must be a whole number",
+  "Jumlah melebihi sisa yang bisa dikembalikan": "Amount exceeds the refundable remainder",
+  "Jumlah dari Midtrans tidak cocok dengan pesanan":
+    "Amount from Midtrans does not match the order",
+  "Payment gateway belum aktif: jalankan bagian v25 di supabase/schema.sql.":
+    "Payment gateway is not active: run section v25 in supabase/schema.sql.",
+  "Midtrans belum diaktifkan di Pengaturan → Integrasi":
+    "Midtrans is not enabled in Settings → Integrations",
+  "Transaksi tidak ditemukan di Midtrans": "Transaction not found at Midtrans",
+  "Pembayaran belum tercatat; cek status dulu": "Payment not recorded yet; check the status first",
+  "Transaksi gateway tidak ditemukan": "Gateway transaction not found",
+  "Invoice punya transaksi Midtrans yang tertunda atau berhasil; tidak bisa dihapus (batalkan saja)":
+    "This invoice has a pending or successful Midtrans transaction and cannot be deleted (cancel it instead)",
+  "Pembayaran dari Midtrans tidak bisa dihapus; gunakan refund":
+    "Midtrans payments cannot be deleted; use a refund",
+  "Pembayaran Midtrans dibuat": "Midtrans payment created",
+  "Pembayaran Midtrans diterima": "Midtrans payment received",
+  "Refund Midtrans dicatat": "Midtrans refund recorded",
+  "Key Midtrans tidak cocok dengan mode: key sandbox diawali SB- dan hanya untuk MIDTRANS_PRODUCTION=false. Gateway nonaktif sampai key dan mode cocok.":
+    "Midtrans key does not match the mode: sandbox keys start with SB- and only work with MIDTRANS_PRODUCTION=false. The gateway stays off until key and mode match.",
+  "Refund dengan kunci ini sudah ada dengan jumlah berbeda; cek status lalu coba lagi":
+    "A refund with this key already exists with a different amount; check the status and try again",
+  "Chargeback dari Midtrans, cek manual": "Chargeback from Midtrans, check manually",
+  "Digantikan order lain yang dibuat bersamaan":
+    "Replaced by another order created at the same time",
+  "Transaksi tertunda ini menahan pembayaran online baru untuk invoice ini sampai dicek (Cek status) atau ditangani manual.":
+    "This pending transaction blocks new online payments for this invoice until it is checked (Check status) or handled manually.",
+  "Tagih ulang invoice ini?": "Bill this invoice again?",
+  "Tombol Bayar sekarang dan pengingat jatuh tempo aktif lagi untuk sisa tagihan. Pilih Batalkan invoice bila pelanggan tidak perlu membayar lagi.":
+    "The Pay now button and due reminders come back for the amount due. Cancel the invoice instead if the customer does not need to pay again.",
+  "Tagih ulang": "Bill again",
+  "Invoice ditagih ulang": "Invoice billed again",
+  "Ada refund Midtrans: tombol Bayar sekarang dan pengingat jatuh tempo dihentikan. Batalkan invoice bila tidak ditagih lagi, atau tagih ulang sisanya.":
+    "There is a Midtrans refund: the Pay now button and due reminders are paused. Cancel the invoice if it will not be billed again, or bill the remainder again.",
+  "Invoice ditagih ulang setelah refund": "Invoice billed again after a refund",
+  /* v26 MacroDroid bank notifications (#96) */
+  Abaikan: "Ignore",
+  "Aplikasi atau nama paket (mis. com.bca)": "App or package name (e.g. com.bca)",
+  "Aplikasi atau nama paket": "App or package name",
+  "Aplikasi tidak dikenal": "Unknown app",
+  "Atur format notifikasi di kartu Format notifikasi bank. Panduan: docs/MACRODROID.md.":
+    "Set up notification formats in the Bank notification formats card. Guide: docs/MACRODROID.md.",
+  "Belum ada format notifikasi.": "No notification formats yet.",
+  "Butuh skema v26. MacroDroid mengirim notifikasi bank ke":
+    "Requires schema v26. MacroDroid sends bank notifications to",
+  Cocok: "Match",
+  "Contoh format ditambahkan, sesuaikan dengan notifikasi Anda":
+    "Example format added, adjust it to your notifications",
+  "Contoh format": "Example format",
+  Diabaikan: "Ignored",
+  "dicatat sebagai pemasukan tambahan.": "is recorded as extra income.",
+  Dikonfirmasi: "Confirmed",
+  "Dompet invoice": "Invoice wallet",
+  "Filter notifikasi": "Filter notifications",
+  "Format generik aktif": "Generic format on",
+  "Format notifikasi bank": "Bank notification formats",
+  "Format pertama yang cocok dengan aplikasi, judul dan teks dipakai.":
+    "The first format matching the app, title and text is used.",
+  "Grup bernama (?<amount>…) atau grup pertama berisi nominal. Format Rp 1.250.000,00 / IDR1,250,000.00 / 1.250.000 dikenali.":
+    "A named group (?<amount>…) or the first group holds the amount. Rp 1.250.000,00 / IDR1,250,000.00 / 1.250.000 are recognised.",
+  "Isi MACRODROID_TOKEN di Integrasi → Notifikasi bank (MacroDroid). Panduan: docs/MACRODROID.md.":
+    "Set MACRODROID_TOKEN in Integrations → Bank notifications (MacroDroid). Guide: docs/MACRODROID.md.",
+  "Judul notifikasi": "Notification title",
+  "Jumlah transfer": "Amount to transfer",
+  "Kode unik": "Unique code",
+  "Konfirmasi manual": "Manual confirmation",
+  "Konfirmasi notifikasi": "Confirm notification",
+  "Konfirmasi otomatis: aktif": "Auto-confirm: on",
+  Konfirmasi: "Confirm",
+  "Mengandung teks": "Contains text",
+  "Nama format": "Format name",
+  "Notifikasi bank belum aktif: jalankan bagian v26 di supabase/schema.sql.":
+    "Bank notifications are not active: run the v26 section in supabase/schema.sql.",
+  "Notifikasi bank": "Bank notifications",
+  "Notifikasi diabaikan": "Notification ignored",
+  "Notifikasi uang masuk yang diteruskan MacroDroid dicocokkan dengan invoice terbuka (sisa tagihan + kode unik).":
+    "Incoming-money notifications forwarded by MacroDroid are matched to open invoices (amount due + unique code).",
+  "Pembayaran dicatat": "Payment recorded",
+  "Pencocokan judul/teks": "Title/text matching",
+  "perlu dicek": "to review",
+  "Perlu dicek": "To review",
+  "Pilih contoh format…": "Pick an example format…",
+  "Pilih invoice": "Pick an invoice",
+  "Regex nominal": "Amount regex",
+  Regex: "Regex",
+  "Semua aplikasi": "All apps",
+  "Tambah contoh": "Add example",
+  "Tambah format": "Add format",
+  "Teks notifikasi, mis. Dana masuk Rp 150.123,00 dari BUDI":
+    "Notification text, e.g. Dana masuk Rp 150.123,00 dari BUDI",
+  "Teks notifikasi": "Notification text",
+  "Tempel notifikasi asli (samarkan nama/nomor). Diproses di browser, tidak dikirim.":
+    "Paste a real notification (mask names/numbers). Processed in the browser, never sent.",
+  "Termasuk kode unik": "Includes unique code",
+  "Tidak ada notifikasi.": "No notifications.",
+  "Token perangkat aktif": "Device token set",
+  "Token perangkat belum diatur": "Device token not set",
+  "Transfer tepat sejumlah ini agar pembayaran dikenali otomatis.":
+    "Transfer exactly this amount so the payment is recognised automatically.",
+  "Ubah format": "Edit format",
+  "Uji teks contoh": "Test with sample text",
+  "Notifikasi bank (MacroDroid)": "Bank notifications (MacroDroid)",
+  "Token perangkat MacroDroid": "MacroDroid device token",
+  "Minimal 32 karakter acak; dikirim MacroDroid di header Authorization: Bearer. Kosong = endpoint notifikasi dan kode unik nonaktif.":
+    "At least 32 random characters; MacroDroid sends it in the Authorization: Bearer header. Empty = notification endpoint and unique codes off.",
+  "Minimal 32 karakter (huruf, angka, - atau _)":
+    "At least 32 characters (letters, digits, - or _)",
+  "Konfirmasi otomatis": "Auto-confirm",
+  "Format generik (Rupiah)": "Generic format (Rupiah)",
+  "true = notifikasi yang tidak cocok dengan format mana pun tetap dicoba dengan pola nominal Rupiah umum + kata kunci uang masuk.":
+    "true = notifications matching no format are still tried with a common Rupiah amount pattern + incoming-money keywords.",
+  "Generik (Rupiah)": "Generic (Rupiah)",
+  "BCA (contoh, sesuaikan)": "BCA (example, adjust)",
+  "Livin' by Mandiri (contoh, sesuaikan)": "Livin' by Mandiri (example, adjust)",
+  "BRImo (contoh, sesuaikan)": "BRImo (example, adjust)",
+  "BNI / wondr (contoh, sesuaikan)": "BNI / wondr (example, adjust)",
+  "DANA (contoh, sesuaikan)": "DANA (example, adjust)",
+  "OVO (contoh, sesuaikan)": "OVO (example, adjust)",
+  "GoPay (contoh, sesuaikan)": "GoPay (example, adjust)",
+  "ShopeePay (contoh, sesuaikan)": "ShopeePay (example, adjust)",
+  "Regex tidak boleh kosong": "Regex must not be empty",
+  "Regex terlalu panjang (maks. 200 karakter)": "Regex too long (max. 200 characters)",
+  "Regex tidak valid": "Invalid regex",
+  "Regex tidak boleh memakai backreference": "Regex must not use backreferences",
+  "Regex tidak boleh memakai lookahead/lookbehind": "Regex must not use lookahead/lookbehind",
+  "Regex berisiko lambat (quantifier bersarang), sederhanakan polanya":
+    "Regex may be slow (nested quantifiers), simplify the pattern",
+  "Regex berisiko lambat (terlalu banyak * atau +), sederhanakan polanya":
+    "Regex may be slow (too many * or +), simplify the pattern",
+  "Regex terlalu rumit (terlalu banyak karakter berbeda), sederhanakan polanya":
+    "Regex too complex (too many different characters), simplify the pattern",
+  "Nama format wajib diisi": "Format name is required",
+  "Nama format terlalu panjang": "Format name is too long",
+  "Teks pencocokan terlalu panjang": "Match text is too long",
+  "Daftar kata kunci terlalu panjang": "Keyword list is too long",
+  "Mode pencocokan tidak valid": "Invalid match mode",
+  "Tidak ada format yang cocok": "No format matches",
+  "Mengandung kata yang diabaikan": "Contains an ignored word",
+  "Tidak ada kata kunci uang masuk": "No incoming-money keyword",
+  "Nominal tidak ditemukan": "Amount not found",
+  "Tidak cocok": "No match",
+  Ambigu: "Ambiguous",
+  "Notifikasi ini sudah diproses": "This notification was already processed",
+  "Notifikasi ini sedang atau sudah diproses":
+    "This notification is being or was already processed",
+  "Notifikasi tidak ditemukan": "Notification not found",
+  "Format tidak ditemukan": "Format not found",
+  "Terlalu banyak format (maks. 50)": "Too many formats (max. 50)",
+  "Waktu notifikasi di luar jendela 48 jam": "Notification time outside the 48-hour window",
+  "Tidak ada invoice dengan nominal ini": "No invoice with this amount",
+  "Diabaikan admin": "Ignored by admin",
+  "Opsional. Kosong = judul apa saja.": "Optional. Empty = any title.",
+  "Opsional. Kosong = teks apa saja.": "Optional. Empty = any text.",
+  "Wajib mengandung salah satu": "Must contain one of",
+  "Kata kunci uang masuk, pisahkan dengan koma (mis. masuk, diterima).":
+    "Incoming-money keywords, comma-separated (e.g. masuk, diterima).",
+  "Abaikan bila mengandung": "Ignore if it contains",
+  "Mis. keluar, debit, OTP. Notifikasi ini tidak pernah dicocokkan.":
+    "E.g. keluar, debit, OTP. Such notifications are never matched.",
+  "Format notifikasi": "Notification format",
+  "Notifikasi bank diterima": "Bank notification received",
+  "Notifikasi bank dikonfirmasi": "Bank notification confirmed",
+  "Notifikasi bank diabaikan": "Bank notification ignored",
+  "Nama paket (mis. com.bca, cocok juga com.bca.x) atau kata dari nama aplikasi (mis. BCA), pisahkan dengan koma. Kosong = semua aplikasi. Konfirmasi otomatis hanya untuk nama paket.":
+    "Package name (e.g. com.bca, also matches com.bca.x) or a word of the app name (e.g. BCA), comma-separated. Empty = all apps. Auto-confirm only works with package names.",
+  "false (default) = notifikasi yang cocok hanya ditandai Menunggu verifikasi. true = langsung dicatat, tetapi hanya untuk format dengan nama paket aplikasi persis (bukan format generik atau nama aplikasi saja); notifikasi bisa dipalsukan aplikasi lain di HP, aktifkan dengan hati-hati.":
+    "false (default) = matching notifications are only marked Awaiting verification. true = booked right away, but only for formats with an exact app package name (not the generic format or app names only); other apps on the phone can fake notifications, enable with care.",
+  "Konfirmasi otomatis hanya untuk format yang kolom Aplikasi-nya berisi nama paket persis (mis. com.bca). Format generik dan format dengan nama aplikasi saja tetap menunggu verifikasi.":
+    "Auto-confirm only applies to formats whose App field holds an exact package name (e.g. com.bca). The generic format and formats with app names only still wait for verification.",
+  "Bisa dikonfirmasi otomatis (nama paket cocok).": "Can be auto-confirmed (package name matches).",
+  "Selalu menunggu verifikasi (bukan nama paket persis atau format generik).":
+    "Always waits for verification (no exact package name, or the generic format).",
+  "Regex berisiko lambat (dua pengulangan bisa mencocokkan karakter yang sama), sederhanakan polanya":
+    "Regex may be slow (two repetitions can match the same characters), simplify the pattern",
+  "Invoice ditahan karena refund; klik Tagih ulang dulu":
+    "Invoice is on hold after a refund; click Bill again first",
+  "Tidak dikonfirmasi otomatis: format tanpa nama paket aplikasi atau format generik":
+    "Not auto-confirmed: format without an app package name, or the generic format",
+  "Invoice sudah lunas atau tidak terbuka lagi": "Invoice is already paid or no longer open",
+  "Invoice sedang memproses pembayaran lain, coba lagi":
+    "The invoice is processing another payment, try again",
+  "Nominal tidak lagi sama dengan sisa tagihan + kode unik":
+    "The amount no longer equals the amount due + unique code",
 };
 
 const LangContext = createContext<{
@@ -1245,6 +1842,11 @@ let activeLang: Lang = "id";
 /** Translate outside React (uses the provider's current language). */
 export function translateNow(s: string): string {
   return activeLang === "en" ? (DICT[s] ?? s) : s;
+}
+
+/** Whether `s` is a key of the dictionary (an English value may equal its key, e.g. "Status"). */
+export function hasTranslation(s: string): boolean {
+  return Object.hasOwn(DICT, s);
 }
 
 /** Pure lookup for code outside React that knows the language (route `head()`, JSON-LD). */

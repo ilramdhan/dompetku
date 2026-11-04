@@ -188,6 +188,36 @@ The eye icon (or **Shift + H**) hides every amount, balance, chart value and gol
 
 </details>
 
+## Invoices and payments
+
+<details>
+<summary><strong>Can customers pay my invoices online?</strong></summary>
+
+Yes, optionally. Share the invoice's public link; the customer sees your bank/QRIS instructions and can upload a transfer proof for you to approve (schema v24). With **Midtrans** enabled (schema v25, Settings → Integrasi) the page also shows **Bayar sekarang** for QRIS, e-wallets, cards and virtual accounts, and the invoice is marked paid automatically after Midtrans confirms it. Step by step (ID + EN): [PAYMENT-GATEWAY.md](PAYMENT-GATEWAY.md).
+
+</details>
+
+<details>
+<summary><strong>Is the payment gateway safe? Does Dompetku store card data?</strong></summary>
+
+Dompetku never sees card or e-wallet details — the customer pays on Midtrans' own page. Your Midtrans Server Key is stored encrypted and never shown again or sent to the browser. Every notification is signature-checked and its status is re-read from the Midtrans API before anything is booked, and a payment can't be booked twice. Midtrans' fee (MDR) is not booked automatically.
+
+</details>
+
+<details>
+<summary><strong>Can Dompetku notice bank transfers by itself, without a payment gateway?</strong></summary>
+
+Yes, optionally (schema v26). An Android phone that receives your bank or e-wallet notifications forwards them with the free **MacroDroid** app to `/api/public/payments/notify`. Each open invoice gets a 1–999 rupiah **unique code** that is added to the amount to transfer, so a notification like "Dana masuk Rp 150.123" matches exactly one invoice. You define which notifications count (app, keywords, amount pattern) in **Settings → Format notifikasi bank**, with editable examples and a "test with sample text" box. By default a match only marks the invoice **Menunggu verifikasi** and you confirm it, because notifications can be faked; auto-confirm is opt-in and only applies to formats pinned to an exact app package name. Step by step (ID + EN): [MACRODROID.md](MACRODROID.md).
+
+</details>
+
+<details>
+<summary><strong>Can I refund a Midtrans payment?</strong></summary>
+
+Yes, from the invoice's gateway panel (partial refunds where the payment method allows it, e.g. QRIS/GoPay/cards). A refund adds a reversing expense instead of deleting history, and the invoice stops asking for payment until you choose **Tagih ulang** or cancel it. Bank transfer / virtual account payments can't be refunded through the API — return the money manually. Details: [PAYMENT-GATEWAY.md §8](PAYMENT-GATEWAY.md#8-refund).
+
+</details>
+
 ## Bot and AI
 
 <details>

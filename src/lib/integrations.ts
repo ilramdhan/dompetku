@@ -8,8 +8,10 @@
  * APP_TOTP_SECRET, DEMO_MODE, SENTRY_DSN, SETTINGS_ENCRYPTION_KEY) are deliberately NOT here:
  * they must exist before the database can be read, or they guard access to the settings themselves.
  */
+import { formatMdrRules, mdrRulesProblem } from "./gateway/mdr";
 
-export type IntegrationGroup = "telegram" | "ai" | "email" | "n8n";
+export type IntegrationGroup =
+  "site" | "telegram" | "ai" | "email" | "n8n" | "payment" | "macrodroid";
 export type IntegrationSource = "db" | "env" | "default" | "none";
 
 export type IntegrationDef = {
@@ -31,6 +33,8 @@ const MAX_LEN = 2000;
 const CHAT_ID = /^-?\d{1,20}$/;
 const NO_SPACE = /^\S+$/;
 const EMAIL = /^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/;
+const BOOL = /^(true|false)$/i;
+const MIDTRANS_KEY = /^[A-Za-z0-9_:.-]{10,200}$/;
 
 /** "a,b , c" → ["a","b","c"] (empty pieces dropped). */
 export function splitList(raw: string | null | undefined): string[] {
@@ -60,6 +64,35 @@ function isHttpUrl(v: string): boolean {
   }
 }
 
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const SITE_PATH = /^(\/[A-Za-z0-9._~-]+)*\/?$/;
+
+/**
+ * PUBLIC_SITE_URL saved from Settings (#117): https (http only for localhost), no credentials,
+ * query or fragment, optional plain base path. Returns an i18n error key or null.
+ */
+export function siteUrlError(v: string): string | null {
+  // Raw checks first: URL() would silently resolve dot segments (`/a/../b`, `%2e%2e`).
+  if (v.length > 200 || /[?#\s%\\]/.test(v) || /\/\.{1,2}(\/|$)/.test(v))
+    return "URL situs tidak valid";
+  let u: URL;
+  try {
+    u = new URL(v);
+  } catch {
+    return "URL situs tidak valid";
+  }
+  if (u.protocol === "http:" ? !LOCAL_HOSTS.has(u.hostname) : u.protocol !== "https:")
+    return "URL situs harus https:// (http hanya untuk localhost)";
+  if (u.username || u.password || !SITE_PATH.test(u.pathname)) return "URL situs tidak valid";
+  return null;
+}
+
+/** Valid site URL → origin + base path without a trailing slash (the stored form). */
+export function normalizeSiteUrlSetting(v: string): string {
+  const u = new URL(v);
+  return `${u.origin}${u.pathname}`.replace(/\/+$/, "");
+}
+
 /** `Name <a@b.c>` or `a@b.c`. */
 export function isEmailSender(v: string): boolean {
   const m = v.match(/^(.*)<([^<>]+)>$/);
@@ -67,6 +100,17 @@ export function isEmailSender(v: string): boolean {
 }
 
 export const INTEGRATIONS: readonly IntegrationDef[] = [
+  // #117: public address for canonical/og:url, sitemap, invoice/email links and the Midtrans
+  // finish URL. Not a secret; demo instances refuse writes like every integration.
+  {
+    key: "PUBLIC_SITE_URL",
+    group: "site",
+    secret: false,
+    label: "URL situs publik",
+    help: "Alamat publik instance ini. Dipakai untuk canonical, sitemap, tautan invoice/email dan URL kembali Midtrans. Kosong = env PUBLIC_SITE_URL.",
+    placeholder: "https://dompetku.example.com",
+    validate: siteUrlError,
+  },
   {
     key: "TELEGRAM_BOT_TOKEN",
     group: "telegram",
@@ -88,6 +132,15 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
       if (!ids.length) return "Isi minimal satu chat ID";
       return ids.every((id) => CHAT_ID.test(id)) ? null : "Chat ID harus berupa angka";
     },
+  },
+  {
+    key: "TELEGRAM_ADMIN_CHAT_ID",
+    group: "telegram",
+    secret: false,
+    label: "Chat ID admin (notifikasi)",
+    help: "Penerima laporan & pengingat terjadwal semua dompet lewat endpoint n8n notifications. Pribadi atau grup (diawali minus). Tidak memberi akses bot.",
+    placeholder: "123456789",
+    validate: (v) => (CHAT_ID.test(v) && !/^-?0+$/.test(v) ? null : "Chat ID harus berupa angka"),
   },
   {
     key: "BOT_TEXT_AI",
@@ -188,11 +241,97 @@ export const INTEGRATIONS: readonly IntegrationDef[] = [
         ? null
         : "Minimal 24 karakter tanpa spasi",
   },
+  // v25 (#97): Midtrans Snap payment gateway for invoices. Off unless MIDTRANS_ENABLED=true.
+  {
+    key: "MIDTRANS_ENABLED",
+    group: "payment",
+    secret: false,
+    label: "Aktifkan Midtrans",
+    help: 'true = tombol "Bayar sekarang" di halaman invoice publik (butuh skema v25 dan server key).',
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
+  {
+    key: "MIDTRANS_SERVER_KEY",
+    group: "payment",
+    secret: true,
+    label: "Server key Midtrans",
+    help: "Dashboard Midtrans → Settings → Access Keys. Sandbox diawali SB-Mid-server-. Tidak pernah dikirim ke browser.",
+    placeholder: "SB-Mid-server-…",
+    validate: (v) => (MIDTRANS_KEY.test(v) ? null : "Format key Midtrans tidak valid"),
+  },
+  {
+    key: "MIDTRANS_CLIENT_KEY",
+    group: "payment",
+    secret: false,
+    label: "Client key Midtrans",
+    help: "Publik, dipakai Snap JS di browser pelanggan.",
+    placeholder: "SB-Mid-client-…",
+    validate: (v) => (MIDTRANS_KEY.test(v) ? null : "Format key Midtrans tidak valid"),
+  },
+  {
+    key: "MIDTRANS_PRODUCTION",
+    group: "payment",
+    secret: false,
+    label: "Mode production Midtrans",
+    help: "false = sandbox (uji coba, default). true = transaksi uang sungguhan; pakai key production.",
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
+  // #124: MDR schedule (Midtrans sends no fee field) and partial "Bayar sekarang" amounts.
+  {
+    key: "MIDTRANS_FEES",
+    group: "payment",
+    secret: false,
+    label: "Biaya MDR Midtrans",
+    help: 'Per metode, mis. "qris=0.7%; gopay=2%; credit_card=2.9%+2000; bank_transfer=4000; *=0" (termasuk PPN bila ada). Dicatat sebagai pengeluaran "Biaya Admin" sekali per pembayaran. Kosong = tidak dicatat.',
+    placeholder: "qris=0.7%; gopay=2%; bank_transfer=4000",
+    validate: (v) => mdrRulesProblem(v),
+  },
+  {
+    key: "MIDTRANS_PARTIAL",
+    group: "payment",
+    secret: false,
+    label: "Izinkan bayar sebagian lewat Midtrans",
+    help: "true = pelanggan boleh memasukkan jumlah (min. Rp10.000 dan sisa setelahnya juga min. Rp10.000) di tombol Bayar sekarang. false = selalu seluruh sisa (default).",
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
+  // v26 (#96): bank notifications forwarded by MacroDroid + unique codes. Off without a token.
+  {
+    key: "MACRODROID_TOKEN",
+    group: "macrodroid",
+    secret: true,
+    label: "Token perangkat MacroDroid",
+    help: "Minimal 32 karakter acak; dikirim MacroDroid di header Authorization: Bearer. Kosong = endpoint notifikasi dan kode unik nonaktif.",
+    validate: (v) =>
+      /^[A-Za-z0-9_-]{32,200}$/.test(v) ? null : "Minimal 32 karakter (huruf, angka, - atau _)",
+  },
+  {
+    key: "MACRODROID_AUTO_CONFIRM",
+    group: "macrodroid",
+    secret: false,
+    label: "Konfirmasi otomatis",
+    help: "false (default) = notifikasi yang cocok hanya ditandai Menunggu verifikasi. true = langsung dicatat, tetapi hanya untuk format dengan nama paket aplikasi persis (bukan format generik atau nama aplikasi saja); notifikasi bisa dipalsukan aplikasi lain di HP, aktifkan dengan hati-hati.",
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
+  {
+    key: "MACRODROID_GENERIC",
+    group: "macrodroid",
+    secret: false,
+    label: "Format generik (Rupiah)",
+    help: "true = notifikasi yang tidak cocok dengan format mana pun tetap dicoba dengan pola nominal Rupiah umum + kata kunci uang masuk.",
+    default: "false",
+    validate: (v) => (BOOL.test(v) ? null : "Isi true atau false"),
+  },
 ] as const;
 
 export type IntegrationKey =
+  | "PUBLIC_SITE_URL"
   | "TELEGRAM_BOT_TOKEN"
   | "BOT_ALLOWED_CHAT_IDS"
+  | "TELEGRAM_ADMIN_CHAT_ID"
   | "BOT_TEXT_AI"
   | "BOT_AI_DAILY_LIMIT"
   | "AI_API_URL"
@@ -202,10 +341,27 @@ export type IntegrationKey =
   | "RESEND_API_KEY"
   | "EMAIL_FROM"
   | "EMAIL_TO"
-  | "N8N_API_KEY";
+  | "N8N_API_KEY"
+  | "MIDTRANS_ENABLED"
+  | "MIDTRANS_SERVER_KEY"
+  | "MIDTRANS_CLIENT_KEY"
+  | "MIDTRANS_PRODUCTION"
+  | "MIDTRANS_FEES"
+  | "MIDTRANS_PARTIAL"
+  | "MACRODROID_TOKEN"
+  | "MACRODROID_AUTO_CONFIRM"
+  | "MACRODROID_GENERIC";
 
 export const INTEGRATION_KEYS = INTEGRATIONS.map((d) => d.key) as IntegrationKey[];
-export const INTEGRATION_GROUPS: readonly IntegrationGroup[] = ["telegram", "ai", "email", "n8n"];
+export const INTEGRATION_GROUPS: readonly IntegrationGroup[] = [
+  "site",
+  "telegram",
+  "ai",
+  "email",
+  "n8n",
+  "payment",
+  "macrodroid",
+];
 
 /** Never manageable from the UI (bootstrap / security values). */
 export const FORBIDDEN_KEYS = [
@@ -242,7 +398,18 @@ export function validateIntegration(
   // Lists are stored normalised ("a, b" → "a,b"); BOT_TEXT_AI is case-insensitive.
   if (key === "BOT_ALLOWED_CHAT_IDS" || key === "EMAIL_TO")
     return { ok: true, value: splitList(value).join(",") };
-  if (key === "BOT_TEXT_AI") return { ok: true, value: value.toLowerCase() };
+  if (key === "PUBLIC_SITE_URL") return { ok: true, value: normalizeSiteUrlSetting(value) };
+  if (
+    key === "BOT_TEXT_AI" ||
+    key === "MIDTRANS_ENABLED" ||
+    key === "MIDTRANS_PRODUCTION" ||
+    key === "MIDTRANS_PARTIAL" ||
+    key === "MACRODROID_AUTO_CONFIRM" ||
+    key === "MACRODROID_GENERIC"
+  )
+    return { ok: true, value: value.toLowerCase() };
+  // MDR schedule is stored normalised: "QRIS = 0.7 %" → "qris=0.7%".
+  if (key === "MIDTRANS_FEES") return { ok: true, value: formatMdrRules(value) };
   return { ok: true, value };
 }
 
@@ -286,8 +453,11 @@ export type IntegrationStatus = {
   /** True when a DB row exists (so "remove" falls back to env). */
   stored: boolean;
   updated_at: string | null;
-  /** "decrypt" = stored secret cannot be decrypted (key rotated) → env used; "invalid" = bad DB value. */
-  problem: "decrypt" | "invalid" | null;
+  /**
+   * "decrypt" = stored secret cannot be decrypted (key rotated) → env used; "invalid" = bad DB
+   * value; "env" = the env value in use does not pass validation (it may be ignored by the feature).
+   */
+  problem: "decrypt" | "invalid" | "env" | null;
 };
 
 /* ---------------- Ciphertext format ---------------- */

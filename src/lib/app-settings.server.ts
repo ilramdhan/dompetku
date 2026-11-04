@@ -82,9 +82,23 @@ export async function readAppSettings() {
 
 export async function saveAppSettings(input: AppSettingsInput) {
   const { isMissingTable, logActivity } = await fin();
-  const res = await db()
-    .from("app_settings")
-    .upsert({ id: 1, ...input, updated_at: new Date().toISOString() }, { onConflict: "id" });
+  const { invoice_prefix, ...base } = input;
+  const write = (prefix: boolean) =>
+    db()
+      .from("app_settings")
+      .upsert(
+        {
+          id: 1,
+          ...base,
+          ...(prefix && invoice_prefix !== undefined ? { invoice_prefix } : {}),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" },
+      );
+  let res = await write(true);
+  // v21 invoice_prefix is optional: before the section is run, save everything else.
+  if (res.error && invoice_prefix !== undefined && /invoice_prefix/.test(res.error.message))
+    res = await write(false);
   if (res.error) {
     if (isMissingTable(res.error))
       throw new Error("Tabel app_settings belum ada — jalankan bagian v14 di supabase/schema.sql.");

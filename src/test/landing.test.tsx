@@ -4,6 +4,7 @@ import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LEGAL_UPDATED } from "@/components/legal/legal-content";
 import { DEFAULT_BRANDING } from "@/lib/app-settings";
 import { docsUrl, landingRedirect, repoUrl, screenshotSrc } from "@/lib/landing";
 import { routeTree } from "@/routeTree.gen";
@@ -222,7 +223,7 @@ describe("legal routes", () => {
     expect(
       screen.getByRole("heading", { name: /Cookie & penyimpanan browser/ }),
     ).toBeInTheDocument();
-    expect(document.querySelector("time")).toHaveAttribute("dateTime", "2026-10-04");
+    expect(document.querySelector("time")).toHaveAttribute("dateTime", LEGAL_UPDATED);
     // Section links in the shared header point back to the landing page.
     expect(screen.getAllByRole("link", { name: "Fitur" })[0]).toHaveAttribute("href", "/#fitur");
   });

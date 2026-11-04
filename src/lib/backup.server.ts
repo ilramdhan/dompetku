@@ -7,6 +7,8 @@
  *   3. `finishRestore()` — logs `backup.restore`.
  * bot_drafts, activity_log and ai_usage (v15 logs) are never exported or restored, nor is
  * integration_settings (v16): it holds encrypted API keys that must never leave the server in a file.
+ * invoice_shares (v23) is not backed up either: public link token hashes are credentials; after a
+ * restore the admin simply creates new links.
  * app_users (v17) is restored without password_hash/session_version and kept in replace mode.
  */
 import { db } from "./db.server";

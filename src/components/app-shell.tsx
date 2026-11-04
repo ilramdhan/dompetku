@@ -9,6 +9,7 @@ import {
   CreditCard,
   Eye,
   EyeOff,
+  FileText,
   HandCoins,
   LayoutDashboard,
   Languages,
@@ -49,6 +50,7 @@ const ALL_NAV = [
   { to: "/goals", label: "Target", icon: Target },
   { to: "/gold", label: "Emas", icon: Coins },
   { to: "/receivables", label: "Piutang", icon: HandCoins },
+  { to: "/invoices", label: "Invoice", icon: FileText },
   { to: "/reminders", label: "Pengingat", icon: Bell },
   { to: "/settings", label: "Pengaturan", icon: Settings },
 ] as const;

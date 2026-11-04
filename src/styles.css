@@ -263,6 +263,43 @@
   }
 }
 
+/* Public invoice (/i/<token>, issue #93): "Print / Save as PDF" is always black on white, edge to
+   edge on A4/Letter, whatever the screen theme. */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  html:has(.invoice-page),
+  html:has(.invoice-page) body {
+    background: #fff !important;
+  }
+  .invoice-page {
+    min-height: 0;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .invoice-page * {
+    color: #000 !important;
+    border-color: #bbb !important;
+    box-shadow: none !important;
+  }
+  .invoice-doc {
+    max-width: none;
+    border: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .invoice-doc tr,
+  .invoice-doc li {
+    break-inside: avoid;
+  }
+  .invoice-status {
+    background: transparent !important;
+    border: 1px solid #000 !important;
+  }
+}
+
 @layer base {
   /* No horizontal page scroll. `hidden` would turn html/body into scroll containers and break
      `position: sticky` (app + landing headers); `clip` avoids that, `hidden` stays as the

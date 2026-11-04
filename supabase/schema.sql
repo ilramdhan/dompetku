@@ -616,3 +616,366 @@ notify pgrst, 'reload schema';
 -- Sama seperti pola transaksi berulang (recurring_transactions.interval).
 alter table public.subscriptions add column if not exists "interval" int not null default 1 check ("interval" > 0);
 notify pgrst, 'reload schema';
+
+-- ============ v21: invoice — draft, nomor otomatis, item, status & pembayaran manual (aman dijalankan ulang) ============
+-- Opsional: tanpa bagian ini halaman Invoice hanya menampilkan petunjuk untuk menjalankan v21.
+-- Butuh v14 (app_settings) untuk prefix nomor; tanpa kolom invoice_prefix prefix-nya 'INV'.
+-- Nomor: <PREFIX>-YYYYMM-#### (urut per bulan terbit, unik). Total = jumlah (qty × harga satuan) item,
+-- selalu dihitung ulang di server. paid = jumlah invoice_payments (ditulis ulang server setiap ada perubahan).
+-- Status tersimpan: draft, unpaid, partial, paid, cancelled. "Terlambat" (due_date < hari ini di zona waktu
+-- aplikasi) dihitung, tidak disimpan. Hanya IDR untuk tahap ini.
+-- Setiap pembayaran = satu transaksi pemasukan kategori "Invoice" di dompet invoice dengan
+-- external_id 'invoice_pay:<id pembayaran>' (idempoten); menghapus pembayaran/invoice ikut menghapus transaksinya.
+alter table public.app_settings add column if not exists invoice_prefix text default 'INV'
+  check (invoice_prefix is null or invoice_prefix ~ '^[A-Z0-9]{1,10}$');
+
+create table if not exists public.invoices (
+  id uuid primary key default gen_random_uuid(),
+  number text not null unique check (length(number) between 1 and 40),
+  customer_name text not null check (length(trim(customer_name)) between 1 and 120),
+  customer_email text check (customer_email is null or length(customer_email) <= 200),
+  customer_phone text check (customer_phone is null or length(customer_phone) <= 30),
+  account_id uuid references public.accounts(id) on delete set null,
+  issue_date date not null default current_date,
+  due_date date,
+  notes text check (notes is null or length(notes) <= 2000),
+  status text not null default 'draft' check (status in ('draft','unpaid','partial','paid','cancelled')),
+  currency text not null default 'IDR' check (currency in ('IDR')),
+  total numeric(18,2) not null default 0 check (total >= 0),
+  paid numeric(18,2) not null default 0 check (paid >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists invoices_status_due_idx on public.invoices (status, due_date);
+create index if not exists invoices_account_idx on public.invoices (account_id);
+create index if not exists invoices_issue_idx on public.invoices (issue_date desc, created_at desc);
+revoke all on public.invoices from anon, authenticated;
+grant all on public.invoices to service_role;
+alter table public.invoices enable row level security;
+
+create table if not exists public.invoice_items (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  description text not null check (length(trim(description)) between 1 and 300),
+  qty numeric(12,3) not null default 1 check (qty > 0),
+  unit_price numeric(18,2) not null default 0 check (unit_price >= 0),
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists invoice_items_invoice_idx on public.invoice_items (invoice_id, position);
+revoke all on public.invoice_items from anon, authenticated;
+grant all on public.invoice_items to service_role;
+alter table public.invoice_items enable row level security;
+
+-- method: cara bayar ('transfer','cash','qris','ewallet','other'); bagian berikutnya (rekening, gateway,
+-- notifikasi bank) menambah nilai baru. reference: nomor referensi bank/gateway (opsional).
+create table if not exists public.invoice_payments (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  amount numeric(18,2) not null check (amount > 0),
+  paid_at date not null default current_date,
+  method text not null default 'transfer' check (length(method) between 1 and 40),
+  reference text check (reference is null or length(reference) <= 120),
+  note text check (note is null or length(note) <= 500),
+  transaction_id uuid references public.transactions(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists invoice_payments_invoice_idx on public.invoice_payments (invoice_id, paid_at);
+revoke all on public.invoice_payments from anon, authenticated;
+grant all on public.invoice_payments to service_role;
+alter table public.invoice_payments enable row level security;
+notify pgrst, 'reload schema';
+
+-- ============ v22: notifikasi Telegram per anggota — laporan & pengingat terjadwal (aman dijalankan ulang) ============
+-- Opsional: tanpa bagian ini laporan & pengingat terjadwal tetap hanya ke chat admin persis seperti sebelumnya.
+-- Butuh v17 + v18 (app_users, account_permissions). (v21 dicadangkan untuk modul lain.)
+-- notify_recipients: satu baris per anggota — chat id Telegram pribadi atau grup (grup = angka negatif),
+-- aktif/nonaktif, dan jenis notifikasi (laporan, pengingat). Pemilik memakai TELEGRAM_ADMIN_CHAT_ID
+-- (Pengaturan → Integrasi atau env), bukan tabel ini.
+-- notify_recipient_wallets: subset dompet opsional (kosong = semua dompet yang boleh dilihat anggota).
+-- Isi notifikasi selalu dibatasi ke dompet yang masih boleh dilihat anggota (account_permissions);
+-- dompet di subset yang aksesnya sudah dicabut diabaikan.
+-- Chat id di sini TERPISAH dari BOT_ALLOWED_CHAT_IDS: menerima notifikasi tidak memberi akses ke bot.
+create table if not exists public.notify_recipients (
+  user_id uuid primary key references public.app_users(id) on delete cascade,
+  chat_id text not null check (chat_id ~ '^-?[0-9]{1,20}$'),
+  enabled boolean not null default true,
+  send_report boolean not null default true,
+  send_reminders boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+revoke all on public.notify_recipients from anon, authenticated;
+grant all on public.notify_recipients to service_role;
+alter table public.notify_recipients enable row level security;
+
+create table if not exists public.notify_recipient_wallets (
+  user_id uuid not null references public.notify_recipients(user_id) on delete cascade,
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, account_id)
+);
+create index if not exists notify_recipient_wallets_account_idx
+  on public.notify_recipient_wallets (account_id);
+revoke all on public.notify_recipient_wallets from anon, authenticated;
+grant all on public.notify_recipient_wallets to service_role;
+alter table public.notify_recipient_wallets enable row level security;
+notify pgrst, 'reload schema';
+
+-- ============ v23: tautan publik invoice bertoken — lihat & cetak/simpan PDF oleh pelanggan (aman dijalankan ulang) ============
+-- Opsional, butuh v21. (v22 dipakai bagian lain.) Tanpa bagian ini tombol "Bagikan" hanya menampilkan petunjuk
+-- dan tautan /i/<token> selalu "tidak ditemukan".
+-- Satu tautan per invoice. Token acak 256-bit (base64url) hanya ditampilkan sekali ke admin; yang disimpan
+-- hanya hash SHA-256 (hex) di token_hash. Buat ulang = hash baru (tautan lama mati), cabut = revoked_at.
+-- Tautan hanya berlaku untuk invoice berstatus unpaid/partial/paid, belum dicabut dan belum kedaluwarsa;
+-- selain itu pengunjung selalu mendapat 404 yang sama. Tabel ini tidak ikut dicadangkan (seperti kunci API).
+create table if not exists public.invoice_shares (
+  invoice_id uuid primary key references public.invoices(id) on delete cascade,
+  token_hash text not null unique check (token_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now(),
+  expires_at timestamptz,
+  revoked_at timestamptz
+);
+revoke all on public.invoice_shares from anon, authenticated;
+grant all on public.invoice_shares to service_role;
+alter table public.invoice_shares enable row level security;
+notify pgrst, 'reload schema';
+
+-- ============ v24: invoice — rekening bank/QRIS, unggah bukti transfer & antrean verifikasi (aman dijalankan ulang) ============
+-- Opsional, butuh v21 (dan v23 untuk halaman publik). Tanpa bagian ini kartu "Metode pembayaran" di Pengaturan
+-- dan antrean verifikasi hanya menampilkan petunjuk, halaman publik tidak menampilkan cara bayar, dan unggah
+-- bukti selalu ditolak.
+-- payment_methods: rekening bank (nama bank, nomor, atas nama) atau QRIS statis (gambar data URL PNG/JPEG/WebP
+-- ≤200 KB, sama seperti logo). account_id hanya untuk admin (dompet tujuan) dan TIDAK pernah tampil ke pelanggan.
+create table if not exists public.payment_methods (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('bank','qris')),
+  label text not null check (length(trim(label)) between 1 and 60),
+  bank_name text check (bank_name is null or length(bank_name) <= 60),
+  account_number text check (account_number is null or length(account_number) <= 40),
+  account_holder text check (account_holder is null or length(account_holder) <= 80),
+  qris_image text check (qris_image is null or (qris_image like 'data:image/%' and length(qris_image) <= 280000)),
+  account_id uuid references public.accounts(id) on delete set null,
+  active boolean not null default true,
+  position int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists payment_methods_active_idx on public.payment_methods (active, position);
+revoke all on public.payment_methods from anon, authenticated;
+grant all on public.payment_methods to service_role;
+alter table public.payment_methods enable row level security;
+
+-- Pilihan metode per invoice. Tidak ada baris = semua metode aktif ditampilkan.
+create table if not exists public.invoice_payment_methods (
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  method_id uuid not null references public.payment_methods(id) on delete cascade,
+  primary key (invoice_id, method_id)
+);
+create index if not exists invoice_payment_methods_method_idx on public.invoice_payment_methods (method_id);
+revoke all on public.invoice_payment_methods from anon, authenticated;
+grant all on public.invoice_payment_methods to service_role;
+alter table public.invoice_payment_methods enable row level security;
+
+-- Bukti transfer dari pelanggan. File ada di bucket privat 'receipts' dengan path inv/<invoice id>/<acak>.<ext>;
+-- pelanggan tidak pernah mendapat URL file, admin melihatnya lewat signed URL berumur pendek.
+-- ip_hash: HMAC-SHA256 alamat IP dengan rahasia server (bukan IP mentah). Approve = satu invoice_payments
+-- (payment_id) + pemasukan kategori "Invoice"; reject wajib alasan.
+create table if not exists public.invoice_proofs (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  method_id uuid references public.payment_methods(id) on delete set null,
+  file_path text not null check (file_path ~ '^inv/[0-9a-f-]{36}/[0-9a-f-]{36}\.(jpg|png|webp)$'),
+  claimed_amount numeric(18,2) not null check (claimed_amount > 0),
+  payer_name text check (payer_name is null or length(payer_name) <= 80),
+  note text check (note is null or length(note) <= 500),
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  reject_reason text check (reject_reason is null or length(reject_reason) <= 300),
+  ip_hash text check (ip_hash is null or ip_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  payment_id uuid references public.invoice_payments(id) on delete set null
+);
+create index if not exists invoice_proofs_invoice_idx on public.invoice_proofs (invoice_id, status);
+create index if not exists invoice_proofs_status_idx on public.invoice_proofs (status, created_at desc);
+revoke all on public.invoice_proofs from anon, authenticated;
+grant all on public.invoice_proofs to service_role;
+alter table public.invoice_proofs enable row level security;
+
+-- Rate limit persisten (umum, dipakai unggah bukti publik): satu baris per kunci + jendela waktu tetap.
+-- Kunci berisi hash (mis. 'proof:ip:<hmac>'), tidak pernah IP/token mentah. Tidak ikut dicadangkan.
+-- dk_rate_hit menaikkan hitungan secara atomik dan mengembalikan nilai barunya; baris lama dibersihkan sesekali.
+create table if not exists public.rate_limits (
+  key text not null check (length(key) between 1 and 200),
+  window_start timestamptz not null,
+  count int not null default 0,
+  primary key (key, window_start)
+);
+create index if not exists rate_limits_window_idx on public.rate_limits (window_start);
+revoke all on public.rate_limits from anon, authenticated;
+grant all on public.rate_limits to service_role;
+alter table public.rate_limits enable row level security;
+
+create or replace function public.dk_rate_hit(p_key text, p_window timestamptz)
+returns int
+language plpgsql volatile security invoker set search_path = public as $$
+declare n int;
+begin
+  insert into public.rate_limits as r (key, window_start, count) values (p_key, p_window, 1)
+  on conflict (key, window_start) do update set count = r.count + 1
+  returning r.count into n;
+  if random() < 0.02 then
+    delete from public.rate_limits where window_start < now() - interval '2 days';
+  end if;
+  return n;
+end;
+$$;
+revoke all on function public.dk_rate_hit(text, timestamptz) from public, anon, authenticated;
+grant execute on function public.dk_rate_hit(text, timestamptz) to service_role;
+notify pgrst, 'reload schema';
+
+-- ============ v25: invoice — payment gateway Midtrans (Snap) + webhook & refund (aman dijalankan ulang) ============
+-- Opsional, butuh v21 + v23 + v24 (rate_limits). Tanpa bagian ini tombol "Bayar sekarang" tidak muncul, webhook
+-- /api/public/payments/midtrans menjawab 503, dan detail invoice tidak menampilkan transaksi gateway.
+-- gateway_transactions: satu baris per order Midtrans. Status internal: pending, success, failed, expired,
+-- refunded, partial_refund (mesin transisi di src/lib/gateway/types.ts: event terlambat tidak menurunkan
+-- status final). Status SELALU dicek ulang ke Midtrans Get Status API; payload webhook tidak dipercaya.
+-- invoice_id ON DELETE RESTRICT: riwayat pembayaran gateway tidak boleh hilang diam-diam. Aplikasi hanya
+-- menghapus invoice bila semua transaksi gatewaynya gagal/kedaluwarsa (baris itu dihapus dulu); selain itu
+-- penghapusan ditolak dengan pesan yang jelas.
+-- payment_id: pembayaran invoice (income kategori "Invoice") yang dibuat saat status menjadi success.
+-- claimed_at: klaim pencatatan atomik (update bersyarat) agar dua webhook bersamaan tidak mencatat dua kali;
+-- hanya klaim kedaluwarsa (>10 menit, crash) yang dilepas, percobaan gagal melepas klaimnya sendiri.
+-- raw: respons status Midtrans yang sudah disaring (whitelist kolom, tanpa signature/kunci).
+-- snap_token/redirect_url: token pembayaran Snap (kedaluwarsa ±24 jam), tidak ikut dicadangkan.
+create table if not exists public.gateway_transactions (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete restrict,
+  provider text not null default 'midtrans' check (provider in ('midtrans')),
+  order_id text not null unique check (order_id ~ '^[A-Za-z0-9._~-]{1,50}$'),
+  gateway_tx_id text unique check (gateway_tx_id is null or length(gateway_tx_id) <= 100),
+  status text not null default 'pending'
+    check (status in ('pending','success','failed','expired','refunded','partial_refund')),
+  gross_amount numeric(18,2) not null check (gross_amount > 0),
+  refunded_amount numeric(18,2) not null default 0 check (refunded_amount >= 0),
+  payment_type text check (payment_type is null or length(payment_type) <= 60),
+  payment_id uuid references public.invoice_payments(id) on delete set null,
+  snap_token text check (snap_token is null or length(snap_token) <= 200),
+  redirect_url text check (redirect_url is null or length(redirect_url) <= 500),
+  expires_at timestamptz,
+  claimed_at timestamptz,
+  last_error text check (last_error is null or length(last_error) <= 300),
+  raw jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists gateway_transactions_invoice_idx on public.gateway_transactions (invoice_id, created_at desc);
+create index if not exists gateway_transactions_payment_idx on public.gateway_transactions (payment_id);
+revoke all on public.gateway_transactions from anon, authenticated;
+grant all on public.gateway_transactions to service_role;
+alter table public.gateway_transactions enable row level security;
+
+-- Setelah refund gateway, invoice "ditahan": tombol "Bayar sekarang" dan pengingat jatuh tempo dimatikan
+-- sampai admin menekan "Tagih ulang" (refund_hold = false). Baris lain tidak terpengaruh.
+alter table public.gateway_transactions add column if not exists refund_hold boolean not null default false;
+
+-- Refund mengurangi "sudah dibayar" tanpa menghapus pembayaran: paid = jumlah (amount - refunded).
+alter table public.invoice_payments add column if not exists refunded numeric(18,2) not null default 0;
+do $$ begin
+  alter table public.invoice_payments add constraint invoice_payments_refunded_check
+    check (refunded >= 0 and refunded <= amount);
+exception when duplicate_object then null; end $$;
+notify pgrst, 'reload schema';
+
+-- ============ v26: invoice — notifikasi bank via MacroDroid + kode unik (aman dijalankan ulang) ============
+-- Opsional, butuh v21 + v24 (rate_limits). Tanpa bagian ini endpoint /api/public/payments/notify menjawab
+-- 503, kartu "Format notifikasi" & antrean "Notifikasi bank" hanya menampilkan petunjuk, dan invoice tidak
+-- punya kode unik. Panduan: docs/MACRODROID.md.
+-- unique_code: 1–999 rupiah yang ditambahkan ke nominal transfer agar transfer dengan nominal sama bisa
+-- dibedakan. Diberikan saat admin membagikan tautan, mengirim email invoice atau membuka detail invoice
+-- terbuka (unpaid/partial) dan MACRODROID_TOKEN aktif — tidak pernah oleh halaman publik. Saat invoice
+-- lunas/batal/draft, unique_code_released_at diisi: kode tetap "dipegang" 48 jam (masa tenang) agar
+-- notifikasi yang terlambat tidak cocok dengan invoice lain, lalu dikosongkan saat kode baru diberikan.
+-- Indeks unik parsial atas kode yang terisi: tanpa syarat status, agar mengubah status invoice tidak
+-- pernah gagal karena bentrok kode.
+alter table public.invoices add column if not exists unique_code smallint
+  check (unique_code is null or unique_code between 1 and 999);
+alter table public.invoices add column if not exists unique_code_released_at timestamptz;
+create unique index if not exists invoices_unique_code_open_idx on public.invoices (unique_code)
+  where unique_code is not null;
+
+-- Format notifikasi (diatur admin di Pengaturan): aplikasi (potongan nama paket/nama aplikasi), filter
+-- judul/teks (contains atau regex), regex nominal (grup bernama "amount" atau grup pertama) dan kata kunci
+-- wajib/abaikan. Regex divalidasi di aplikasi (panjang, pola berisiko lambat) dan hanya dijalankan pada
+-- teks yang dipotong. account_id (opsional): hanya invoice ke dompet ini yang dicocokkan.
+create table if not exists public.payment_notify_formats (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (length(trim(name)) between 1 and 60),
+  app_match text check (app_match is null or length(app_match) <= 200),
+  title_match text check (title_match is null or length(title_match) <= 200),
+  text_match text check (text_match is null or length(text_match) <= 200),
+  match_mode text not null default 'contains' check (match_mode in ('contains','regex')),
+  amount_regex text not null check (length(amount_regex) between 1 and 200),
+  must_contain text check (must_contain is null or length(must_contain) <= 300),
+  ignore_contains text check (ignore_contains is null or length(ignore_contains) <= 300),
+  account_id uuid references public.accounts(id) on delete set null,
+  enabled boolean not null default true,
+  position int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists payment_notify_formats_pos_idx on public.payment_notify_formats (enabled, position);
+revoke all on public.payment_notify_formats from anon, authenticated;
+grant all on public.payment_notify_formats to service_role;
+alter table public.payment_notify_formats enable row level security;
+
+-- payment_signals: satu baris per notifikasi yang diterima. Teks disimpan seminimal mungkin (excerpt ≤300
+-- karakter, deretan angka ≥6 digit disamarkan), tidak ada payload mentah. hash = SHA-256 isi notifikasi
+-- (+ waktu notifikasi) untuk dedupe: kiriman ulang yang sama tidak membuat baris baru.
+-- Status: unmatched (tidak ada invoice cocok), matched (satu invoice cocok → "Menunggu verifikasi"),
+-- ambiguous (lebih dari satu kandidat), confirmed (pembayaran dicatat, payment_id), ignored (bukan uang
+-- masuk / diabaikan admin). claimed_at: klaim atomik pencatatan (auto-confirm / tombol Konfirmasi);
+-- indeks unik parsial payment_signals_invoice_claim_idx: hanya satu notifikasi per invoice yang boleh
+-- sedang dicatat, jadi notifikasi paralel untuk invoice yang sama dicatat bergantian (bukan bentrok).
+-- Tidak ikut dicadangkan; baris ignored/unmatched lebih dari 90 hari dibersihkan sesekali.
+create table if not exists public.payment_signals (
+  id uuid primary key default gen_random_uuid(),
+  source text not null default 'macrodroid' check (source in ('macrodroid')),
+  hash text not null unique check (hash ~ '^[0-9a-f]{64}$'),
+  device text check (device is null or length(device) <= 60),
+  app text check (app is null or length(app) <= 120),
+  excerpt text check (excerpt is null or length(excerpt) <= 300),
+  format_name text check (format_name is null or length(format_name) <= 60),
+  amount numeric(18,2) check (amount is null or amount > 0),
+  posted_at timestamptz,
+  received_at timestamptz not null default now(),
+  status text not null default 'unmatched'
+    check (status in ('unmatched','matched','ambiguous','confirmed','ignored')),
+  reason text check (reason is null or length(reason) <= 300),
+  invoice_id uuid references public.invoices(id) on delete set null,
+  candidate_ids uuid[] not null default '{}',
+  payment_id uuid references public.invoice_payments(id) on delete set null,
+  claimed_at timestamptz,
+  reviewed_at timestamptz,
+  last_error text check (last_error is null or length(last_error) <= 300)
+);
+create index if not exists payment_signals_status_idx on public.payment_signals (status, received_at desc);
+create index if not exists payment_signals_invoice_idx on public.payment_signals (invoice_id, status);
+-- Klaim yang sudah selesai atau ditinggalkan (>10 menit) tidak menahan invoice (aman diulang; perlu sebelum
+-- indeks unik di bawah).
+update public.payment_signals set claimed_at = null
+  where claimed_at is not null and (payment_id is not null or claimed_at < now() - interval '10 minutes');
+create unique index if not exists payment_signals_invoice_claim_idx on public.payment_signals (invoice_id)
+  where claimed_at is not null;
+revoke all on public.payment_signals from anon, authenticated;
+grant all on public.payment_signals to service_role;
+alter table public.payment_signals enable row level security;
+notify pgrst, 'reload schema';
+
+-- ============ v27: invoice — bahasa email pelanggan (aman dijalankan ulang) ============
+-- Opsional, butuh v21. Bahasa (id/en) email invoice, konfirmasi pembayaran dan pengingat jatuh tempo untuk
+-- pelanggan ini. Dipilih di form invoice (default id) dan di "Kirim invoice" (perubahan disimpan kembali).
+-- Tanpa bagian ini semua email invoice memakai Bahasa Indonesia; kolom ikut tabel invoices di cadangan.
+-- Kosong (null, baris lama) = id.
+alter table public.invoices add column if not exists lang text check (lang in ('id','en'));
+notify pgrst, 'reload schema';

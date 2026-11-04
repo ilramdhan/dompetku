@@ -23,6 +23,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppDebtsRouteImport } from './routes/_app/debts'
 import { Route as AppGoalsRouteImport } from './routes/_app/goals'
 import { Route as AppGoldRouteImport } from './routes/_app/gold'
+import { Route as AppInvoicesRouteImport } from './routes/_app/invoices'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppReceivablesRouteImport } from './routes/_app/receivables'
 import { Route as AppRecurringRouteImport } from './routes/_app/recurring'
@@ -32,12 +33,16 @@ import { Route as AppReportsRouteImport } from './routes/_app/reports'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSubscriptionsRouteImport } from './routes/_app/subscriptions'
 import { Route as AppTransactionsRouteImport } from './routes/_app/transactions'
+import { Route as ITokenRouteImport } from './routes/i.$token'
 import { Route as AppAccountsIdRouteImport } from './routes/_app/accounts_.$id'
+import { Route as AppInvoicesReportRouteImport } from './routes/_app/invoices_.report'
 import { Route as ApiPublicAppIconRouteImport } from './routes/api/public/app-icon'
 import { Route as ApiPublicN8nBackupRouteImport } from './routes/api/public/n8n/backup'
 import { Route as ApiPublicN8nBotRouteImport } from './routes/api/public/n8n/bot'
 import { Route as ApiPublicN8nCommandRouteImport } from './routes/api/public/n8n/command'
+import { Route as ApiPublicN8nInvoicesDueEmailRouteImport } from './routes/api/public/n8n/invoices-due-email'
 import { Route as ApiPublicN8nMessageRouteImport } from './routes/api/public/n8n/message'
+import { Route as ApiPublicN8nNotificationsRouteImport } from './routes/api/public/n8n/notifications'
 import { Route as ApiPublicN8nOcrRouteImport } from './routes/api/public/n8n/ocr'
 import { Route as ApiPublicN8nRemindersRouteImport } from './routes/api/public/n8n/reminders'
 import { Route as ApiPublicN8nRemindersEmailRouteImport } from './routes/api/public/n8n/reminders-email'
@@ -45,6 +50,8 @@ import { Route as ApiPublicN8nRemindersSendEmailRouteImport } from './routes/api
 import { Route as ApiPublicN8nReportRouteImport } from './routes/api/public/n8n/report'
 import { Route as ApiPublicN8nSummaryRouteImport } from './routes/api/public/n8n/summary'
 import { Route as ApiPublicN8nTransactionsRouteImport } from './routes/api/public/n8n/transactions'
+import { Route as ApiPublicPaymentsMidtransRouteImport } from './routes/api/public/payments/midtrans'
+import { Route as ApiPublicPaymentsNotifyRouteImport } from './routes/api/public/payments/notify'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -116,6 +123,11 @@ const AppGoldRoute = AppGoldRouteImport.update({
   path: '/gold',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInvoicesRoute = AppInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -161,9 +173,19 @@ const AppTransactionsRoute = AppTransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => AppRoute,
 } as any)
+const ITokenRoute = ITokenRouteImport.update({
+  id: '/i/$token',
+  path: '/i/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppAccountsIdRoute = AppAccountsIdRouteImport.update({
   id: '/accounts_/$id',
   path: '/accounts/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInvoicesReportRoute = AppInvoicesReportRouteImport.update({
+  id: '/invoices_/report',
+  path: '/invoices/report',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiPublicAppIconRoute = ApiPublicAppIconRouteImport.update({
@@ -186,11 +208,23 @@ const ApiPublicN8nCommandRoute = ApiPublicN8nCommandRouteImport.update({
   path: '/api/public/n8n/command',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicN8nInvoicesDueEmailRoute =
+  ApiPublicN8nInvoicesDueEmailRouteImport.update({
+    id: '/api/public/n8n/invoices-due-email',
+    path: '/api/public/n8n/invoices-due-email',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicN8nMessageRoute = ApiPublicN8nMessageRouteImport.update({
   id: '/api/public/n8n/message',
   path: '/api/public/n8n/message',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicN8nNotificationsRoute =
+  ApiPublicN8nNotificationsRouteImport.update({
+    id: '/api/public/n8n/notifications',
+    path: '/api/public/n8n/notifications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicN8nOcrRoute = ApiPublicN8nOcrRouteImport.update({
   id: '/api/public/n8n/ocr',
   path: '/api/public/n8n/ocr',
@@ -229,6 +263,17 @@ const ApiPublicN8nTransactionsRoute =
     path: '/api/public/n8n/transactions',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPaymentsMidtransRoute =
+  ApiPublicPaymentsMidtransRouteImport.update({
+    id: '/api/public/payments/midtrans',
+    path: '/api/public/payments/midtrans',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicPaymentsNotifyRoute = ApiPublicPaymentsNotifyRouteImport.update({
+  id: '/api/public/payments/notify',
+  path: '/api/public/payments/notify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTelegramWebhookRoute =
   ApiPublicTelegramWebhookRouteImport.update({
     id: '/api/public/telegram/webhook',
@@ -250,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/debts': typeof AppDebtsRoute
   '/goals': typeof AppGoalsRoute
   '/gold': typeof AppGoldRoute
+  '/invoices': typeof AppInvoicesRoute
   '/profile': typeof AppProfileRoute
   '/receivables': typeof AppReceivablesRoute
   '/recurring': typeof AppRecurringRoute
@@ -259,12 +305,16 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/subscriptions': typeof AppSubscriptionsRoute
   '/transactions': typeof AppTransactionsRoute
+  '/i/$token': typeof ITokenRoute
   '/accounts/$id': typeof AppAccountsIdRoute
+  '/invoices/report': typeof AppInvoicesReportRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
   '/api/public/n8n/command': typeof ApiPublicN8nCommandRoute
+  '/api/public/n8n/invoices-due-email': typeof ApiPublicN8nInvoicesDueEmailRoute
   '/api/public/n8n/message': typeof ApiPublicN8nMessageRoute
+  '/api/public/n8n/notifications': typeof ApiPublicN8nNotificationsRoute
   '/api/public/n8n/ocr': typeof ApiPublicN8nOcrRoute
   '/api/public/n8n/reminders': typeof ApiPublicN8nRemindersRoute
   '/api/public/n8n/reminders-email': typeof ApiPublicN8nRemindersEmailRoute
@@ -272,6 +322,8 @@ export interface FileRoutesByFullPath {
   '/api/public/n8n/report': typeof ApiPublicN8nReportRoute
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
+  '/api/public/payments/midtrans': typeof ApiPublicPaymentsMidtransRoute
+  '/api/public/payments/notify': typeof ApiPublicPaymentsNotifyRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -288,6 +340,7 @@ export interface FileRoutesByTo {
   '/debts': typeof AppDebtsRoute
   '/goals': typeof AppGoalsRoute
   '/gold': typeof AppGoldRoute
+  '/invoices': typeof AppInvoicesRoute
   '/profile': typeof AppProfileRoute
   '/receivables': typeof AppReceivablesRoute
   '/recurring': typeof AppRecurringRoute
@@ -297,12 +350,16 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/subscriptions': typeof AppSubscriptionsRoute
   '/transactions': typeof AppTransactionsRoute
+  '/i/$token': typeof ITokenRoute
   '/accounts/$id': typeof AppAccountsIdRoute
+  '/invoices/report': typeof AppInvoicesReportRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
   '/api/public/n8n/command': typeof ApiPublicN8nCommandRoute
+  '/api/public/n8n/invoices-due-email': typeof ApiPublicN8nInvoicesDueEmailRoute
   '/api/public/n8n/message': typeof ApiPublicN8nMessageRoute
+  '/api/public/n8n/notifications': typeof ApiPublicN8nNotificationsRoute
   '/api/public/n8n/ocr': typeof ApiPublicN8nOcrRoute
   '/api/public/n8n/reminders': typeof ApiPublicN8nRemindersRoute
   '/api/public/n8n/reminders-email': typeof ApiPublicN8nRemindersEmailRoute
@@ -310,6 +367,8 @@ export interface FileRoutesByTo {
   '/api/public/n8n/report': typeof ApiPublicN8nReportRoute
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
+  '/api/public/payments/midtrans': typeof ApiPublicPaymentsMidtransRoute
+  '/api/public/payments/notify': typeof ApiPublicPaymentsNotifyRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesById {
@@ -328,6 +387,7 @@ export interface FileRoutesById {
   '/_app/debts': typeof AppDebtsRoute
   '/_app/goals': typeof AppGoalsRoute
   '/_app/gold': typeof AppGoldRoute
+  '/_app/invoices': typeof AppInvoicesRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/receivables': typeof AppReceivablesRoute
   '/_app/recurring': typeof AppRecurringRoute
@@ -337,12 +397,16 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/subscriptions': typeof AppSubscriptionsRoute
   '/_app/transactions': typeof AppTransactionsRoute
+  '/i/$token': typeof ITokenRoute
   '/_app/accounts_/$id': typeof AppAccountsIdRoute
+  '/_app/invoices_/report': typeof AppInvoicesReportRoute
   '/api/public/app-icon': typeof ApiPublicAppIconRoute
   '/api/public/n8n/backup': typeof ApiPublicN8nBackupRoute
   '/api/public/n8n/bot': typeof ApiPublicN8nBotRoute
   '/api/public/n8n/command': typeof ApiPublicN8nCommandRoute
+  '/api/public/n8n/invoices-due-email': typeof ApiPublicN8nInvoicesDueEmailRoute
   '/api/public/n8n/message': typeof ApiPublicN8nMessageRoute
+  '/api/public/n8n/notifications': typeof ApiPublicN8nNotificationsRoute
   '/api/public/n8n/ocr': typeof ApiPublicN8nOcrRoute
   '/api/public/n8n/reminders': typeof ApiPublicN8nRemindersRoute
   '/api/public/n8n/reminders-email': typeof ApiPublicN8nRemindersEmailRoute
@@ -350,6 +414,8 @@ export interface FileRoutesById {
   '/api/public/n8n/report': typeof ApiPublicN8nReportRoute
   '/api/public/n8n/summary': typeof ApiPublicN8nSummaryRoute
   '/api/public/n8n/transactions': typeof ApiPublicN8nTransactionsRoute
+  '/api/public/payments/midtrans': typeof ApiPublicPaymentsMidtransRoute
+  '/api/public/payments/notify': typeof ApiPublicPaymentsNotifyRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRouteTypes {
@@ -368,6 +434,7 @@ export interface FileRouteTypes {
     | '/debts'
     | '/goals'
     | '/gold'
+    | '/invoices'
     | '/profile'
     | '/receivables'
     | '/recurring'
@@ -377,12 +444,16 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscriptions'
     | '/transactions'
+    | '/i/$token'
     | '/accounts/$id'
+    | '/invoices/report'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
     | '/api/public/n8n/command'
+    | '/api/public/n8n/invoices-due-email'
     | '/api/public/n8n/message'
+    | '/api/public/n8n/notifications'
     | '/api/public/n8n/ocr'
     | '/api/public/n8n/reminders'
     | '/api/public/n8n/reminders-email'
@@ -390,6 +461,8 @@ export interface FileRouteTypes {
     | '/api/public/n8n/report'
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
+    | '/api/public/payments/midtrans'
+    | '/api/public/payments/notify'
     | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -406,6 +479,7 @@ export interface FileRouteTypes {
     | '/debts'
     | '/goals'
     | '/gold'
+    | '/invoices'
     | '/profile'
     | '/receivables'
     | '/recurring'
@@ -415,12 +489,16 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscriptions'
     | '/transactions'
+    | '/i/$token'
     | '/accounts/$id'
+    | '/invoices/report'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
     | '/api/public/n8n/command'
+    | '/api/public/n8n/invoices-due-email'
     | '/api/public/n8n/message'
+    | '/api/public/n8n/notifications'
     | '/api/public/n8n/ocr'
     | '/api/public/n8n/reminders'
     | '/api/public/n8n/reminders-email'
@@ -428,6 +506,8 @@ export interface FileRouteTypes {
     | '/api/public/n8n/report'
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
+    | '/api/public/payments/midtrans'
+    | '/api/public/payments/notify'
     | '/api/public/telegram/webhook'
   id:
     | '__root__'
@@ -445,6 +525,7 @@ export interface FileRouteTypes {
     | '/_app/debts'
     | '/_app/goals'
     | '/_app/gold'
+    | '/_app/invoices'
     | '/_app/profile'
     | '/_app/receivables'
     | '/_app/recurring'
@@ -454,12 +535,16 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/subscriptions'
     | '/_app/transactions'
+    | '/i/$token'
     | '/_app/accounts_/$id'
+    | '/_app/invoices_/report'
     | '/api/public/app-icon'
     | '/api/public/n8n/backup'
     | '/api/public/n8n/bot'
     | '/api/public/n8n/command'
+    | '/api/public/n8n/invoices-due-email'
     | '/api/public/n8n/message'
+    | '/api/public/n8n/notifications'
     | '/api/public/n8n/ocr'
     | '/api/public/n8n/reminders'
     | '/api/public/n8n/reminders-email'
@@ -467,6 +552,8 @@ export interface FileRouteTypes {
     | '/api/public/n8n/report'
     | '/api/public/n8n/summary'
     | '/api/public/n8n/transactions'
+    | '/api/public/payments/midtrans'
+    | '/api/public/payments/notify'
     | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -479,11 +566,14 @@ export interface RootRouteChildren {
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
+  ITokenRoute: typeof ITokenRoute
   ApiPublicAppIconRoute: typeof ApiPublicAppIconRoute
   ApiPublicN8nBackupRoute: typeof ApiPublicN8nBackupRoute
   ApiPublicN8nBotRoute: typeof ApiPublicN8nBotRoute
   ApiPublicN8nCommandRoute: typeof ApiPublicN8nCommandRoute
+  ApiPublicN8nInvoicesDueEmailRoute: typeof ApiPublicN8nInvoicesDueEmailRoute
   ApiPublicN8nMessageRoute: typeof ApiPublicN8nMessageRoute
+  ApiPublicN8nNotificationsRoute: typeof ApiPublicN8nNotificationsRoute
   ApiPublicN8nOcrRoute: typeof ApiPublicN8nOcrRoute
   ApiPublicN8nRemindersRoute: typeof ApiPublicN8nRemindersRoute
   ApiPublicN8nRemindersEmailRoute: typeof ApiPublicN8nRemindersEmailRoute
@@ -491,6 +581,8 @@ export interface RootRouteChildren {
   ApiPublicN8nReportRoute: typeof ApiPublicN8nReportRoute
   ApiPublicN8nSummaryRoute: typeof ApiPublicN8nSummaryRoute
   ApiPublicN8nTransactionsRoute: typeof ApiPublicN8nTransactionsRoute
+  ApiPublicPaymentsMidtransRoute: typeof ApiPublicPaymentsMidtransRoute
+  ApiPublicPaymentsNotifyRoute: typeof ApiPublicPaymentsNotifyRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
 
@@ -594,6 +686,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppGoldRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/invoices': {
+      id: '/_app/invoices'
+      path: '/invoices'
+      fullPath: '/invoices'
+      preLoaderRoute: typeof AppInvoicesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/profile': {
       id: '/_app/profile'
       path: '/profile'
@@ -657,11 +756,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTransactionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/i/$token': {
+      id: '/i/$token'
+      path: '/i/$token'
+      fullPath: '/i/$token'
+      preLoaderRoute: typeof ITokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/accounts_/$id': {
       id: '/_app/accounts_/$id'
       path: '/accounts/$id'
       fullPath: '/accounts/$id'
       preLoaderRoute: typeof AppAccountsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/invoices_/report': {
+      id: '/_app/invoices_/report'
+      path: '/invoices/report'
+      fullPath: '/invoices/report'
+      preLoaderRoute: typeof AppInvoicesReportRouteImport
       parentRoute: typeof AppRoute
     }
     '/api/public/app-icon': {
@@ -692,11 +805,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicN8nCommandRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/n8n/invoices-due-email': {
+      id: '/api/public/n8n/invoices-due-email'
+      path: '/api/public/n8n/invoices-due-email'
+      fullPath: '/api/public/n8n/invoices-due-email'
+      preLoaderRoute: typeof ApiPublicN8nInvoicesDueEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/n8n/message': {
       id: '/api/public/n8n/message'
       path: '/api/public/n8n/message'
       fullPath: '/api/public/n8n/message'
       preLoaderRoute: typeof ApiPublicN8nMessageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/n8n/notifications': {
+      id: '/api/public/n8n/notifications'
+      path: '/api/public/n8n/notifications'
+      fullPath: '/api/public/n8n/notifications'
+      preLoaderRoute: typeof ApiPublicN8nNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/n8n/ocr': {
@@ -748,6 +875,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicN8nTransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/midtrans': {
+      id: '/api/public/payments/midtrans'
+      path: '/api/public/payments/midtrans'
+      fullPath: '/api/public/payments/midtrans'
+      preLoaderRoute: typeof ApiPublicPaymentsMidtransRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/payments/notify': {
+      id: '/api/public/payments/notify'
+      path: '/api/public/payments/notify'
+      fullPath: '/api/public/payments/notify'
+      preLoaderRoute: typeof ApiPublicPaymentsNotifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/telegram/webhook': {
       id: '/api/public/telegram/webhook'
       path: '/api/public/telegram/webhook'
@@ -765,6 +906,7 @@ interface AppRouteChildren {
   AppDebtsRoute: typeof AppDebtsRoute
   AppGoalsRoute: typeof AppGoalsRoute
   AppGoldRoute: typeof AppGoldRoute
+  AppInvoicesRoute: typeof AppInvoicesRoute
   AppProfileRoute: typeof AppProfileRoute
   AppReceivablesRoute: typeof AppReceivablesRoute
   AppRecurringRoute: typeof AppRecurringRoute
@@ -775,6 +917,7 @@ interface AppRouteChildren {
   AppSubscriptionsRoute: typeof AppSubscriptionsRoute
   AppTransactionsRoute: typeof AppTransactionsRoute
   AppAccountsIdRoute: typeof AppAccountsIdRoute
+  AppInvoicesReportRoute: typeof AppInvoicesReportRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -784,6 +927,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDebtsRoute: AppDebtsRoute,
   AppGoalsRoute: AppGoalsRoute,
   AppGoldRoute: AppGoldRoute,
+  AppInvoicesRoute: AppInvoicesRoute,
   AppProfileRoute: AppProfileRoute,
   AppReceivablesRoute: AppReceivablesRoute,
   AppRecurringRoute: AppRecurringRoute,
@@ -794,6 +938,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSubscriptionsRoute: AppSubscriptionsRoute,
   AppTransactionsRoute: AppTransactionsRoute,
   AppAccountsIdRoute: AppAccountsIdRoute,
+  AppInvoicesReportRoute: AppInvoicesReportRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -807,11 +952,14 @@ const rootRouteChildren: RootRouteChildren = {
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
+  ITokenRoute: ITokenRoute,
   ApiPublicAppIconRoute: ApiPublicAppIconRoute,
   ApiPublicN8nBackupRoute: ApiPublicN8nBackupRoute,
   ApiPublicN8nBotRoute: ApiPublicN8nBotRoute,
   ApiPublicN8nCommandRoute: ApiPublicN8nCommandRoute,
+  ApiPublicN8nInvoicesDueEmailRoute: ApiPublicN8nInvoicesDueEmailRoute,
   ApiPublicN8nMessageRoute: ApiPublicN8nMessageRoute,
+  ApiPublicN8nNotificationsRoute: ApiPublicN8nNotificationsRoute,
   ApiPublicN8nOcrRoute: ApiPublicN8nOcrRoute,
   ApiPublicN8nRemindersRoute: ApiPublicN8nRemindersRoute,
   ApiPublicN8nRemindersEmailRoute: ApiPublicN8nRemindersEmailRoute,
@@ -819,6 +967,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicN8nReportRoute: ApiPublicN8nReportRoute,
   ApiPublicN8nSummaryRoute: ApiPublicN8nSummaryRoute,
   ApiPublicN8nTransactionsRoute: ApiPublicN8nTransactionsRoute,
+  ApiPublicPaymentsMidtransRoute: ApiPublicPaymentsMidtransRoute,
+  ApiPublicPaymentsNotifyRoute: ApiPublicPaymentsNotifyRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport

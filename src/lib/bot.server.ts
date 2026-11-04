@@ -30,6 +30,7 @@ import { withTax } from "./fees";
 import { subMonthly } from "./subscriptions";
 import { isChatAllowed } from "./integrations";
 import { groupAddress, isGroupChat } from "./bot-group";
+import { scopeIds } from "./permissions";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const fin = () => import("./finance.server");
@@ -639,6 +640,7 @@ async function txIn(
   start: string,
   end: string,
   kind?: string,
+  scope?: readonly string[] | null,
 ): Promise<{ rows: TxLite[]; truncated: boolean }> {
   const page = (from: number, to: number) => {
     let q = db()
@@ -648,6 +650,9 @@ async function txIn(
       .lt("occurred_at", end)
       .neq("kind", "transfer");
     if (kind) q = q.eq("kind", kind as TxKind);
+    // v22 member notifications: income/expense recorded on the member's wallets (same rule as the
+    // member Laporan/dashboard, `fetchAggTx(..., { scope })`); transfers stay excluded.
+    if (scope) q = q.in("account_id", scopeIds(scope));
     // Tie-break on id so pages are stable when many rows share a date.
     return q.order("occurred_at", { ascending: false }).order("id").range(from, to);
   };
@@ -671,17 +676,26 @@ const shortDay = (d: string) =>
     new Date(d + "T00:00:00Z"),
   );
 
-export async function reportData(spec: string) {
+/**
+ * Options for scoped (v22 member notification) reports. No options = the global report, unchanged.
+ * `scope` is always computed server-side from the member's grants, never from request input.
+ */
+export type ReportOpts = { scope?: readonly string[] | null; skipLazy?: boolean };
+
+export async function reportData(spec: string, opts: ReportOpts = {}) {
   const f = await fin();
   const today = f.today();
   const p = resolvePeriod(spec, today);
   if (!p) return null;
-  await f.applyMonthlyFees();
-  await f.applyRecurringLazy();
+  if (!opts.skipLazy) {
+    await f.applyMonthlyFees();
+    await f.applyRecurringLazy();
+  }
   const prev = previousRange(p);
+  const scope = opts.scope ?? null;
   const [cur, prevRes] = await Promise.all([
-    txIn(p.start, p.end),
-    txIn(prev.start, prev.end, "expense"),
+    txIn(p.start, p.end, undefined, scope),
+    txIn(prev.start, prev.end, "expense", scope),
   ]);
   const rows = cur.rows;
   const prevRows = prevRes.rows;
@@ -714,8 +728,8 @@ export async function reportData(spec: string) {
   };
 }
 
-export async function reportText(spec: string): Promise<string> {
-  const d = await reportData(spec);
+export async function reportText(spec: string, opts: ReportOpts = {}): Promise<string> {
+  const d = await reportData(spec, opts);
   if (!d) return "❓ Periode tidak dikenali. Contoh: /bulan 2026-05, atau /pengeluaran minggu.";
   const lines = [`📊 Laporan ${d.period.label}`, "", `💰 Pemasukan: ${idr(d.income)}`];
   const chg =
@@ -748,7 +762,7 @@ export async function reportText(spec: string): Promise<string> {
     /^\d{4}-\d{2}$/.test(d.period.key) ||
     d.period.key === "lastmonth"
   ) {
-    const bal = await balanceRows();
+    const bal = await balanceRows(opts.scope ?? null);
     lines.push("", `🏦 Total saldo saat ini: ${idr(bal.total)}`);
   }
   return lines.join("\n");
@@ -773,11 +787,11 @@ export async function listText(kind: "income" | "expense", spec: string): Promis
   return lines.join("\n");
 }
 
-async function balanceRows() {
+async function balanceRows(scope: readonly string[] | null = null) {
   const f = await fin();
-  const rows = ((
-    await db().from("account_balances").select("*").eq("archived", false).order("name")
-  ).data ?? []) as any[];
+  let q = db().from("account_balances").select("*").eq("archived", false);
+  if (scope) q = q.in("id", scopeIds(scope));
+  const rows = ((await q.order("name")).data ?? []) as any[];
   const rate = rows.some((a) => a.currency === "USD") ? await f.getUsdIdr() : 1;
   const total = rows.reduce((a, r) => a + Number(r.balance) * (r.currency === "USD" ? rate : 1), 0);
   return { rows, total };

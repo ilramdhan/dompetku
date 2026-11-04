@@ -53,12 +53,6 @@ export function isDemoWrite(method: string, handlerType: string): boolean {
   return handlerType === "serverFn" && method.toUpperCase() === "POST";
 }
 
-/** Best-effort client IP from proxy headers (Vercel sets x-forwarded-for / x-real-ip). */
-export function clientIp(headers: Headers): string {
-  const fwd = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return fwd || headers.get("x-real-ip")?.trim() || "unknown";
-}
-
 /**
  * In-memory sliding-window rate limiter. State lives in one server instance only, so on
  * serverless platforms each warm instance counts separately — a soft limit, not a hard quota.

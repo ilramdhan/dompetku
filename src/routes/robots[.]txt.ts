@@ -9,7 +9,7 @@ export const Route = createFileRoute("/robots.txt")({
       GET: withErrorLogging("public:robots", async () => {
         const { seoConfig } = await import("@/lib/seo.server");
         const { robotsTxt } = await import("@/lib/seo");
-        return new Response(robotsTxt(seoConfig()), {
+        return new Response(robotsTxt(await seoConfig()), {
           headers: {
             "content-type": "text/plain; charset=utf-8",
             "cache-control": "public, max-age=3600",
