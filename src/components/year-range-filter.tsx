@@ -29,6 +29,7 @@ export function YearRangeFilter({ value, customStart, customEnd, onChange }: Pro
 
   const handleSelect = (range: YearRange) => {
     if (range === "custom") {
+      onChange("custom", customStart, customEnd);
       setOpen(true);
     } else {
       onChange(range);
